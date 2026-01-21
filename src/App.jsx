@@ -1,10 +1,21 @@
-// TODO: implement
-
+import { useEffect } from 'react';
 import Viewer3D from './components/Viewer3D';
 import BopTable from './components/BopTable';
 import UnifiedChatPanel from './components/UnifiedChatPanel';
+import useBopStore from './store/bopStore';
+import { mockBopData } from './data/mockBopData';
 
 function App() {
+  const { bopData, setBopData } = useBopStore();
+
+  // Load mock data on initial mount if no BOP data exists
+  useEffect(() => {
+    if (!bopData) {
+      console.log('[APP] Loading mock BOP data...');
+      setBopData(mockBopData);
+    }
+  }, []);
+
   return (
     <div style={styles.container}>
       {/* 왼쪽: BOP 테이블 */}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import useBopStore from '../store/bopStore';
 import { api } from '../services/api';
 
@@ -6,28 +6,11 @@ function BopTable() {
   const {
     bopData,
     selectedProcessId,
-    selectedOperationId,
-    expandedProcessIds,
     setSelectedProcess,
-    setSelectedOperation,
-    toggleProcessExpand,
-    expandAllProcesses,
-    collapseAllProcesses,
     getEquipmentById,
-    getWorkerById
+    getWorkerById,
+    getMaterialById
   } = useBopStore();
-
-  const selectedOperationRef = useRef(null);
-
-  // 선택된 operation으로 스크롤
-  useEffect(() => {
-    if (selectedOperationId && selectedOperationRef.current) {
-      selectedOperationRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center'
-      });
-    }
-  }, [selectedOperationId]);
 
   const [exportLoading, setExportLoading] = useState(false);
   const [exportError, setExportError] = useState('');
@@ -80,28 +63,35 @@ function BopTable() {
   }
 
   // Helper functions
-  const isProcessExpanded = (processId) => expandedProcessIds.has(processId);
+  const getResourcesByType = (process) => {
+    const equipments = [];
+    const workers = [];
+    const materials = [];
 
-  const getEquipmentName = (equipmentId) => {
-    if (!equipmentId) return '-';
-    const equipment = getEquipmentById(equipmentId);
-    return equipment ? equipment.name : equipmentId;
+    process.resources.forEach(resource => {
+      if (resource.resource_type === 'equipment') {
+        const eq = getEquipmentById(resource.resource_id);
+        if (eq) {
+          equipments.push({ ...eq, quantity: resource.quantity, role: resource.role });
+        }
+      } else if (resource.resource_type === 'worker') {
+        const worker = getWorkerById(resource.resource_id);
+        if (worker) {
+          workers.push({ ...worker, quantity: resource.quantity, role: resource.role });
+        }
+      } else if (resource.resource_type === 'material') {
+        const material = getMaterialById(resource.resource_id);
+        if (material) {
+          materials.push({ ...material, quantity: resource.quantity, role: resource.role });
+        }
+      }
+    });
+
+    return { equipments, workers, materials };
   };
 
-  const getWorkerNames = (workerIds) => {
-    if (!workerIds || workerIds.length === 0) return '-';
-    return workerIds.map(id => {
-      const worker = getWorkerById(id);
-      return worker ? worker.name : id;
-    }).join(', ');
-  };
-
-  const getEquipmentTypeColor = (equipmentId) => {
-    if (!equipmentId) return '#888';
-    const equipment = getEquipmentById(equipmentId);
-    if (!equipment) return '#888';
-
-    switch (equipment.type) {
+  const getEquipmentTypeColor = (equipmentType) => {
+    switch (equipmentType) {
       case 'robot': return '#4a90e2';
       case 'machine': return '#ff6b6b';
       case 'manual_station': return '#50c878';
@@ -109,19 +99,9 @@ function BopTable() {
     }
   };
 
-  const formatMaterials = (materials) => {
-    if (!materials || materials.length === 0) return '-';
-    return materials.map(m => `${m.name} (${m.quantity}${m.unit})`).join(', ');
-  };
-
-  // Calculate total cycle time for a process
-  const getProcessTotalCycleTime = (process) => {
-    return process.operations.reduce((sum, op) => sum + op.cycle_time_sec, 0);
-  };
-
-  const getProcessEffectiveCycleTime = (process) => {
-    const total = getProcessTotalCycleTime(process);
-    return process.parallel_count > 0 ? total / process.parallel_count : total;
+  const formatResources = (resources, formatter) => {
+    if (!resources || resources.length === 0) return '-';
+    return resources.map(formatter).join(', ');
   };
 
   // Calculate bottleneck
@@ -130,7 +110,7 @@ function BopTable() {
     let bottleneckProcess = null;
 
     bopData.processes.forEach(process => {
-      const effectiveTime = getProcessEffectiveCycleTime(process);
+      const effectiveTime = process.cycle_time_sec / process.parallel_count;
       if (effectiveTime > maxTime) {
         maxTime = effectiveTime;
         bottleneckProcess = process;
@@ -141,7 +121,6 @@ function BopTable() {
   };
 
   const bottleneck = getBottleneck();
-  const allExpanded = bopData.processes.every(p => isProcessExpanded(p.process_id));
 
   return (
     <div style={styles.container}>
@@ -151,164 +130,110 @@ function BopTable() {
         <div style={styles.uph}>Target: {bopData.target_uph} UPH</div>
       </div>
 
-      {/* Expand/Collapse Controls */}
-      <div style={styles.controls}>
-        <button
-          style={styles.controlButton}
-          onClick={() => allExpanded ? collapseAllProcesses() : expandAllProcesses()}
-        >
-          {allExpanded ? '▼ Collapse All' : '▶ Expand All'}
-        </button>
-      </div>
-
       {/* Table */}
       <div style={styles.tableWrapper}>
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={{ ...styles.th, width: '40px' }}></th>
-              <th style={{ ...styles.th, width: '100px' }}>ID</th>
+              <th style={{ ...styles.th, width: '80px' }}>ID</th>
               <th style={{ ...styles.th, minWidth: '150px' }}>Name</th>
               <th style={{ ...styles.th, minWidth: '100px' }}>Cycle Time</th>
-              <th style={{ ...styles.th, minWidth: '150px' }}>Equipment</th>
+              <th style={{ ...styles.th, minWidth: '80px' }}>Parallel</th>
+              <th style={{ ...styles.th, minWidth: '150px' }}>Equipments</th>
               <th style={{ ...styles.th, minWidth: '120px' }}>Workers</th>
               <th style={{ ...styles.th, minWidth: '200px' }}>Materials</th>
             </tr>
           </thead>
           <tbody>
             {bopData.processes.map((process) => {
-              const isExpanded = isProcessExpanded(process.process_id);
               const isProcessSelected = selectedProcessId === process.process_id;
-              const totalCycleTime = getProcessTotalCycleTime(process);
-              const effectiveCycleTime = getProcessEffectiveCycleTime(process);
+              const effectiveCycleTime = process.cycle_time_sec / process.parallel_count;
               const isBottleneck = bottleneck.process?.process_id === process.process_id;
+              const { equipments, workers, materials } = getResourcesByType(process);
 
-              return (
-                <>
-                  {/* Process Row */}
+              // 병렬 라인 수만큼 row 생성
+              const rows = [];
+              for (let i = 0; i < process.parallel_count; i++) {
+                const isFirstRow = i === 0;
+                rows.push(
                   <tr
-                    key={process.process_id}
+                    key={`${process.process_id}-${i}`}
                     style={{
                       ...styles.processRow,
                       ...(isProcessSelected ? styles.processRowSelected : {}),
-                      ...(isBottleneck ? styles.bottleneckRow : {})
+                      ...(isBottleneck && isFirstRow ? styles.bottleneckRow : {}),
+                      ...(isFirstRow ? {} : styles.parallelRow)
                     }}
-                    onClick={() => {
-                      setSelectedProcess(process.process_id);
-                      toggleProcessExpand(process.process_id);
-                    }}
+                    onClick={() => setSelectedProcess(process.process_id)}
                   >
-                    <td style={styles.td}>
-                      <button style={styles.expandButton}>
-                        {isExpanded ? '▼' : '▶'}
-                      </button>
-                    </td>
-                    <td style={styles.td}>
-                      <strong>{process.process_id}</strong>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={styles.processName}>
-                        <strong>{process.name}</strong>
-                        {process.parallel_count > 1 && (
-                          <span style={styles.parallelBadge}>
-                            {process.parallel_count}x Parallel
-                          </span>
-                        )}
-                        {isBottleneck && (
-                          <span style={styles.bottleneckBadge}>
-                            🔴 Bottleneck
-                          </span>
-                        )}
-                      </div>
-                      <div style={styles.processDescription}>{process.description}</div>
-                    </td>
-                    <td style={styles.td}>
-                      <div style={styles.cycleTimeInfo}>
-                        <div>Total: <strong>{totalCycleTime.toFixed(1)}s</strong></div>
-                        <div style={styles.effectiveTime}>
-                          Effective: <strong>{effectiveCycleTime.toFixed(1)}s</strong>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={styles.td} colSpan="3">
-                      <span style={styles.operationCount}>
-                        {process.operations.length} operation{process.operations.length !== 1 ? 's' : ''}
-                      </span>
-                    </td>
-                  </tr>
-
-                  {/* Operations Rows (if expanded) */}
-                  {isExpanded && process.operations.map((operation) => {
-                    const isOperationSelected = selectedOperationId === operation.operation_id;
-                    const equipmentColor = getEquipmentTypeColor(operation.equipment_id);
-
-                    return (
-                      <tr
-                        key={operation.operation_id}
-                        ref={isOperationSelected ? selectedOperationRef : null}
-                        style={{
-                          ...styles.operationRow,
-                          ...(isOperationSelected ? styles.operationRowSelected : {})
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedOperation(operation.operation_id);
-                        }}
-                      >
-                        <td style={styles.td}></td>
+                    {isFirstRow ? (
+                      <>
                         <td style={styles.td}>
-                          <span style={styles.operationId}>↳ {operation.operation_id}</span>
+                          <strong>{process.process_id}</strong>
                         </td>
                         <td style={styles.td}>
-                          <div style={styles.operationName}>{operation.name}</div>
-                          <div style={styles.operationDescription}>{operation.description}</div>
-                        </td>
-                        <td style={styles.td}>
-                          <span style={styles.cycleTime}>{operation.cycle_time_sec}s</span>
-                        </td>
-                        <td style={styles.td}>
-                          <span
-                            style={{
-                              ...styles.equipmentBadge,
-                              borderColor: equipmentColor
-                            }}
-                          >
-                            {getEquipmentName(operation.equipment_id)}
-                          </span>
-                        </td>
-                        <td style={styles.td}>
-                          <span style={styles.workerText}>
-                            {getWorkerNames(operation.worker_ids)}
-                          </span>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.materialsCell}>
-                            {operation.input_materials.length > 0 && (
-                              <div style={styles.materialSection}>
-                                <span style={styles.materialLabel}>In:</span>
-                                <span style={styles.materialText}>
-                                  {formatMaterials(operation.input_materials)}
-                                </span>
-                              </div>
+                          <div style={styles.processName}>
+                            <strong>{process.name}</strong>
+                            {process.parallel_count > 1 && (
+                              <span style={styles.parallelBadge}>
+                                {process.parallel_count}x
+                              </span>
                             )}
-                            {operation.output_materials.length > 0 && (
-                              <div style={styles.materialSection}>
-                                <span style={styles.materialLabel}>Out:</span>
-                                <span style={styles.materialText}>
-                                  {formatMaterials(operation.output_materials)}
-                                </span>
-                              </div>
+                            {isBottleneck && (
+                              <span style={styles.bottleneckBadge}>
+                                🔴 Bottleneck
+                              </span>
                             )}
-                            {operation.input_materials.length === 0 && operation.output_materials.length === 0 && (
-                              <span style={styles.materialText}>-</span>
+                          </div>
+                          <div style={styles.processDescription}>{process.description}</div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.cycleTimeInfo}>
+                            <div><strong>{process.cycle_time_sec.toFixed(1)}s</strong></div>
+                            <div style={styles.effectiveTime}>
+                              Eff: <strong>{effectiveCycleTime.toFixed(1)}s</strong>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.parallelCount}>{process.parallel_count}</span>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.resourcesCell}>
+                            {formatResources(equipments, eq =>
+                              `${eq.name} (x${eq.quantity})`
                             )}
                           </div>
                         </td>
-                      </tr>
-                    );
-                  })}
-                </>
-              );
+                        <td style={styles.td}>
+                          <div style={styles.resourcesCell}>
+                            {formatResources(workers, w =>
+                              `${w.name} (x${w.quantity})`
+                            )}
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.resourcesCell}>
+                            {formatResources(materials, m =>
+                              `${m.name} (${m.quantity}${m.unit})`
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td style={styles.td}>
+                          <span style={styles.parallelLabel}>└ #{i + 1}</span>
+                        </td>
+                        <td style={styles.td} colSpan="6">
+                          <span style={styles.parallelLineText}>(병렬 라인 #{i + 1})</span>
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                );
+              }
+              return rows;
             })}
           </tbody>
         </table>
@@ -321,18 +246,16 @@ function BopTable() {
           <span style={styles.summaryValue}>{bopData.processes.length}</span>
         </div>
         <div style={styles.summaryItem}>
-          <span style={styles.summaryLabel}>Total Operations:</span>
-          <span style={styles.summaryValue}>
-            {bopData.processes.reduce((sum, p) => sum + p.operations.length, 0)}
-          </span>
-        </div>
-        <div style={styles.summaryItem}>
           <span style={styles.summaryLabel}>Equipments:</span>
-          <span style={styles.summaryValue}>{bopData.equipments.length}</span>
+          <span style={styles.summaryValue}>{bopData.equipments?.length || 0}</span>
         </div>
         <div style={styles.summaryItem}>
           <span style={styles.summaryLabel}>Workers:</span>
-          <span style={styles.summaryValue}>{bopData.workers.length}</span>
+          <span style={styles.summaryValue}>{bopData.workers?.length || 0}</span>
+        </div>
+        <div style={styles.summaryItem}>
+          <span style={styles.summaryLabel}>Materials:</span>
+          <span style={styles.summaryValue}>{bopData.materials?.length || 0}</span>
         </div>
         <div style={styles.summaryItem}>
           <span style={styles.summaryLabel}>Bottleneck Time:</span>
@@ -403,20 +326,6 @@ const styles = {
     color: '#4a90e2',
     fontWeight: 'bold',
   },
-  controls: {
-    padding: '10px 20px',
-    borderBottom: '1px solid #eee',
-    backgroundColor: '#f5f5f5',
-  },
-  controlButton: {
-    padding: '6px 12px',
-    fontSize: '12px',
-    backgroundColor: 'white',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-  },
   tableWrapper: {
     flex: 1,
     overflow: 'auto',
@@ -440,7 +349,7 @@ const styles = {
     zIndex: 1,
   },
   processRow: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f8f8f8',
     borderBottom: '1px solid #ddd',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
@@ -452,26 +361,12 @@ const styles = {
   bottleneckRow: {
     backgroundColor: '#fff3e0',
   },
-  operationRow: {
+  parallelRow: {
     backgroundColor: '#fafafa',
-    borderBottom: '1px solid #eee',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-  },
-  operationRowSelected: {
-    backgroundColor: '#fff9c4',
-    borderLeft: '4px solid #ffc107',
   },
   td: {
     padding: '10px 8px',
     verticalAlign: 'top',
-  },
-  expandButton: {
-    background: 'none',
-    border: 'none',
-    fontSize: '12px',
-    cursor: 'pointer',
-    padding: '4px',
   },
   processName: {
     display: 'flex',
@@ -509,27 +404,9 @@ const styles = {
   effectiveTime: {
     color: '#4a90e2',
     marginTop: '2px',
-  },
-  operationCount: {
-    color: '#666',
-    fontSize: '12px',
-    fontStyle: 'italic',
-  },
-  operationId: {
-    color: '#666',
-    fontSize: '12px',
-    fontFamily: 'monospace',
-  },
-  operationName: {
-    fontWeight: '500',
-    marginBottom: '2px',
-  },
-  operationDescription: {
     fontSize: '11px',
-    color: '#777',
-    fontStyle: 'italic',
   },
-  cycleTime: {
+  parallelCount: {
     display: 'inline-block',
     padding: '4px 8px',
     backgroundColor: '#e8f4f8',
@@ -537,31 +414,18 @@ const styles = {
     fontWeight: 'bold',
     color: '#4a90e2',
   },
-  equipmentBadge: {
-    display: 'inline-block',
-    padding: '4px 8px',
-    border: '2px solid',
-    borderRadius: '4px',
+  parallelLabel: {
+    color: '#999',
     fontSize: '11px',
-    fontWeight: '500',
+    fontFamily: 'monospace',
   },
-  workerText: {
+  parallelLineText: {
+    color: '#999',
+    fontSize: '11px',
+    fontStyle: 'italic',
+  },
+  resourcesCell: {
     fontSize: '12px',
-    color: '#50c878',
-    fontWeight: '500',
-  },
-  materialsCell: {
-    fontSize: '11px',
-  },
-  materialSection: {
-    marginBottom: '2px',
-  },
-  materialLabel: {
-    fontWeight: 'bold',
-    marginRight: '4px',
-    color: '#666',
-  },
-  materialText: {
     color: '#555',
   },
   summary: {

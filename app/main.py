@@ -105,10 +105,10 @@ async def unified_chat_endpoint(req: UnifiedChatRequest) -> UnifiedChatResponse:
 @app.post("/api/export/excel")
 async def export_excel(bop: BOPData):
     """
-    계층적 BOP 데이터를 Excel 파일로 내보냅니다.
+    BOP 데이터를 Excel 파일로 내보냅니다.
 
-    Sheet 1: Project Info + Equipment List + Worker List
-    Sheet 2: Hierarchical BOP (Processes & Operations)
+    Sheet 1: Overview (Project Info + Resource Masters)
+    Sheet 2: BOP Processes
     """
     try:
         wb = Workbook()
@@ -124,12 +124,12 @@ async def export_excel(bop: BOPData):
         ws_overview.append(["Target UPH", bop.target_uph])
         ws_overview.append([])
 
-        # Equipment List
-        ws_overview.append(["Equipment List"])
+        # Equipment Master
+        ws_overview.append(["Equipment Master"])
         ws_overview[f'A{ws_overview.max_row}'].font = Font(bold=True, size=12)
-        ws_overview.append(["Equipment ID", "Name", "Type", "Location (X, Y, Z)"])
+        ws_overview.append(["Equipment ID", "Name", "Type"])
         header_row = ws_overview.max_row
-        for col in range(1, 5):
+        for col in range(1, 4):
             ws_overview.cell(header_row, col).font = Font(bold=True)
             ws_overview.cell(header_row, col).fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
 
@@ -137,16 +137,15 @@ async def export_excel(bop: BOPData):
             ws_overview.append([
                 eq.equipment_id,
                 eq.name,
-                eq.type,
-                f"({eq.location.x}, {eq.location.y}, {eq.location.z})"
+                eq.type
             ])
 
         ws_overview.append([])
 
-        # Worker List
-        ws_overview.append(["Worker List"])
+        # Worker Master
+        ws_overview.append(["Worker Master"])
         ws_overview[f'A{ws_overview.max_row}'].font = Font(bold=True, size=12)
-        ws_overview.append(["Worker ID", "Name", "Location (X, Y, Z)"])
+        ws_overview.append(["Worker ID", "Name", "Skill Level"])
         header_row = ws_overview.max_row
         for col in range(1, 4):
             ws_overview.cell(header_row, col).font = Font(bold=True)
@@ -156,19 +155,38 @@ async def export_excel(bop: BOPData):
             ws_overview.append([
                 worker.worker_id,
                 worker.name,
-                f"({worker.location.x}, {worker.location.y}, {worker.location.z})"
+                worker.skill_level or "-"
             ])
 
-        # ==================== Sheet 2: BOP Hierarchy ====================
-        ws_bop = wb.create_sheet("BOP Hierarchy")
+        ws_overview.append([])
+
+        # Material Master
+        ws_overview.append(["Material Master"])
+        ws_overview[f'A{ws_overview.max_row}'].font = Font(bold=True, size=12)
+        ws_overview.append(["Material ID", "Name", "Unit"])
+        header_row = ws_overview.max_row
+        for col in range(1, 4):
+            ws_overview.cell(header_row, col).font = Font(bold=True)
+            ws_overview.cell(header_row, col).fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+
+        for material in bop.materials:
+            ws_overview.append([
+                material.material_id,
+                material.name,
+                material.unit
+            ])
+
+        # ==================== Sheet 2: BOP Processes ====================
+        ws_bop = wb.create_sheet("BOP Processes")
 
         # Header
         ws_bop.append([
-            "Process ID", "Process Name", "Parallel", "Operation ID",
-            "Operation Name", "Cycle Time (s)", "Equipment", "Workers", "Input Materials", "Output Materials"
+            "Process ID", "Name", "Description", "Cycle Time (s)", "Parallel Count",
+            "Effective Time (s)", "Location (X,Y,Z)", "Predecessors", "Successors",
+            "Equipments", "Workers", "Materials"
         ])
         header_row = 1
-        for col in range(1, 11):
+        for col in range(1, 13):
             ws_bop.cell(header_row, col).font = Font(bold=True)
             ws_bop.cell(header_row, col).fill = PatternFill(start_color="4a90e2", end_color="4a90e2", fill_type="solid")
             ws_bop.cell(header_row, col).font = Font(bold=True, color="FFFFFF")
@@ -176,96 +194,92 @@ async def export_excel(bop: BOPData):
 
         # Data
         for process in bop.processes:
-            # Process header row
-            process_start_row = ws_bop.max_row + 1
+            # 병렬 라인 수만큼 row 생성
+            for parallel_idx in range(process.parallel_count):
+                # 리소스 요약 생성
+                equipments_summary = []
+                workers_summary = []
+                materials_summary = []
 
-            # Calculate total and effective cycle times
-            total_cycle_time = sum(op.cycle_time_sec for op in process.operations)
-            effective_cycle_time = total_cycle_time / process.parallel_count if process.parallel_count > 0 else total_cycle_time
+                if hasattr(process, 'resources') and process.resources:
+                    for resource in process.resources:
+                        if resource.resource_type == "equipment":
+                            eq = next((e for e in bop.equipments if e.equipment_id == resource.resource_id), None)
+                            eq_name = eq.name if eq else resource.resource_id
+                            equipments_summary.append(f"{eq_name} (x{resource.quantity})")
+                        elif resource.resource_type == "worker":
+                            worker = next((w for w in bop.workers if w.worker_id == resource.resource_id), None)
+                            worker_name = worker.name if worker else resource.resource_id
+                            workers_summary.append(f"{worker_name} (x{resource.quantity})")
+                        elif resource.resource_type == "material":
+                            mat = next((m for m in bop.materials if m.material_id == resource.resource_id), None)
+                            mat_name = mat.name if mat else resource.resource_id
+                            unit = mat.unit if mat else "ea"
+                            materials_summary.append(f"{mat_name} ({resource.quantity}{unit})")
 
-            for idx, operation in enumerate(process.operations):
-                # Get equipment name
-                equipment_name = "-"
-                if operation.equipment_id:
-                    eq = next((e for e in bop.equipments if e.equipment_id == operation.equipment_id), None)
-                    equipment_name = eq.name if eq else operation.equipment_id
+                equipments_str = ", ".join(equipments_summary) if equipments_summary else "-"
+                workers_str = ", ".join(workers_summary) if workers_summary else "-"
+                materials_str = ", ".join(materials_summary) if materials_summary else "-"
 
-                # Get worker names
-                worker_names = []
-                for worker_id in operation.worker_ids:
-                    worker = next((w for w in bop.workers if w.worker_id == worker_id), None)
-                    worker_names.append(worker.name if worker else worker_id)
-                workers_str = ", ".join(worker_names) if worker_names else "-"
+                # 첫 번째 라인만 전체 정보 표시
+                if parallel_idx == 0:
+                    # Safe handling of predecessor/successor IDs
+                    predecessor_str = "-"
+                    if hasattr(process, 'predecessor_ids') and process.predecessor_ids:
+                        predecessor_str = ", ".join(process.predecessor_ids)
 
-                # Format materials
-                input_materials_str = ", ".join([f"{m.name} ({m.quantity}{m.unit})" for m in operation.input_materials]) if operation.input_materials else "-"
-                output_materials_str = ", ".join([f"{m.name} ({m.quantity}{m.unit})" for m in operation.output_materials]) if operation.output_materials else "-"
+                    successor_str = "-"
+                    if hasattr(process, 'successor_ids') and process.successor_ids:
+                        successor_str = ", ".join(process.successor_ids)
 
-                if idx == 0:
-                    # First operation row includes process info
                     ws_bop.append([
                         process.process_id,
                         process.name,
+                        process.description,
+                        process.cycle_time_sec,
                         process.parallel_count,
-                        operation.operation_id,
-                        operation.name,
-                        operation.cycle_time_sec,
-                        equipment_name,
+                        process.effective_cycle_time_sec,
+                        f"({process.location.x}, {process.location.y}, {process.location.z})",
+                        predecessor_str,
+                        successor_str,
+                        equipments_str,
                         workers_str,
-                        input_materials_str,
-                        output_materials_str
+                        materials_str
                     ])
                 else:
-                    # Subsequent operation rows have empty process columns
+                    # 병렬 라인은 간략하게 표시
                     ws_bop.append([
-                        "",
-                        "",
-                        "",
-                        operation.operation_id,
-                        operation.name,
-                        operation.cycle_time_sec,
-                        equipment_name,
-                        workers_str,
-                        input_materials_str,
-                        output_materials_str
+                        f"{process.process_id}-#{parallel_idx + 1}",
+                        f"(병렬 라인 #{parallel_idx + 1})",
+                        "-",
+                        "-",
+                        "-",
+                        "-",
+                        f"({process.location.x}, {process.location.y}, {process.location.z + parallel_idx * 5})",
+                        "-",
+                        "-",
+                        "-",
+                        "-",
+                        "-"
                     ])
-
-            # Merge process columns for this process group
-            process_end_row = ws_bop.max_row
-            if process_end_row > process_start_row:
-                ws_bop.merge_cells(f'A{process_start_row}:A{process_end_row}')
-                ws_bop.merge_cells(f'B{process_start_row}:B{process_end_row}')
-                ws_bop.merge_cells(f'C{process_start_row}:C{process_end_row}')
-
-            # Style process cells
-            for row in range(process_start_row, process_end_row + 1):
-                ws_bop.cell(row, 1).alignment = Alignment(horizontal="center", vertical="center")
-                ws_bop.cell(row, 2).alignment = Alignment(horizontal="center", vertical="center")
-                ws_bop.cell(row, 3).alignment = Alignment(horizontal="center", vertical="center")
-
-            # Fill process rows with color
-            process_fill = PatternFill(start_color="f0f0f0", end_color="f0f0f0", fill_type="solid")
-            for row in range(process_start_row, process_end_row + 1):
-                for col in range(1, 4):
-                    ws_bop.cell(row, col).fill = process_fill
-                    ws_bop.cell(row, col).font = Font(bold=True)
 
         # Adjust column widths
         ws_overview.column_dimensions['A'].width = 20
         ws_overview.column_dimensions['B'].width = 30
         ws_overview.column_dimensions['C'].width = 20
-        ws_overview.column_dimensions['D'].width = 25
 
         ws_bop.column_dimensions['A'].width = 12
         ws_bop.column_dimensions['B'].width = 25
-        ws_bop.column_dimensions['C'].width = 10
+        ws_bop.column_dimensions['C'].width = 35
         ws_bop.column_dimensions['D'].width = 15
-        ws_bop.column_dimensions['E'].width = 30
+        ws_bop.column_dimensions['E'].width = 15
         ws_bop.column_dimensions['F'].width = 15
-        ws_bop.column_dimensions['G'].width = 25
-        ws_bop.column_dimensions['H'].width = 25
-        ws_bop.column_dimensions['I'].width = 35
-        ws_bop.column_dimensions['J'].width = 35
+        ws_bop.column_dimensions['G'].width = 20
+        ws_bop.column_dimensions['H'].width = 20
+        ws_bop.column_dimensions['I'].width = 20
+        ws_bop.column_dimensions['J'].width = 30
+        ws_bop.column_dimensions['K'].width = 25
+        ws_bop.column_dimensions['L'].width = 35
 
         # Save to buffer
         buffer = BytesIO()
@@ -300,75 +314,101 @@ def _get_color_for_equipment_type(equipment_type: str) -> str:
 @app.post("/api/export/3d")
 async def export_3d(bop: BOPData):
     """
-    계층적 BOP 데이터를 3D 시각화용 JSON으로 내보냅니다.
-    Equipment 위치 기반으로 Operation을 배치합니다.
+    BOP 데이터를 3D 시각화용 JSON으로 내보냅니다.
+    Process 위치 + Resource 상대 위치로 실제 배치 계산
     """
     try:
         export_data = {
             "project_title": bop.project_title,
             "target_uph": bop.target_uph,
-            "equipments": [],
-            "workers": [],
-            "operations": []
+            "processes": [],
+            "resources": []
         }
 
-        # Equipment 정보
-        for equipment in bop.equipments:
-            export_data["equipments"].append({
-                "equipment_id": equipment.equipment_id,
-                "name": equipment.name,
-                "type": equipment.type,
-                "position": {
-                    "x": equipment.location.x,
-                    "y": equipment.location.y,
-                    "z": equipment.location.z
-                },
-                "color": _get_color_for_equipment_type(equipment.type)
-            })
-
-        # Worker 정보
-        for worker in bop.workers:
-            export_data["workers"].append({
-                "worker_id": worker.worker_id,
-                "name": worker.name,
-                "position": {
-                    "x": worker.location.x,
-                    "y": worker.location.y,
-                    "z": worker.location.z
-                },
-                "color": "#50c878"
-            })
-
-        # Operation 정보 (Equipment 위치 기반)
+        # Process 정보
         for process in bop.processes:
-            for operation in process.operations:
-                # Find equipment for this operation
-                equipment = next((eq for eq in bop.equipments if eq.equipment_id == operation.equipment_id), None)
+            # 병렬 라인 수만큼 복제
+            for parallel_idx in range(process.parallel_count):
+                # 병렬 라인은 z축으로 5m씩 이동
+                process_z_offset = parallel_idx * 5
 
-                if equipment:
-                    # parallel_count만큼 복제
-                    for parallel_idx in range(process.parallel_count):
-                        operation_obj = {
-                            "operation_id": operation.operation_id,
+                process_obj = {
+                    "process_id": process.process_id if parallel_idx == 0 else f"{process.process_id}-#{parallel_idx + 1}",
+                    "name": process.name,
+                    "parallel_index": parallel_idx,
+                    "position": {
+                        "x": process.location.x,
+                        "y": process.location.y,
+                        "z": process.location.z + process_z_offset
+                    },
+                    "size": {
+                        "width": 4.0,
+                        "height": 2.0,
+                        "depth": 3.0
+                    },
+                    "color": "#e0e0e0"
+                }
+                export_data["processes"].append(process_obj)
+
+                # 이 공정의 리소스들 배치
+                if hasattr(process, 'resources') and process.resources:
+                    for resource in process.resources:
+                        # 실제 위치 = Process 위치 + Resource 상대 위치
+                        actual_x = process.location.x + resource.relative_location.x
+                        actual_y = process.location.y + resource.relative_location.y
+                        actual_z = process.location.z + process_z_offset + resource.relative_location.z
+
+                        resource_obj = {
+                            "resource_id": resource.resource_id,
+                            "resource_type": resource.resource_type,
                             "process_id": process.process_id,
-                            "name": operation.name,
-                            "cycle_time_sec": operation.cycle_time_sec,
                             "parallel_index": parallel_idx,
+                            "quantity": resource.quantity,
+                            "role": resource.role or "",
                             "position": {
-                                "x": equipment.location.x + parallel_idx * 2,
-                                "y": equipment.location.y + 1.2,
-                                "z": equipment.location.z
-                            },
-                            "size": {
-                                "width": 0.8,
-                                "height": 0.5,
-                                "depth": 0.8
-                            },
-                            "color": _get_color_for_equipment_type(equipment.type),
-                            "equipment_id": operation.equipment_id,
-                            "equipment_name": equipment.name
+                                "x": actual_x,
+                                "y": actual_y,
+                                "z": actual_z
+                            }
                         }
-                        export_data["operations"].append(operation_obj)
+
+                        # 리소스 타입별 추가 정보
+                        if resource.resource_type == "equipment":
+                            equipment = next((eq for eq in bop.equipments if eq.equipment_id == resource.resource_id), None)
+                            if equipment:
+                                resource_obj["name"] = equipment.name
+                                resource_obj["equipment_type"] = equipment.type
+                                resource_obj["color"] = _get_color_for_equipment_type(equipment.type)
+                                resource_obj["size"] = {
+                                    "width": 1.0,
+                                    "height": 2.0,
+                                    "depth": 1.0
+                                }
+
+                        elif resource.resource_type == "worker":
+                            worker = next((w for w in bop.workers if w.worker_id == resource.resource_id), None)
+                            if worker:
+                                resource_obj["name"] = worker.name
+                                resource_obj["color"] = "#50c878"
+                                resource_obj["size"] = {
+                                    "width": 0.6,
+                                    "height": 1.7,
+                                    "depth": 0.6
+                                }
+
+                        elif resource.resource_type == "material":
+                            material = next((m for m in bop.materials if m.material_id == resource.resource_id), None)
+                            if material:
+                                resource_obj["name"] = material.name
+                                resource_obj["unit"] = material.unit
+                                resource_obj["color"] = "#ffa500"
+                                resource_obj["size"] = {
+                                    "width": 0.5,
+                                    "height": 0.3,
+                                    "depth": 0.5
+                                }
+
+                        export_data["resources"].append(resource_obj)
 
         # JSON으로 변환
         json_str = json.dumps(export_data, indent=2, ensure_ascii=False)
