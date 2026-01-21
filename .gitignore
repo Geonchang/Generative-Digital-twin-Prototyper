@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+venv/
+env/
+.venv/
+
+# Node
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+
+# Temporary files
+nul
+error_capture1.png
+
+# Claude IDE extension
+.claude/
