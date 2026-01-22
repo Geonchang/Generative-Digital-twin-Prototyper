@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import Viewer3D from './components/Viewer3D';
-import BopTable from './components/BopTable';
+import TabbedPanel from './components/TabbedPanel';
 import UnifiedChatPanel from './components/UnifiedChatPanel';
 import useBopStore from './store/bopStore';
 import { mockBopData } from './data/mockBopData';
@@ -14,13 +14,13 @@ function App() {
       console.log('[APP] Loading mock BOP data...');
       setBopData(mockBopData);
     }
-  }, []);
+  }, [bopData, setBopData]);
 
   return (
     <div style={styles.container}>
-      {/* 왼쪽: BOP 테이블 */}
+      {/* 왼쪽: 탭 패널 (BOP, 장비, 작업자, 자재) */}
       <div style={styles.tableSection}>
-        <BopTable />
+        <TabbedPanel />
       </div>
 
       {/* 중간: 3D 뷰어 */}

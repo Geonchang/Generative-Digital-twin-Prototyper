@@ -5,7 +5,7 @@ import { api } from '../services/api';
 function BopTable() {
   const {
     bopData,
-    selectedProcessId,
+    selectedProcessKey,
     setSelectedProcess,
     getEquipmentById,
     getWorkerById,
@@ -62,13 +62,20 @@ function BopTable() {
     );
   }
 
-  // Helper functions
-  const getResourcesByType = (process) => {
+  // Helper functions - 병렬 라인별 리소스 필터링
+  const getResourcesByType = (process, parallelLineIndex) => {
     const equipments = [];
     const workers = [];
     const materials = [];
 
     process.resources.forEach(resource => {
+      // parallel_line_index가 있으면 해당 라인만, 없으면 모든 라인에서 사용
+      const isForThisLine = resource.parallel_line_index === undefined ||
+                            resource.parallel_line_index === null ||
+                            resource.parallel_line_index === parallelLineIndex;
+
+      if (!isForThisLine) return;
+
       if (resource.resource_type === 'equipment') {
         const eq = getEquipmentById(resource.resource_id);
         if (eq) {
@@ -88,15 +95,6 @@ function BopTable() {
     });
 
     return { equipments, workers, materials };
-  };
-
-  const getEquipmentTypeColor = (equipmentType) => {
-    switch (equipmentType) {
-      case 'robot': return '#4a90e2';
-      case 'machine': return '#ff6b6b';
-      case 'manual_station': return '#50c878';
-      default: return '#888';
-    }
   };
 
   const formatResources = (resources, formatter) => {
@@ -139,6 +137,7 @@ function BopTable() {
               <th style={{ ...styles.th, minWidth: '150px' }}>Name</th>
               <th style={{ ...styles.th, minWidth: '100px' }}>Cycle Time</th>
               <th style={{ ...styles.th, minWidth: '80px' }}>Parallel</th>
+              <th style={{ ...styles.th, minWidth: '120px' }}>Location</th>
               <th style={{ ...styles.th, minWidth: '150px' }}>Equipments</th>
               <th style={{ ...styles.th, minWidth: '120px' }}>Workers</th>
               <th style={{ ...styles.th, minWidth: '200px' }}>Materials</th>
@@ -146,25 +145,28 @@ function BopTable() {
           </thead>
           <tbody>
             {bopData.processes.map((process) => {
-              const isProcessSelected = selectedProcessId === process.process_id;
               const effectiveCycleTime = process.cycle_time_sec / process.parallel_count;
               const isBottleneck = bottleneck.process?.process_id === process.process_id;
-              const { equipments, workers, materials } = getResourcesByType(process);
 
               // 병렬 라인 수만큼 row 생성
               const rows = [];
               for (let i = 0; i < process.parallel_count; i++) {
                 const isFirstRow = i === 0;
+                const processKey = `${process.process_id}-${i}`;
+                const isThisRowSelected = selectedProcessKey === processKey;
+
+                // 각 병렬 라인의 리소스 가져오기
+                const { equipments, workers, materials } = getResourcesByType(process, i);
                 rows.push(
                   <tr
-                    key={`${process.process_id}-${i}`}
+                    key={processKey}
                     style={{
                       ...styles.processRow,
-                      ...(isProcessSelected ? styles.processRowSelected : {}),
+                      ...(isThisRowSelected ? styles.processRowSelected : {}),
                       ...(isBottleneck && isFirstRow ? styles.bottleneckRow : {}),
                       ...(isFirstRow ? {} : styles.parallelRow)
                     }}
-                    onClick={() => setSelectedProcess(process.process_id)}
+                    onClick={() => setSelectedProcess(process.process_id, i)}
                   >
                     {isFirstRow ? (
                       <>
@@ -199,6 +201,11 @@ function BopTable() {
                           <span style={styles.parallelCount}>{process.parallel_count}</span>
                         </td>
                         <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            ({process.location.x}, {process.location.y}, {process.location.z})
+                          </div>
+                        </td>
+                        <td style={styles.td}>
                           <div style={styles.resourcesCell}>
                             {formatResources(equipments, eq =>
                               `${eq.name} (x${eq.quantity})`
@@ -223,10 +230,40 @@ function BopTable() {
                     ) : (
                       <>
                         <td style={styles.td}>
-                          <span style={styles.parallelLabel}>└ #{i + 1}</span>
+                          <span style={styles.parallelLabel}>{process.process_id}-#{i + 1}</span>
                         </td>
-                        <td style={styles.td} colSpan="6">
-                          <span style={styles.parallelLineText}>(병렬 라인 #{i + 1})</span>
+                        <td style={styles.td}>
+                          <span style={styles.parallelLineText}>└ 병렬 라인 #{i + 1}</span>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.parallelLineText}>-</span>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.parallelLineText}>-</span>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.parallelLineText}>-</span>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.resourcesCell}>
+                            {formatResources(equipments, eq =>
+                              `${eq.name} (x${eq.quantity})`
+                            )}
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.resourcesCell}>
+                            {formatResources(workers, w =>
+                              `${w.name} (x${w.quantity})`
+                            )}
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.resourcesCell}>
+                            {formatResources(materials, m =>
+                              `${m.name} (${m.quantity}${m.unit})`
+                            )}
+                          </div>
                         </td>
                       </>
                     )}
@@ -427,6 +464,11 @@ const styles = {
   resourcesCell: {
     fontSize: '12px',
     color: '#555',
+  },
+  locationCell: {
+    fontSize: '11px',
+    color: '#666',
+    fontFamily: 'monospace',
   },
   summary: {
     display: 'flex',

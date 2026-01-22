@@ -19,15 +19,33 @@ export const mockBopData = {
           "resource_type": "equipment",
           "resource_id": "EQ-ROBOT-01",
           "quantity": 1,
+          "parallel_line_index": 0,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
-          "role": "Main welding robot"
+          "role": "Main welding robot - Line 1"
         },
         {
           "resource_type": "worker",
           "resource_id": "W001",
           "quantity": 1,
+          "parallel_line_index": 0,
           "relative_location": { "x": 2, "y": 0, "z": 1 },
-          "role": "Welding operator"
+          "role": "Welding operator - Line 1"
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ-ROBOT-02",
+          "quantity": 1,
+          "parallel_line_index": 1,
+          "relative_location": { "x": 0, "y": 0, "z": 0 },
+          "role": "Main welding robot - Line 2"
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W002",
+          "quantity": 1,
+          "parallel_line_index": 1,
+          "relative_location": { "x": 2, "y": 0, "z": 1 },
+          "role": "Welding operator - Line 2"
         },
         {
           "resource_type": "material",
@@ -85,15 +103,33 @@ export const mockBopData = {
           "resource_type": "equipment",
           "resource_id": "EQ-MANUAL-01",
           "quantity": 1,
+          "parallel_line_index": 0,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
-          "role": "Assembly workstation"
+          "role": "Assembly workstation - Line 1"
         },
         {
           "resource_type": "worker",
           "resource_id": "W003",
           "quantity": 2,
+          "parallel_line_index": 0,
           "relative_location": { "x": 1.5, "y": 0, "z": 0 },
-          "role": "Electronics assembler"
+          "role": "Electronics assembler - Line 1"
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ-MANUAL-03",
+          "quantity": 1,
+          "parallel_line_index": 1,
+          "relative_location": { "x": 0, "y": 0, "z": 0 },
+          "role": "Assembly workstation - Line 2"
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W007",
+          "quantity": 2,
+          "parallel_line_index": 1,
+          "relative_location": { "x": 1.5, "y": 0, "z": 0 },
+          "role": "Electronics assembler - Line 2"
         },
         {
           "resource_type": "material",
@@ -125,15 +161,33 @@ export const mockBopData = {
           "resource_type": "equipment",
           "resource_id": "EQ-MANUAL-02",
           "quantity": 1,
+          "parallel_line_index": 0,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
-          "role": "Assembly station"
+          "role": "Assembly station - Line 1"
         },
         {
           "resource_type": "worker",
           "resource_id": "W004",
           "quantity": 2,
+          "parallel_line_index": 0,
           "relative_location": { "x": 1.5, "y": 0, "z": 0 },
-          "role": "Mechanical assembler"
+          "role": "Mechanical assembler - Line 1"
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ-MANUAL-04",
+          "quantity": 1,
+          "parallel_line_index": 1,
+          "relative_location": { "x": 0, "y": 0, "z": 0 },
+          "role": "Assembly station - Line 2"
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W008",
+          "quantity": 2,
+          "parallel_line_index": 1,
+          "relative_location": { "x": 1.5, "y": 0, "z": 0 },
+          "role": "Mechanical assembler - Line 2"
         },
         {
           "resource_type": "material",
@@ -195,7 +249,12 @@ export const mockBopData = {
   "equipments": [
     {
       "equipment_id": "EQ-ROBOT-01",
-      "name": "6축 용접 로봇",
+      "name": "6축 용접 로봇 #1",
+      "type": "robot"
+    },
+    {
+      "equipment_id": "EQ-ROBOT-02",
+      "name": "6축 용접 로봇 #2",
       "type": "robot"
     },
     {
@@ -205,12 +264,22 @@ export const mockBopData = {
     },
     {
       "equipment_id": "EQ-MANUAL-01",
-      "name": "전장 조립 워크스테이션",
+      "name": "전장 조립 워크스테이션 #1",
       "type": "manual_station"
     },
     {
       "equipment_id": "EQ-MANUAL-02",
-      "name": "기계 조립 워크스테이션",
+      "name": "기계 조립 워크스테이션 #1",
+      "type": "manual_station"
+    },
+    {
+      "equipment_id": "EQ-MANUAL-03",
+      "name": "전장 조립 워크스테이션 #2",
+      "type": "manual_station"
+    },
+    {
+      "equipment_id": "EQ-MANUAL-04",
+      "name": "기계 조립 워크스테이션 #2",
       "type": "manual_station"
     },
     {
@@ -221,11 +290,13 @@ export const mockBopData = {
   ],
   "workers": [
     { "worker_id": "W001", "name": "김철수", "skill_level": "Senior" },
-    { "worker_id": "W002", "name": "이영희", "skill_level": "Mid" },
+    { "worker_id": "W002", "name": "이영희", "skill_level": "Senior" },
     { "worker_id": "W003", "name": "박민수", "skill_level": "Senior" },
     { "worker_id": "W004", "name": "정수진", "skill_level": "Mid" },
     { "worker_id": "W005", "name": "최준호", "skill_level": "Senior" },
-    { "worker_id": "W006", "name": "강미라", "skill_level": "Junior" }
+    { "worker_id": "W006", "name": "강미라", "skill_level": "Junior" },
+    { "worker_id": "W007", "name": "홍길동", "skill_level": "Senior" },
+    { "worker_id": "W008", "name": "윤지원", "skill_level": "Mid" }
   ],
   "materials": [
     { "material_id": "M-STEEL-001", "name": "알루미늄 합금 프레임", "unit": "kg" },
