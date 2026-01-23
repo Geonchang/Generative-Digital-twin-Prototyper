@@ -28,7 +28,7 @@ export const mockBopData = {
           "resource_id": "W001",
           "quantity": 1,
           "parallel_line_index": 0,
-          "relative_location": { "x": 2, "y": 0, "z": 1 },
+          "relative_location": { "x": 0.8, "y": 0, "z": 0.5 },
           "role": "Welding operator - Line 1"
         },
         {
@@ -44,14 +44,14 @@ export const mockBopData = {
           "resource_id": "W002",
           "quantity": 1,
           "parallel_line_index": 1,
-          "relative_location": { "x": 2, "y": 0, "z": 1 },
+          "relative_location": { "x": 0.8, "y": 0, "z": 0.5 },
           "role": "Welding operator - Line 2"
         },
         {
           "resource_type": "material",
           "resource_id": "M-STEEL-001",
           "quantity": 5.2,
-          "relative_location": { "x": -1, "y": 0, "z": 0.5 },
+          "relative_location": { "x": -0.8, "y": 0, "z": 0.3 },
           "role": "Frame material"
         }
       ]
@@ -77,14 +77,14 @@ export const mockBopData = {
           "resource_type": "worker",
           "resource_id": "W002",
           "quantity": 1,
-          "relative_location": { "x": 2, "y": 0, "z": 1 },
+          "relative_location": { "x": 0.8, "y": 0, "z": 0.5 },
           "role": "Coating operator"
         },
         {
           "resource_type": "material",
           "resource_id": "M-PAINT-001",
           "quantity": 0.8,
-          "relative_location": { "x": -1, "y": 0, "z": 0.5 },
+          "relative_location": { "x": -0.8, "y": 0, "z": 0.3 },
           "role": "Coating powder"
         }
       ]
@@ -112,7 +112,7 @@ export const mockBopData = {
           "resource_id": "W003",
           "quantity": 2,
           "parallel_line_index": 0,
-          "relative_location": { "x": 1.5, "y": 0, "z": 0 },
+          "relative_location": { "x": 0.7, "y": 0, "z": 0.5 },
           "role": "Electronics assembler - Line 1"
         },
         {
@@ -128,21 +128,21 @@ export const mockBopData = {
           "resource_id": "W007",
           "quantity": 2,
           "parallel_line_index": 1,
-          "relative_location": { "x": 1.5, "y": 0, "z": 0 },
+          "relative_location": { "x": 0.7, "y": 0, "z": 0.5 },
           "role": "Electronics assembler - Line 2"
         },
         {
           "resource_type": "material",
           "resource_id": "M-BATTERY-001",
           "quantity": 1,
-          "relative_location": { "x": -1, "y": 0, "z": 0.5 },
+          "relative_location": { "x": -0.8, "y": 0, "z": 0.3 },
           "role": "Battery pack"
         },
         {
           "resource_type": "material",
           "resource_id": "M-MOTOR-001",
           "quantity": 1,
-          "relative_location": { "x": -1, "y": 0, "z": -0.5 },
+          "relative_location": { "x": -0.8, "y": 0, "z": -0.3 },
           "role": "Hub motor"
         }
       ]
@@ -170,7 +170,7 @@ export const mockBopData = {
           "resource_id": "W004",
           "quantity": 2,
           "parallel_line_index": 0,
-          "relative_location": { "x": 1.5, "y": 0, "z": 0 },
+          "relative_location": { "x": 0.7, "y": 0, "z": 0.5 },
           "role": "Mechanical assembler - Line 1"
         },
         {
@@ -186,21 +186,21 @@ export const mockBopData = {
           "resource_id": "W008",
           "quantity": 2,
           "parallel_line_index": 1,
-          "relative_location": { "x": 1.5, "y": 0, "z": 0 },
+          "relative_location": { "x": 0.7, "y": 0, "z": 0.5 },
           "role": "Mechanical assembler - Line 2"
         },
         {
           "resource_type": "material",
           "resource_id": "M-WHEEL-001",
           "quantity": 2,
-          "relative_location": { "x": -1.5, "y": 0, "z": 0 },
+          "relative_location": { "x": -0.7, "y": 0, "z": 0 },
           "role": "Wheels"
         },
         {
           "resource_type": "material",
           "resource_id": "M-BRAKE-001",
           "quantity": 2,
-          "relative_location": { "x": 1, "y": 0, "z": 0.5 },
+          "relative_location": { "x": 0.8, "y": 0, "z": 0.3 },
           "role": "Brake set"
         }
       ]
@@ -226,21 +226,21 @@ export const mockBopData = {
           "resource_type": "worker",
           "resource_id": "W005",
           "quantity": 1,
-          "relative_location": { "x": 2, "y": 0, "z": 1 },
+          "relative_location": { "x": 0.8, "y": 0, "z": 0.5 },
           "role": "Quality inspector"
         },
         {
           "resource_type": "worker",
           "resource_id": "W006",
           "quantity": 1,
-          "relative_location": { "x": -2, "y": 0, "z": 1 },
+          "relative_location": { "x": -0.8, "y": 0, "z": 0.5 },
           "role": "Packaging worker"
         },
         {
           "resource_type": "material",
           "resource_id": "M-BOX-001",
           "quantity": 1,
-          "relative_location": { "x": 1, "y": 0, "z": 0.5 },
+          "relative_location": { "x": 0.8, "y": 0, "z": 0.3 },
           "role": "Packaging box"
         }
       ]

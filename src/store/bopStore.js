@@ -25,7 +25,7 @@ const useBopStore = create((set) => ({
 
   setSelectedProcess: (processId, parallelIndex = 0) => {
     const key = `${processId}-${parallelIndex}`;
-    set({ selectedProcessKey: key });
+    set({ selectedProcessKey: key, selectedResourceKey: null });
   },
 
   clearSelection: () => set({ selectedProcessKey: null, selectedResourceKey: null }),
@@ -131,6 +131,28 @@ const useBopStore = create((set) => ({
     };
   }),
 
+  // Update process rotation (Y-axis only)
+  updateProcessRotation: (processId, rotationY) => set((state) => {
+    if (!state.bopData) return state;
+
+    const updatedProcesses = state.bopData.processes.map(process => {
+      if (process.process_id === processId) {
+        return {
+          ...process,
+          rotation_y: rotationY
+        };
+      }
+      return process;
+    });
+
+    return {
+      bopData: {
+        ...state.bopData,
+        processes: updatedProcesses
+      }
+    };
+  }),
+
   // Update resource relative location
   updateResourceLocation: (processId, resourceType, resourceId, newRelativeLocation) => set((state) => {
     if (!state.bopData) return state;
@@ -142,6 +164,70 @@ const useBopStore = create((set) => ({
             return {
               ...resource,
               relative_location: { ...newRelativeLocation }
+            };
+          }
+          return resource;
+        });
+
+        return {
+          ...process,
+          resources: updatedResources
+        };
+      }
+      return process;
+    });
+
+    return {
+      bopData: {
+        ...state.bopData,
+        processes: updatedProcesses
+      }
+    };
+  }),
+
+  // Update resource rotation (Y-axis only)
+  updateResourceRotation: (processId, resourceType, resourceId, rotationY) => set((state) => {
+    if (!state.bopData) return state;
+
+    const updatedProcesses = state.bopData.processes.map(process => {
+      if (process.process_id === processId) {
+        const updatedResources = process.resources.map(resource => {
+          if (resource.resource_type === resourceType && resource.resource_id === resourceId) {
+            return {
+              ...resource,
+              rotation_y: rotationY
+            };
+          }
+          return resource;
+        });
+
+        return {
+          ...process,
+          resources: updatedResources
+        };
+      }
+      return process;
+    });
+
+    return {
+      bopData: {
+        ...state.bopData,
+        processes: updatedProcesses
+      }
+    };
+  }),
+
+  // Update resource scale (XYZ)
+  updateResourceScale: (processId, resourceType, resourceId, scale) => set((state) => {
+    if (!state.bopData) return state;
+
+    const updatedProcesses = state.bopData.processes.map(process => {
+      if (process.process_id === processId) {
+        const updatedResources = process.resources.map(resource => {
+          if (resource.resource_type === resourceType && resource.resource_id === resourceId) {
+            return {
+              ...resource,
+              scale: { ...scale }
             };
           }
           return resource;

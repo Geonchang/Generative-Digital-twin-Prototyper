@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useBopStore from '../store/bopStore';
 
 function EquipmentsTable() {
-  const { bopData, selectedResourceKey, setSelectedResource } = useBopStore();
+  const { bopData, selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceScale, updateResourceRotation } = useBopStore();
   const selectedRowRef = useRef(null);
+  const [editingCell, setEditingCell] = useState(null); // {equipmentId, processId, parallelIndex, field}
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -86,74 +87,119 @@ function EquipmentsTable() {
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={{ ...styles.th, width: '120px' }}>장비 ID</th>
-              <th style={{ ...styles.th, minWidth: '200px' }}>장비명</th>
-              <th style={{ ...styles.th, width: '120px' }}>유형</th>
-              <th style={{ ...styles.th, minWidth: '250px' }}>사용 공정 및 위치</th>
+              <th style={{ ...styles.th, width: '100px' }}>장비 ID</th>
+              <th style={{ ...styles.th, minWidth: '150px' }}>장비명</th>
+              <th style={{ ...styles.th, width: '80px' }}>유형</th>
+              <th style={{ ...styles.th, width: '100px' }}>사용 공정</th>
+              <th style={{ ...styles.th, width: '120px' }}>Location (x,z)</th>
+              <th style={{ ...styles.th, width: '150px' }}>Size (x,y,z)</th>
+              <th style={{ ...styles.th, width: '80px' }}>Rotation (Y)</th>
             </tr>
           </thead>
           <tbody>
-            {bopData.equipments.map((equipment) => {
+            {bopData.equipments.flatMap((equipment) => {
               const usedProcesses = getProcessesUsingEquipment(equipment.equipment_id);
 
-              return (
-                <tr key={equipment.equipment_id} style={styles.row}>
-                  <td style={styles.td}>
-                    <strong>{equipment.equipment_id}</strong>
-                  </td>
-                  <td style={styles.td}>
-                    {equipment.name}
-                  </td>
-                  <td style={styles.td}>
-                    <span
-                      style={{
-                        ...styles.typeBadge,
-                        backgroundColor: getEquipmentTypeColor(equipment.type),
-                      }}
-                    >
-                      {getEquipmentTypeLabel(equipment.type)}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
-                    {usedProcesses.length > 0 ? (
-                      <div style={styles.processList}>
-                        {usedProcesses.map(({ process, actualLocation, parallelLineIndex }, idx) => {
-                          const lineLabel = parallelLineIndex !== undefined && parallelLineIndex !== null
-                            ? `${process.process_id}-#${parallelLineIndex + 1}`
-                            : process.process_id;
+              if (usedProcesses.length === 0) {
+                return (
+                  <tr key={equipment.equipment_id} style={styles.row}>
+                    <td style={styles.td}><strong>{equipment.equipment_id}</strong></td>
+                    <td style={styles.td}>{equipment.name}</td>
+                    <td style={styles.td}>
+                      <span style={{ ...styles.typeBadge, backgroundColor: getEquipmentTypeColor(equipment.type) }}>
+                        {getEquipmentTypeLabel(equipment.type)}
+                      </span>
+                    </td>
+                    <td style={styles.td} colSpan={4}><span style={styles.notUsed}>미사용</span></td>
+                  </tr>
+                );
+              }
 
-                          const resourceKey = `equipment-${equipment.equipment_id}-${process.process_id}-${parallelLineIndex || 0}`;
-                          const isSelected = selectedResourceKey === resourceKey;
+              return usedProcesses.map(({ process, resource, parallelLineIndex }, idx) => {
+                const lineLabel = parallelLineIndex !== undefined && parallelLineIndex !== null
+                  ? `${process.process_id}-#${parallelLineIndex + 1}`
+                  : process.process_id;
 
-                          return (
-                            <div
-                              key={`${process.process_id}-${idx}`}
-                              ref={isSelected ? selectedRowRef : null}
-                              style={{
-                                ...styles.processItem,
-                                ...(isSelected ? styles.processItemSelected : {}),
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedResource('equipment', equipment.equipment_id, process.process_id, parallelLineIndex || 0);
-                              }}
-                            >
-                              <span style={styles.processChip}>
-                                {lineLabel}
-                              </span>
-                              <span style={styles.locationText}>
-                                ({actualLocation.x.toFixed(1)}, {actualLocation.y.toFixed(1)}, {actualLocation.z.toFixed(1)})
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span style={styles.notUsed}>미사용</span>
+                const resourceKey = `equipment-${equipment.equipment_id}-${process.process_id}-${parallelLineIndex || 0}`;
+                const isSelected = selectedResourceKey === resourceKey;
+
+                const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
+                const scale = resource.scale || { x: 1, y: 1, z: 1 };
+                const rotationY = resource.rotation_y || 0;
+
+                return (
+                  <tr
+                    key={`${equipment.equipment_id}-${process.process_id}-${parallelLineIndex}`}
+                    ref={isSelected ? selectedRowRef : null}
+                    style={{
+                      ...styles.row,
+                      ...(isSelected ? styles.rowSelected : {}),
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedResource('equipment', equipment.equipment_id, process.process_id, parallelLineIndex || 0);
+                    }}
+                  >
+                    {idx === 0 && (
+                      <>
+                        <td style={styles.td} rowSpan={usedProcesses.length}>
+                          <strong>{equipment.equipment_id}</strong>
+                        </td>
+                        <td style={styles.td} rowSpan={usedProcesses.length}>
+                          {equipment.name}
+                        </td>
+                        <td style={styles.td} rowSpan={usedProcesses.length}>
+                          <span style={{ ...styles.typeBadge, backgroundColor: getEquipmentTypeColor(equipment.type) }}>
+                            {getEquipmentTypeLabel(equipment.type)}
+                          </span>
+                        </td>
+                      </>
                     )}
-                  </td>
-                </tr>
-              );
+                    <td style={styles.td}>
+                      <span style={styles.processChip}>{lineLabel}</span>
+                    </td>
+                    <td style={styles.td}>
+                      <input
+                        type="text"
+                        style={styles.input}
+                        value={`${relLoc.x.toFixed(1)}, ${relLoc.z.toFixed(1)}`}
+                        onChange={(e) => {
+                          const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
+                          if (values.length === 2 && !values.some(isNaN)) {
+                            updateResourceLocation(process.process_id, 'equipment', equipment.equipment_id, { x: values[0], y: 0, z: values[1] });
+                          }
+                        }}
+                      />
+                    </td>
+                    <td style={styles.td}>
+                      <input
+                        type="text"
+                        style={styles.input}
+                        value={`${scale.x.toFixed(2)}, ${scale.y.toFixed(2)}, ${scale.z.toFixed(2)}`}
+                        onChange={(e) => {
+                          const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
+                          if (values.length === 3 && !values.some(isNaN)) {
+                            updateResourceScale(process.process_id, 'equipment', equipment.equipment_id, { x: values[0], y: values[1], z: values[2] });
+                          }
+                        }}
+                      />
+                    </td>
+                    <td style={styles.td}>
+                      <input
+                        type="text"
+                        style={styles.input}
+                        value={(rotationY * 180 / Math.PI).toFixed(1)}
+                        onChange={(e) => {
+                          const deg = parseFloat(e.target.value);
+                          if (!isNaN(deg)) {
+                            updateResourceRotation(process.process_id, 'equipment', equipment.equipment_id, deg * Math.PI / 180);
+                          }
+                        }}
+                      />
+                    </td>
+                  </tr>
+                );
+              });
             })}
           </tbody>
         </table>
@@ -225,10 +271,23 @@ const styles = {
     backgroundColor: 'white',
     borderBottom: '1px solid #ddd',
     transition: 'background-color 0.2s',
+    cursor: 'pointer',
+  },
+  rowSelected: {
+    backgroundColor: '#e3f2fd',
+    borderLeft: '3px solid #4a90e2',
   },
   td: {
-    padding: '12px 8px',
+    padding: '8px 6px',
     verticalAlign: 'middle',
+  },
+  input: {
+    width: '100%',
+    padding: '4px 6px',
+    fontSize: '11px',
+    border: '1px solid #ddd',
+    borderRadius: '3px',
+    fontFamily: 'monospace',
   },
   typeBadge: {
     display: 'inline-block',

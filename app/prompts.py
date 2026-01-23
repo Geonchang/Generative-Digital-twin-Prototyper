@@ -29,14 +29,14 @@ Output ONLY valid JSON (no markdown, no code blocks):
           "resource_type": "worker",
           "resource_id": "W001",
           "quantity": 1,
-          "relative_location": {"x": 2, "y": 0, "z": 1},
+          "relative_location": {"x": 0.8, "y": 0, "z": 0.5},
           "role": "Quality inspector"
         },
         {
           "resource_type": "material",
           "resource_id": "M-STEEL-001",
           "quantity": 2.5,
-          "relative_location": {"x": -1, "y": 0, "z": 0.5},
+          "relative_location": {"x": -0.8, "y": 0, "z": 0.3},
           "role": "Raw material"
         }
       ]
@@ -86,24 +86,24 @@ Output ONLY valid JSON (no markdown, no code blocks):
 ### Equipment Resources
 - equipment_id format: "EQ-{TYPE}-{NUMBER:02d}" (e.g., "EQ-ROBOT-01")
 - type: "robot", "machine", or "manual_station"
-- relative_location: Position within process space (usually center at 0,0,0)
+- relative_location: Position within process space (KEEP COMPACT - x range: -1.5 to 1.5, z range: -1 to 1)
   - Main equipment: (0, 0, 0)
-  - Secondary equipment: (3, 0, 0) or (-3, 0, 0)
+  - Secondary equipment: (1, 0, 0) or (-1, 0, 0)
 
 ### Worker Resources
 - worker_id format: "W{NUMBER:03d}" (e.g., "W001")
-- relative_location: Offset from process center
-  - Primary worker: (2, 0, 1)
-  - Secondary worker: (-2, 0, 1)
-  - Inspector: (0, 0, 2)
+- relative_location: Offset from process center (KEEP COMPACT - x range: -1.5 to 1.5, z range: -1 to 1)
+  - Primary worker: (0.8, 0, 0.5)
+  - Secondary worker: (-0.8, 0, 0.5)
+  - Inspector: (0, 0, 0.8)
 
 ### Material Resources
 - material_id format: "M-{CATEGORY}-{NUMBER:03d}" (e.g., "M-STEEL-001")
 - unit: "kg", "ea", "m", "L", etc.
 - quantity: Realistic amount used in this process
-- relative_location: Material staging area
-  - Input materials: (-1, 0, 0.5)
-  - Output materials: (1, 0, 0.5)
+- relative_location: Material staging area (KEEP COMPACT - x range: -1.5 to 1.5, z range: -1 to 1)
+  - Input materials: (-0.8, 0, 0.3)
+  - Output materials: (0.8, 0, 0.3)
 
 ## Other Requirements
 - Parallel_count: Number of parallel production lines (usually 1)
@@ -170,14 +170,14 @@ BOP Schema (when included):
           "resource_type": "worker",
           "resource_id": "W001",
           "quantity": 1,
-          "relative_location": {{"x": 2, "y": 0, "z": 1}},
+          "relative_location": {{"x": 0.8, "y": 0, "z": 0.5}},
           "role": "Operator"
         }},
         {{
           "resource_type": "material",
           "resource_id": "M-STEEL-001",
           "quantity": 2.5,
-          "relative_location": {{"x": -1, "y": 0, "z": 0.5}},
+          "relative_location": {{"x": -0.8, "y": 0, "z": 0.3}},
           "role": "Input material"
         }}
       ]
@@ -196,6 +196,7 @@ Rules:
 - Process locations: CRITICAL y=0, z=0 always, x-axis spacing of 5 (x=0, 5, 10, 15, ...)
 - Resource types: equipment/worker/material with relative_location within process
 - Equipment type: "robot", "machine", or "manual_station"
+- CRITICAL: relative_location MUST be compact (x: -1.5 to 1.5, z: -1 to 1, y: always 0)
 - Output ONLY valid JSON, NO markdown, NO code blocks
 
 Examples:

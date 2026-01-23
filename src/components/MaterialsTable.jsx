@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useBopStore from '../store/bopStore';
 
 function MaterialsTable() {
-  const { bopData, selectedResourceKey, setSelectedResource } = useBopStore();
+  const { bopData, selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceScale, updateResourceRotation } = useBopStore();
   const selectedRowRef = useRef(null);
+  const [editingCell, setEditingCell] = useState(null);
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -25,12 +26,11 @@ function MaterialsTable() {
     );
   }
 
-  // 각 자재가 사용되는 공정 찾기 및 총 사용량 계산
+  // 각 자재가 사용되는 공정 찾기
   const getMaterialUsage = (materialId) => {
-    if (!bopData.processes) return { processes: [], totalQuantity: 0 };
+    if (!bopData.processes) return [];
 
     const usage = [];
-    let totalQuantity = 0;
 
     bopData.processes.forEach(process => {
       const materialResource = process.resources?.find(
@@ -38,24 +38,15 @@ function MaterialsTable() {
       );
 
       if (materialResource) {
-        // 실제 위치 = 공정 위치 + 상대 위치
-        const actualLocation = {
-          x: process.location.x + materialResource.relative_location.x,
-          y: process.location.y + materialResource.relative_location.y,
-          z: process.location.z + materialResource.relative_location.z,
-        };
-
         usage.push({
           process,
-          quantity: materialResource.quantity,
-          actualLocation,
+          resource: materialResource,
           parallelLineIndex: materialResource.parallel_line_index,
         });
-        totalQuantity += materialResource.quantity * process.parallel_count;
       }
     });
 
-    return { processes: usage, totalQuantity };
+    return usage;
   };
 
   return (
@@ -71,78 +62,117 @@ function MaterialsTable() {
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={{ ...styles.th, width: '120px' }}>자재 ID</th>
-              <th style={{ ...styles.th, minWidth: '200px' }}>자재명</th>
-              <th style={{ ...styles.th, width: '80px' }}>단위</th>
-              <th style={{ ...styles.th, width: '120px' }}>총 사용량</th>
-              <th style={{ ...styles.th, minWidth: '300px' }}>사용 공정 및 위치</th>
+              <th style={{ ...styles.th, width: '100px' }}>자재 ID</th>
+              <th style={{ ...styles.th, minWidth: '150px' }}>자재명</th>
+              <th style={{ ...styles.th, width: '60px' }}>단위</th>
+              <th style={{ ...styles.th, width: '100px' }}>사용 공정</th>
+              <th style={{ ...styles.th, width: '80px' }}>수량</th>
+              <th style={{ ...styles.th, width: '120px' }}>Location (x,z)</th>
+              <th style={{ ...styles.th, width: '150px' }}>Size (x,y,z)</th>
+              <th style={{ ...styles.th, width: '80px' }}>Rotation (Y)</th>
             </tr>
           </thead>
           <tbody>
-            {bopData.materials.map((material) => {
-              const { processes, totalQuantity } = getMaterialUsage(material.material_id);
+            {bopData.materials.flatMap((material) => {
+              const usage = getMaterialUsage(material.material_id);
 
-              return (
-                <tr key={material.material_id} style={styles.row}>
-                  <td style={styles.td}>
-                    <strong>{material.material_id}</strong>
-                  </td>
-                  <td style={styles.td}>
-                    {material.name}
-                  </td>
-                  <td style={styles.td}>
-                    <span style={styles.unit}>{material.unit}</span>
-                  </td>
-                  <td style={styles.td}>
-                    <span style={styles.totalQuantity}>
-                      {totalQuantity > 0 ? `${totalQuantity.toFixed(1)} ${material.unit}` : '-'}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
-                    {processes.length > 0 ? (
-                      <div style={styles.processList}>
-                        {processes.map(({ process, quantity, actualLocation, parallelLineIndex }, idx) => {
-                          const lineLabel = parallelLineIndex !== undefined && parallelLineIndex !== null
-                            ? `${process.process_id}-#${parallelLineIndex + 1}`
-                            : process.process_id;
+              if (usage.length === 0) {
+                return (
+                  <tr key={material.material_id} style={styles.row}>
+                    <td style={styles.td}><strong>{material.material_id}</strong></td>
+                    <td style={styles.td}>{material.name}</td>
+                    <td style={styles.td}><span style={styles.unit}>{material.unit}</span></td>
+                    <td style={styles.td} colSpan={5}><span style={styles.notUsed}>미사용</span></td>
+                  </tr>
+                );
+              }
 
-                          const resourceKey = `material-${material.material_id}-${process.process_id}-${parallelLineIndex || 0}`;
-                          const isSelected = selectedResourceKey === resourceKey;
+              return usage.map(({ process, resource, parallelLineIndex }, idx) => {
+                const lineLabel = parallelLineIndex !== undefined && parallelLineIndex !== null
+                  ? `${process.process_id}-#${parallelLineIndex + 1}`
+                  : process.process_id;
 
-                          return (
-                            <div
-                              key={`${process.process_id}-${idx}`}
-                              ref={isSelected ? selectedRowRef : null}
-                              style={{
-                                ...styles.processItem,
-                                ...(isSelected ? styles.processItemSelected : {}),
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedResource('material', material.material_id, process.process_id, parallelLineIndex || 0);
-                              }}
-                            >
-                              <div style={styles.processRow}>
-                                <span style={styles.processChip}>
-                                  {lineLabel}
-                                </span>
-                                <span style={styles.quantity}>
-                                  {quantity} {material.unit}
-                                </span>
-                              </div>
-                              <span style={styles.locationText}>
-                                ({actualLocation.x.toFixed(1)}, {actualLocation.y.toFixed(1)}, {actualLocation.z.toFixed(1)})
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <span style={styles.notUsed}>미사용</span>
+                const resourceKey = `material-${material.material_id}-${process.process_id}-${parallelLineIndex || 0}`;
+                const isSelected = selectedResourceKey === resourceKey;
+
+                const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
+                const scale = resource.scale || { x: 1, y: 1, z: 1 };
+                const rotationY = resource.rotation_y || 0;
+
+                return (
+                  <tr
+                    key={`${material.material_id}-${process.process_id}-${parallelLineIndex}`}
+                    ref={isSelected ? selectedRowRef : null}
+                    style={{
+                      ...styles.row,
+                      ...(isSelected ? styles.rowSelected : {}),
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedResource('material', material.material_id, process.process_id, parallelLineIndex || 0);
+                    }}
+                  >
+                    {idx === 0 && (
+                      <>
+                        <td style={styles.td} rowSpan={usage.length}>
+                          <strong>{material.material_id}</strong>
+                        </td>
+                        <td style={styles.td} rowSpan={usage.length}>
+                          {material.name}
+                        </td>
+                        <td style={styles.td} rowSpan={usage.length}>
+                          <span style={styles.unit}>{material.unit}</span>
+                        </td>
+                      </>
                     )}
-                  </td>
-                </tr>
-              );
+                    <td style={styles.td}>
+                      <span style={styles.processChip}>{lineLabel}</span>
+                    </td>
+                    <td style={styles.td}>
+                      <span style={styles.quantity}>{resource.quantity} {material.unit}</span>
+                    </td>
+                    <td style={styles.td}>
+                      <input
+                        type="text"
+                        style={styles.input}
+                        value={`${relLoc.x.toFixed(1)}, ${relLoc.z.toFixed(1)}`}
+                        onChange={(e) => {
+                          const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
+                          if (values.length === 2 && !values.some(isNaN)) {
+                            updateResourceLocation(process.process_id, 'material', material.material_id, { x: values[0], y: 0, z: values[1] });
+                          }
+                        }}
+                      />
+                    </td>
+                    <td style={styles.td}>
+                      <input
+                        type="text"
+                        style={styles.input}
+                        value={`${scale.x.toFixed(2)}, ${scale.y.toFixed(2)}, ${scale.z.toFixed(2)}`}
+                        onChange={(e) => {
+                          const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
+                          if (values.length === 3 && !values.some(isNaN)) {
+                            updateResourceScale(process.process_id, 'material', material.material_id, { x: values[0], y: values[1], z: values[2] });
+                          }
+                        }}
+                      />
+                    </td>
+                    <td style={styles.td}>
+                      <input
+                        type="text"
+                        style={styles.input}
+                        value={(rotationY * 180 / Math.PI).toFixed(1)}
+                        onChange={(e) => {
+                          const deg = parseFloat(e.target.value);
+                          if (!isNaN(deg)) {
+                            updateResourceRotation(process.process_id, 'material', material.material_id, deg * Math.PI / 180);
+                          }
+                        }}
+                      />
+                    </td>
+                  </tr>
+                );
+              });
             })}
           </tbody>
         </table>
@@ -214,43 +244,32 @@ const styles = {
     backgroundColor: 'white',
     borderBottom: '1px solid #ddd',
     transition: 'background-color 0.2s',
+    cursor: 'pointer',
+  },
+  rowSelected: {
+    backgroundColor: '#fff3e0',
+    borderLeft: '3px solid #ff9800',
   },
   td: {
-    padding: '12px 8px',
-    verticalAlign: 'top',
+    padding: '8px 6px',
+    verticalAlign: 'middle',
+  },
+  input: {
+    width: '100%',
+    padding: '4px 6px',
+    fontSize: '11px',
+    border: '1px solid #ddd',
+    borderRadius: '3px',
+    fontFamily: 'monospace',
   },
   unit: {
     color: '#666',
     fontSize: '12px',
     fontWeight: '500',
   },
-  totalQuantity: {
-    color: '#ff9800',
-    fontSize: '13px',
-    fontWeight: 'bold',
-  },
-  processList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  processItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
-    padding: '4px 8px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-  },
-  processItemSelected: {
-    backgroundColor: '#fff3e0',
-    borderLeft: '3px solid #ff9800',
-  },
-  processRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
+  quantity: {
+    fontSize: '12px',
+    color: '#666',
   },
   processChip: {
     display: 'inline-block',
@@ -260,15 +279,6 @@ const styles = {
     fontSize: '11px',
     borderRadius: '8px',
     fontWeight: '500',
-  },
-  quantity: {
-    fontSize: '12px',
-    color: '#666',
-  },
-  locationText: {
-    fontSize: '10px',
-    color: '#666',
-    fontFamily: 'monospace',
   },
   notUsed: {
     color: '#999',
