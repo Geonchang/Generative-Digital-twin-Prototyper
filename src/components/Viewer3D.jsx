@@ -43,26 +43,15 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
   // 공장 레이아웃:
   // X축: 공정 흐름 방향 (0, 5, 10, 15...)
   // Y축: 높이 (height) - 바닥은 0
-  // Z축: 병렬 라인 방향 (parallel lines)
-
-  // 병렬 라인은 Z축으로 5m씩 이동
-  const zOffset = parallelIndex * 5;
+  // Z축: 병렬 공정 분리 방향 (parallel processes are now separated into individual processes)
 
   const color = isSelected ? '#ffeb3b' : (hovered ? '#ffd54f' : '#e0e0e0');
 
   // 바운딩 박스 계산: 이 공정의 모든 리소스를 포함
-  // useMemo 제거 - 리소스의 scale/rotation 변경 시에도 즉시 반영되도록
   const calculateBoundingBox = () => {
     const resources = process.resources || [];
 
-    // 이 병렬 라인에 해당하는 리소스만 필터링
-    const filteredResources = resources.filter(resource => {
-      return resource.parallel_line_index === undefined ||
-             resource.parallel_line_index === null ||
-             resource.parallel_line_index === parallelIndex;
-    });
-
-    if (filteredResources.length === 0) {
+    if (resources.length === 0) {
       // 리소스가 없으면 아주 작은 크기
       return { width: 0.5, depth: 0.5, centerX: 0, centerZ: 0 };
     }
@@ -73,7 +62,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
     let minZ = Infinity;
     let maxZ = -Infinity;
 
-    filteredResources.forEach((resource, resourceIndex) => {
+    resources.forEach((resource, resourceIndex) => {
       const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
 
       // ResourceMarker와 동일한 로직으로 위치 계산
@@ -86,7 +75,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
         // Auto-layout: ResourceMarker와 동일한 계산
         const boxWidth = 2;
         const boxDepth = 1.5;
-        const totalResources = filteredResources.length;
+        const totalResources = resources.length;
         const cols = Math.ceil(Math.sqrt(totalResources));
         const rows = Math.ceil(totalResources / cols);
         const col = resourceIndex % cols;
@@ -154,11 +143,11 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
 
   const boundingBox = calculateBoundingBox();
 
-  // group을 process.location에 고정 (바운딩 박스 중심 제외)
+  // group을 process.location에 고정
   const position = [
     process.location.x,
     0,
-    process.location.z + zOffset
+    process.location.z
   ];
 
   // Get rotation from process data (with default)
@@ -190,11 +179,11 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
     if (!groupRef.current) return;
 
     if (transformMode === 'translate') {
-      // 새 위치 계산 (zOffset만 제거)
+      // 새 위치 저장
       const newLocation = {
         x: groupRef.current.position.x,
         y: 0,
-        z: groupRef.current.position.z - zOffset
+        z: groupRef.current.position.z
       };
 
       // Store 업데이트
@@ -335,7 +324,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
   return (
     <>
       <group ref={groupRef} position={position} rotation={[0, rotationY, 0]}>
-      {/* Process plane - 얇은 바닥 표시 (바운딩 박스 중심에 배치) */}
+      {/* Process plane - 바운딩 박스 중심에 배치 */}
       <mesh
         position={[boundingBox.centerX, 0.01, boundingBox.centerZ]}
         rotation={[-Math.PI / 2, 0, 0]}
@@ -360,14 +349,10 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
         <planeGeometry args={[boundingBox.width, boundingBox.depth]} />
         <meshStandardMaterial
           color={color}
-          emissive={
-            isSelected
-              ? (transformMode === 'translate' ? '#4a90e2' : '#ff6b6b')
-              : '#000000'
-          }
-          emissiveIntensity={isSelected ? 0.5 : 0}
+          emissive={isSelected ? '#ffeb3b' : '#000000'}
+          emissiveIntensity={isSelected ? 0.6 : 0}
           transparent={true}
-          opacity={0.3}
+          opacity={isSelected ? 0.7 : 0.3}
           side={2}
           depthWrite={false}
         />
@@ -386,7 +371,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
 
       {/* Process ID and cycle time */}
       <Text
-        position={[boundingBox.centerX, 2.2, boundingBox.centerZ]}
+        position={[0, 2.2, 0]}
         fontSize={0.15}
         color="#666"
         anchorX="center"
@@ -398,7 +383,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
       {/* Parallel indicator */}
       {parallelIndex > 0 && (
         <Text
-          position={[boundingBox.centerX, 1.9, boundingBox.centerZ]}
+          position={[0, 1.9, 0]}
           fontSize={0.12}
           color="#999"
           anchorX="center"
@@ -411,7 +396,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
       {/* Transform mode indicator - 선택된 경우에만 표시 */}
       {isSelected && (
         <Text
-          position={[boundingBox.centerX, 3.0, boundingBox.centerZ]}
+          position={[0, 3.0, 0]}
           fontSize={0.2}
           color={
             (activeAxis || hoveredAxis) === 'X' ? '#ff0000' :
@@ -466,9 +451,6 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   const groupRef = useRef();
   const transformControlsRef = useRef();
 
-  // 병렬 라인 Z축 오프셋
-  const zOffset = parallelIndex * 5;
-
   // 리소스 위치 계산: relative_location이 명시적으로 설정되었으면 사용, 아니면 auto-layout
   const getPosition = () => {
     const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
@@ -509,7 +491,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
 
   // 3. 월드 좌표로 변환: process.location + 회전된 좌표
   const actualX = processLocation.x + rotatedX;
-  const actualZ = processLocation.z + rotatedZ + zOffset;
+  const actualZ = processLocation.z + rotatedZ;
 
   const getColor = () => {
     if (resource.resource_type === 'equipment' && equipmentData) {
@@ -559,25 +541,25 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   };
 
   // Calculate resource key and check if selected
-  const resourceKey = `${resource.resource_type}-${resource.resource_id}-${processId}-${parallelIndex}`;
+  // Use ':' separator (format: type:resourceId:processId)
+  const resourceKey = `${resource.resource_type}:${resource.resource_id}:${processId}`;
   const isSelected = selectedResourceKey === resourceKey;
 
   // 디버깅 로그 (선택된 리소스만)
   if (isSelected) {
-    console.log(`[ResourceMarker ${resource.resource_id}] processId=${processId}, parallelIndex=${parallelIndex}`);
+    console.log(`[ResourceMarker ${resource.resource_id}] processId=${processId}`);
     console.log(`  processLocation: (${processLocation.x.toFixed(2)}, ${processLocation.z.toFixed(2)})`);
     console.log(`  relative_location (autoPos): (${autoPos.x.toFixed(2)}, ${autoPos.z.toFixed(2)})`);
-    console.log(`  zOffset: ${zOffset}`);
     console.log(`  processRotation: ${(processRotation * 180 / Math.PI).toFixed(1)}°`);
     console.log(`  after rotation: (${rotatedX.toFixed(2)}, ${rotatedZ.toFixed(2)})`);
     console.log(`  final actualPosition: (${actualX.toFixed(2)}, ${actualZ.toFixed(2)})`);
-    console.log(`  expected (no rotation): (${(processLocation.x + autoPos.x).toFixed(2)}, ${(processLocation.z + autoPos.z + zOffset).toFixed(2)})`);
+    console.log(`  expected (no rotation): (${(processLocation.x + autoPos.x).toFixed(2)}, ${(processLocation.z + autoPos.z).toFixed(2)})`);
   }
 
   // Click handler
   const handleClick = (e) => {
     e.stopPropagation();
-    setSelectedResource(resource.resource_type, resource.resource_id, processId, parallelIndex);
+    setSelectedResource(resource.resource_type, resource.resource_id, processId);
   };
 
   const color = isSelected ? '#ffeb3b' : (hovered ? '#ffeb3b' : getColor());
@@ -615,13 +597,25 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
     if (!groupRef.current) return;
 
     if (transformMode === 'translate') {
+      console.log(`\n[ResourceMarker Transform] ${resource.resource_id} (${resource.resource_type})`);
+      console.log(`  processId: ${processId}`);
+
       // 1. 월드 좌표 → process.location 기준 좌표
       const worldOffsetX = groupRef.current.position.x - processLocation.x;
-      const worldOffsetZ = groupRef.current.position.z - processLocation.z - zOffset;
+      const worldOffsetZ = groupRef.current.position.z - processLocation.z;
 
-      // 2. 역회전 변환 - 정회전의 역
+      console.log(`  월드 좌표: (${groupRef.current.position.x.toFixed(2)}, ${groupRef.current.position.z.toFixed(2)})`);
+      console.log(`  공정 위치: (${processLocation.x.toFixed(2)}, ${processLocation.z.toFixed(2)})`);
+      console.log(`  월드 오프셋: (${worldOffsetX.toFixed(2)}, ${worldOffsetZ.toFixed(2)})`);
+      console.log(`  공정 회전: ${(processRotation * 180 / Math.PI).toFixed(1)}°`);
+
+      // 2. 역회전 변환 - 정회전의 역행렬
+      // 정회전: rotatedX = x*cos + z*sin, rotatedZ = -x*sin + z*cos
+      // 역회전: x = rotatedX*cos - rotatedZ*sin, z = rotatedX*sin + rotatedZ*cos
       const relX = worldOffsetX * Math.cos(processRotation) - worldOffsetZ * Math.sin(processRotation);
       const relZ = worldOffsetX * Math.sin(processRotation) + worldOffsetZ * Math.cos(processRotation);
+
+      console.log(`  역회전 결과 (relative): (${relX.toFixed(2)}, ${relZ.toFixed(2)})`);
 
       // 3. process.location 기준 상대 좌표
       const newRelativeLocation = {
@@ -631,6 +625,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
       };
 
       // Store 업데이트
+      console.log(`  ⚡ updateResourceLocation 호출`);
       updateResourceLocation(
         processId,
         resource.resource_type,
@@ -967,18 +962,12 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
 // Process Flow Arrow Component with arrowhead
 function ProcessFlowArrow({ fromProcess, toProcess, parallelIndex }) {
   const { bopData } = useBopStore();
-  const zOffset = parallelIndex * 5;
 
   // 각 공정의 바운딩 박스 계산 (ProcessBox와 동일한 로직)
-  const calculateBoundingBox = (process, pIndex) => {
+  const calculateBoundingBox = (process) => {
     const resources = process.resources || [];
-    const filteredResources = resources.filter(resource => {
-      return resource.parallel_line_index === undefined ||
-             resource.parallel_line_index === null ||
-             resource.parallel_line_index === pIndex;
-    });
 
-    if (filteredResources.length === 0) {
+    if (resources.length === 0) {
       return { width: 0.5, depth: 0.5, centerX: 0, centerZ: 0 };
     }
 
@@ -987,7 +976,7 @@ function ProcessFlowArrow({ fromProcess, toProcess, parallelIndex }) {
     let minZ = Infinity;
     let maxZ = -Infinity;
 
-    filteredResources.forEach(resource => {
+    resources.forEach(resource => {
       const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
       const x = relLoc.x;
       const z = relLoc.z;
@@ -1015,16 +1004,36 @@ function ProcessFlowArrow({ fromProcess, toProcess, parallelIndex }) {
     return { width, depth, centerX, centerZ };
   };
 
-  const fromBBox = calculateBoundingBox(fromProcess, parallelIndex);
-  const toBBox = calculateBoundingBox(toProcess, parallelIndex);
+  const fromBBox = calculateBoundingBox(fromProcess);
+  const toBBox = calculateBoundingBox(toProcess);
 
-  // X축 방향으로 흐름 (왼쪽에서 오른쪽)
-  // 공정 바운딩 박스의 실제 끝점 사용 (center offset 반영)
-  const startX = fromProcess.location.x + fromBBox.centerX + (fromBBox.width / 2);
-  const startZ = fromProcess.location.z + fromBBox.centerZ + zOffset;
+  // 공정 회전 고려
+  const fromRotation = fromProcess.rotation_y || 0;
+  const toRotation = toProcess.rotation_y || 0;
 
-  const endX = toProcess.location.x + toBBox.centerX - (toBBox.width / 2);
-  const endZ = toProcess.location.z + toBBox.centerZ + zOffset;
+  // From 공정의 출구점 (로컬 좌표계에서 오른쪽 끝)
+  const fromLocalX = fromBBox.centerX + (fromBBox.width / 2);
+  const fromLocalZ = fromBBox.centerZ;
+
+  // 회전 변환 적용 (Y축 회전, 부호 반대)
+  const fromRotatedX = fromLocalX * Math.cos(fromRotation) + fromLocalZ * Math.sin(fromRotation);
+  const fromRotatedZ = -fromLocalX * Math.sin(fromRotation) + fromLocalZ * Math.cos(fromRotation);
+
+  // 월드 좌표로 변환
+  const startX = fromProcess.location.x + fromRotatedX;
+  const startZ = fromProcess.location.z + fromRotatedZ;
+
+  // To 공정의 입구점 (로컬 좌표계에서 왼쪽 끝)
+  const toLocalX = toBBox.centerX - (toBBox.width / 2);
+  const toLocalZ = toBBox.centerZ;
+
+  // 회전 변환 적용 (Y축 회전, 부호 반대)
+  const toRotatedX = toLocalX * Math.cos(toRotation) + toLocalZ * Math.sin(toRotation);
+  const toRotatedZ = -toLocalX * Math.sin(toRotation) + toLocalZ * Math.cos(toRotation);
+
+  // 월드 좌표로 변환
+  const endX = toProcess.location.x + toRotatedX;
+  const endZ = toProcess.location.z + toRotatedZ;
 
   const points = [
     [startX, 1, startZ],
@@ -1167,12 +1176,15 @@ function Scene() {
     let minZ = Infinity;
 
     bopData.processes.forEach(process => {
+      // Skip parent processes (no location)
+      if (process.is_parent) return;
+
       // X축: 공정 흐름 방향 (동적 크기이므로 여유 공간 확보)
       const processMaxX = process.location.x + 3;
       const processMinX = process.location.x - 3;
 
-      // Z축: 병렬 라인 방향 (동적 크기이므로 여유 공간 확보)
-      const processMaxZ = process.location.z + (process.parallel_count - 1) * 5 + 2;
+      // Z축: 병렬 공정 분리 방향 (이제 각 프로세스가 독립적이므로 간단하게)
+      const processMaxZ = process.location.z + 2;
       const processMinZ = process.location.z - 2;
 
       maxX = Math.max(maxX, processMaxX);
@@ -1214,118 +1226,119 @@ function Scene() {
     const arrows = [];
 
     bopData.processes.forEach((process) => {
-      // 병렬 라인 수만큼 복제
-      for (let parallelIdx = 0; parallelIdx < process.parallel_count; parallelIdx++) {
-        const key = `${process.process_id}-parallel-${parallelIdx}`;
-        const processKey = `${process.process_id}-${parallelIdx}`;
-        const isSelected = selectedProcessKey === processKey;
+      // Skip parent processes (logical grouping only)
+      if (process.is_parent) return;
 
-        // Process box
-        elements.push(
-          <ProcessBox
-            key={key}
-            process={process}
-            parallelIndex={parallelIdx}
-            isSelected={isSelected}
-            onSelect={() => setSelectedProcess(process.process_id, parallelIdx)}
-            onTransformMouseDown={handleTransformMouseDown}
-            onTransformMouseUp={handleTransformMouseUp}
-            isDraggingTransformRef={isDraggingTransform}
-          />
-        );
+      const key = `process-${process.process_id}`;
+      const processKey = process.process_id; // Now directly use process_id (e.g., "P001-0")
+      const isSelected = selectedProcessKey === processKey;
 
-        // Process flow arrows (successor 기반) - 첫 번째 병렬 라인만
-        if (parallelIdx === 0 && Array.isArray(process.successor_ids) && process.successor_ids.length > 0) {
-          process.successor_ids.forEach(successorId => {
-            if (successorId) {
-              const successorProcess = getProcessById(successorId);
-              if (successorProcess) {
-                arrows.push(
-                  <ProcessFlowArrow
-                    key={`${key}-arrow-${successorId}`}
-                    fromProcess={process}
-                    toProcess={successorProcess}
-                    parallelIndex={0}
-                  />
-                );
+      // Process box
+      elements.push(
+        <ProcessBox
+          key={key}
+          process={process}
+          parallelIndex={0} // Always 0 since each process is independent now
+          isSelected={isSelected}
+          onSelect={() => setSelectedProcess(process.process_id)}
+          onTransformMouseDown={handleTransformMouseDown}
+          onTransformMouseUp={handleTransformMouseUp}
+          isDraggingTransformRef={isDraggingTransform}
+        />
+      );
+
+      // Process flow arrows (successor 기반)
+      if (Array.isArray(process.successor_ids) && process.successor_ids.length > 0) {
+        process.successor_ids.forEach(successorId => {
+          if (successorId) {
+            let successorProcess = getProcessById(successorId);
+
+            // If successor is a parent process, use the first child instead
+            if (successorProcess && successorProcess.is_parent) {
+              const firstChildId = successorProcess.children?.[0];
+              if (firstChildId) {
+                successorProcess = getProcessById(firstChildId);
               }
             }
-          });
-        }
 
-        // Resources for this process instance - 병렬 라인별 필터링
-        const resources = process.resources || [];
-        const filteredResources = resources.filter(resource => {
-          // parallel_line_index가 없으면 모든 라인에서 사용, 있으면 해당 라인만
-          return resource.parallel_line_index === undefined ||
-                 resource.parallel_line_index === null ||
-                 resource.parallel_line_index === parallelIdx;
-        });
-
-        // 공정의 실제 중심 좌표 계산 (ProcessBox와 동일한 로직)
-        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-        filteredResources.forEach(resource => {
-          const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
-          const x = relLoc.x;
-          const z = relLoc.z;
-
-          let equipmentType = null;
-          if (resource.resource_type === 'equipment' && bopData?.equipments) {
-            const equipmentData = bopData.equipments.find(e => e.equipment_id === resource.resource_id);
-            equipmentType = equipmentData?.type;
+            if (successorProcess && !successorProcess.is_parent) {
+              arrows.push(
+                <ProcessFlowArrow
+                  key={`${key}-arrow-${successorId}`}
+                  fromProcess={process}
+                  toProcess={successorProcess}
+                  parallelIndex={0}
+                />
+              );
+            }
           }
-          const resourceSize = getResourceSize(resource.resource_type, equipmentType);
-
-          minX = Math.min(minX, x - resourceSize.width / 2);
-          maxX = Math.max(maxX, x + resourceSize.width / 2);
-          minZ = Math.min(minZ, z - resourceSize.depth / 2);
-          maxZ = Math.max(maxZ, z + resourceSize.depth / 2);
-        });
-
-        const centerX = filteredResources.length > 0 ? (minX + maxX) / 2 : 0;
-        const centerZ = filteredResources.length > 0 ? (minZ + maxZ) / 2 : 0;
-
-        // Bounding center (회전 중심 오프셋)
-        const boundingCenter = { x: centerX, z: centerZ };
-
-        // 디버깅: ProcessBox와 Scene의 boundingBox 계산이 일치하는지 확인
-        console.log(`[Scene boundingBox] ${process.process_id}-${parallelIdx}: centerX=${centerX.toFixed(2)}, centerZ=${centerZ.toFixed(2)}`);
-
-        filteredResources.forEach((resource, resIdx) => {
-          const resKey = `${key}-resource-${resIdx}`;
-
-          let equipmentData = null;
-          let workerData = null;
-          let materialData = null;
-
-          if (resource.resource_type === 'equipment') {
-            equipmentData = getEquipmentById(resource.resource_id);
-          } else if (resource.resource_type === 'worker') {
-            workerData = getWorkerById(resource.resource_id);
-          } else if (resource.resource_type === 'material') {
-            materialData = getMaterialById(resource.resource_id);
-          }
-
-          elements.push(
-            <ResourceMarker
-              key={resKey}
-              resource={resource}
-              processLocation={process.location}
-              processBoundingCenter={boundingCenter}
-              processRotation={process.rotation_y || 0}
-              parallelIndex={parallelIdx}
-              processId={process.process_id}
-              equipmentData={equipmentData}
-              workerData={workerData}
-              materialData={materialData}
-              resourceIndex={resIdx}
-              totalResources={filteredResources.length}
-              onTransformMouseDown={handleTransformMouseDown}
-              onTransformMouseUp={handleTransformMouseUp}
-            />
-          );
         });
       }
+
+      // Resources for this process - no filtering needed (already separated)
+      const resources = process.resources || [];
+
+      // 공정의 실제 중심 좌표 계산 (ProcessBox와 동일한 로직)
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      resources.forEach(resource => {
+        const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
+        const x = relLoc.x;
+        const z = relLoc.z;
+
+        let equipmentType = null;
+        if (resource.resource_type === 'equipment' && bopData?.equipments) {
+          const equipmentData = bopData.equipments.find(e => e.equipment_id === resource.resource_id);
+          equipmentType = equipmentData?.type;
+        }
+        const resourceSize = getResourceSize(resource.resource_type, equipmentType);
+
+        minX = Math.min(minX, x - resourceSize.width / 2);
+        maxX = Math.max(maxX, x + resourceSize.width / 2);
+        minZ = Math.min(minZ, z - resourceSize.depth / 2);
+        maxZ = Math.max(maxZ, z + resourceSize.depth / 2);
+      });
+
+      const centerX = resources.length > 0 ? (minX + maxX) / 2 : 0;
+      const centerZ = resources.length > 0 ? (minZ + maxZ) / 2 : 0;
+
+      // Bounding center (회전 중심 오프셋)
+      const boundingCenter = { x: centerX, z: centerZ };
+
+      // Render resources
+      resources.forEach((resource, resIdx) => {
+        const resKey = `${key}-resource-${resIdx}`;
+
+        let equipmentData = null;
+        let workerData = null;
+        let materialData = null;
+
+        if (resource.resource_type === 'equipment') {
+          equipmentData = getEquipmentById(resource.resource_id);
+        } else if (resource.resource_type === 'worker') {
+          workerData = getWorkerById(resource.resource_id);
+        } else if (resource.resource_type === 'material') {
+          materialData = getMaterialById(resource.resource_id);
+        }
+
+        elements.push(
+          <ResourceMarker
+            key={resKey}
+            resource={resource}
+            processLocation={process.location}
+            processBoundingCenter={boundingCenter}
+            processRotation={process.rotation_y || 0}
+            parallelIndex={0} // Always 0 now
+            processId={process.process_id}
+            equipmentData={equipmentData}
+            workerData={workerData}
+            materialData={materialData}
+            resourceIndex={resIdx}
+            totalResources={resources.length}
+            onTransformMouseDown={handleTransformMouseDown}
+            onTransformMouseUp={handleTransformMouseUp}
+          />
+        );
+      });
     });
 
     return [...elements, ...arrows];

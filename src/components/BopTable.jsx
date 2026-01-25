@@ -62,20 +62,15 @@ function BopTable() {
     );
   }
 
-  // Helper functions - 병렬 라인별 리소스 필터링
-  const getResourcesByType = (process, parallelLineIndex) => {
+  // Helper functions - 리소스 타입별 분류
+  const getResourcesByType = (process) => {
     const equipments = [];
     const workers = [];
     const materials = [];
 
+    if (!process.resources) return { equipments, workers, materials };
+
     process.resources.forEach(resource => {
-      // parallel_line_index가 있으면 해당 라인만, 없으면 모든 라인에서 사용
-      const isForThisLine = resource.parallel_line_index === undefined ||
-                            resource.parallel_line_index === null ||
-                            resource.parallel_line_index === parallelLineIndex;
-
-      if (!isForThisLine) return;
-
       if (resource.resource_type === 'equipment') {
         const eq = getEquipmentById(resource.resource_id);
         if (eq) {
@@ -102,15 +97,18 @@ function BopTable() {
     return resources.map(formatter).join(', ');
   };
 
-  // Calculate bottleneck
+  // Calculate bottleneck - only consider child processes (actual production lines)
   const getBottleneck = () => {
     let maxTime = 0;
     let bottleneckProcess = null;
 
     bopData.processes.forEach(process => {
-      const effectiveTime = process.cycle_time_sec / process.parallel_count;
-      if (effectiveTime > maxTime) {
-        maxTime = effectiveTime;
+      // Skip parent processes
+      if (process.is_parent) return;
+
+      const cycleTime = process.cycle_time_sec;
+      if (cycleTime > maxTime) {
+        maxTime = cycleTime;
         bottleneckProcess = process;
       }
     });
@@ -119,6 +117,34 @@ function BopTable() {
   };
 
   const bottleneck = getBottleneck();
+
+  // Group processes by parent (for hierarchical display)
+  const processGroups = [];
+  const processedIds = new Set();
+
+  bopData.processes.forEach(process => {
+    if (processedIds.has(process.process_id)) return;
+
+    if (process.is_parent) {
+      // Parent process - find all children
+      const children = bopData.processes.filter(p => p.parent_id === process.process_id);
+      if (children.length > 0) {
+        processGroups.push({
+          parent: process,
+          children: children.sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0))
+        });
+        processedIds.add(process.process_id);
+        children.forEach(c => processedIds.add(c.process_id));
+      }
+    } else if (!process.parent_id) {
+      // Independent process (no parent)
+      processGroups.push({
+        parent: null,
+        children: [process]
+      });
+      processedIds.add(process.process_id);
+    }
+  });
 
   return (
     <div style={styles.container}>
@@ -137,72 +163,123 @@ function BopTable() {
               <th style={{ ...styles.th, minWidth: '150px' }}>Name</th>
               <th style={{ ...styles.th, minWidth: '100px' }}>Cycle Time</th>
               <th style={{ ...styles.th, minWidth: '80px' }}>Parallel</th>
-              <th style={{ ...styles.th, minWidth: '120px' }}>Location</th>
+              <th style={{ ...styles.th, minWidth: '120px' }}>Location (x,z)</th>
+              <th style={{ ...styles.th, width: '80px' }}>Rotation (Y)</th>
               <th style={{ ...styles.th, minWidth: '150px' }}>Equipments</th>
               <th style={{ ...styles.th, minWidth: '120px' }}>Workers</th>
               <th style={{ ...styles.th, minWidth: '200px' }}>Materials</th>
             </tr>
           </thead>
           <tbody>
-            {bopData.processes.map((process) => {
-              const effectiveCycleTime = process.cycle_time_sec / process.parallel_count;
-              const isBottleneck = bottleneck.process?.process_id === process.process_id;
-
-              // 병렬 라인 수만큼 row 생성
+            {processGroups.map((group, groupIdx) => {
               const rows = [];
-              for (let i = 0; i < process.parallel_count; i++) {
-                const isFirstRow = i === 0;
-                const processKey = `${process.process_id}-${i}`;
-                const isThisRowSelected = selectedProcessKey === processKey;
+              const isParallelGroup = group.parent && group.children.length > 1;
 
-                // 각 병렬 라인의 리소스 가져오기
-                const { equipments, workers, materials } = getResourcesByType(process, i);
+              group.children.forEach((process, childIdx) => {
+                const isFirstChild = childIdx === 0;
+                const isThisRowSelected = selectedProcessKey === process.process_id;
+                const isBottleneck = bottleneck.process?.process_id === process.process_id;
+
+                const { equipments, workers, materials } = getResourcesByType(process);
+
                 rows.push(
                   <tr
-                    key={processKey}
+                    key={process.process_id}
                     style={{
                       ...styles.processRow,
                       ...(isThisRowSelected ? styles.processRowSelected : {}),
-                      ...(isBottleneck && isFirstRow ? styles.bottleneckRow : {}),
-                      ...(isFirstRow ? {} : styles.parallelRow)
+                      ...(isBottleneck ? styles.bottleneckRow : {}),
+                      ...(isFirstChild ? {} : styles.parallelRow)
                     }}
-                    onClick={() => setSelectedProcess(process.process_id, i)}
+                    onClick={() => setSelectedProcess(process.process_id)}
                   >
-                    {isFirstRow ? (
+                    {isFirstChild && isParallelGroup ? (
+                      // Parent group header (first child of parallel group)
                       <>
                         <td style={styles.td}>
-                          <strong>{process.process_id}</strong>
+                          <strong>{group.parent.process_id}</strong>
                         </td>
                         <td style={styles.td}>
                           <div style={styles.processName}>
-                            <strong>{process.name}</strong>
-                            {process.parallel_count > 1 && (
-                              <span style={styles.parallelBadge}>
-                                {process.parallel_count}x
-                              </span>
-                            )}
+                            <strong>{group.parent.name}</strong>
+                            <span style={styles.parallelBadge}>
+                              {group.children.length}x
+                            </span>
                             {isBottleneck && (
                               <span style={styles.bottleneckBadge}>
                                 🔴 Bottleneck
                               </span>
                             )}
                           </div>
-                          <div style={styles.processDescription}>{process.description}</div>
+                          <div style={styles.processDescription}>{group.parent.description}</div>
                         </td>
                         <td style={styles.td}>
                           <div style={styles.cycleTimeInfo}>
-                            <div><strong>{process.cycle_time_sec.toFixed(1)}s</strong></div>
-                            <div style={styles.effectiveTime}>
-                              Eff: <strong>{effectiveCycleTime.toFixed(1)}s</strong>
-                            </div>
+                            <div><strong>{process.cycle_time_sec?.toFixed(1) || 0}s</strong></div>
                           </div>
                         </td>
                         <td style={styles.td}>
-                          <span style={styles.parallelCount}>{process.parallel_count}</span>
+                          <span style={styles.parallelCount}>#{process.parallel_index + 1}</span>
                         </td>
                         <td style={styles.td}>
                           <div style={styles.locationCell}>
-                            ({process.location.x}, {process.location.y}, {process.location.z})
+                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.resourcesCell}>
+                            {formatResources(equipments, eq =>
+                              `${eq.name} (x${eq.quantity})`
+                            )}
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.resourcesCell}>
+                            {formatResources(workers, w =>
+                              `${w.name} (x${w.quantity})`
+                            )}
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.resourcesCell}>
+                            {formatResources(materials, m =>
+                              `${m.name} (${m.quantity}${m.unit})`
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    ) : isParallelGroup ? (
+                      // Child rows of parallel group (2nd and beyond)
+                      <>
+                        <td style={styles.td}>
+                          <span style={styles.parallelLabel}>{process.process_id}</span>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.parallelLineText}>
+                            └ #{process.parallel_index + 1}
+                          </span>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.cycleTimeInfo}>
+                            <div>{process.cycle_time_sec?.toFixed(1) || 0}s</div>
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={styles.parallelCount}>#{process.parallel_index + 1}</span>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
                           </div>
                         </td>
                         <td style={styles.td}>
@@ -228,21 +305,39 @@ function BopTable() {
                         </td>
                       </>
                     ) : (
+                      // Independent process (no parent)
                       <>
                         <td style={styles.td}>
-                          <span style={styles.parallelLabel}>{process.process_id}-#{i + 1}</span>
+                          <strong>{process.process_id}</strong>
                         </td>
                         <td style={styles.td}>
-                          <span style={styles.parallelLineText}>└ 병렬 라인 #{i + 1}</span>
+                          <div style={styles.processName}>
+                            <strong>{process.name}</strong>
+                            {isBottleneck && (
+                              <span style={styles.bottleneckBadge}>
+                                🔴 Bottleneck
+                              </span>
+                            )}
+                          </div>
+                          <div style={styles.processDescription}>{process.description}</div>
                         </td>
                         <td style={styles.td}>
-                          <span style={styles.parallelLineText}>-</span>
+                          <div style={styles.cycleTimeInfo}>
+                            <div><strong>{process.cycle_time_sec.toFixed(1)}s</strong></div>
+                          </div>
                         </td>
                         <td style={styles.td}>
-                          <span style={styles.parallelLineText}>-</span>
+                          <span>1</span>
                         </td>
                         <td style={styles.td}>
-                          <span style={styles.parallelLineText}>-</span>
+                          <div style={styles.locationCell}>
+                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
+                          </div>
                         </td>
                         <td style={styles.td}>
                           <div style={styles.resourcesCell}>
@@ -269,7 +364,8 @@ function BopTable() {
                     )}
                   </tr>
                 );
-              }
+              });
+
               return rows;
             })}
           </tbody>
@@ -280,7 +376,9 @@ function BopTable() {
       <div style={styles.summary}>
         <div style={styles.summaryItem}>
           <span style={styles.summaryLabel}>Total Processes:</span>
-          <span style={styles.summaryValue}>{bopData.processes.length}</span>
+          <span style={styles.summaryValue}>
+            {bopData.processes.filter(p => !p.is_parent).length}
+          </span>
         </div>
         <div style={styles.summaryItem}>
           <span style={styles.summaryLabel}>Equipments:</span>

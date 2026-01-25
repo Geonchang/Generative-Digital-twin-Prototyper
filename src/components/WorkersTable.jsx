@@ -50,7 +50,6 @@ function WorkersTable() {
         result.push({
           process,
           resource,
-          parallelLineIndex: resource.parallel_line_index,
         });
       }
     });
@@ -103,12 +102,11 @@ function WorkersTable() {
                 );
               }
 
-              return usedProcesses.map(({ process, resource, parallelLineIndex }, idx) => {
-                const lineLabel = parallelLineIndex !== undefined && parallelLineIndex !== null
-                  ? `${process.process_id}-#${parallelLineIndex + 1}`
-                  : process.process_id;
+              return usedProcesses.map(({ process, resource }, idx) => {
+                // process_id is now unique (e.g., "P001-0", "P001-1")
+                const lineLabel = process.process_id;
 
-                const resourceKey = `worker-${worker.worker_id}-${process.process_id}-${parallelLineIndex || 0}`;
+                const resourceKey = `worker:${worker.worker_id}:${process.process_id}`;
                 const isSelected = selectedResourceKey === resourceKey;
 
                 const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
@@ -125,7 +123,7 @@ function WorkersTable() {
 
                 return (
                   <tr
-                    key={`${worker.worker_id}-${process.process_id}-${parallelLineIndex}`}
+                    key={`${worker.worker_id}-${process.process_id}`}
                     ref={isSelected ? selectedRowRef : null}
                     style={{
                       ...styles.row,
@@ -133,7 +131,7 @@ function WorkersTable() {
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedResource('worker', worker.worker_id, process.process_id, parallelLineIndex || 0);
+                      setSelectedResource('worker', worker.worker_id, process.process_id);
                     }}
                   >
                     {idx === 0 && (

@@ -13,6 +13,7 @@ function App() {
     if (!bopData) {
       console.log('[APP] Loading mock BOP data...');
       setBopData(mockBopData);
+      console.log('[APP] BOP data loaded and parallel processes expanded');
     }
   }, [bopData, setBopData]);
 
