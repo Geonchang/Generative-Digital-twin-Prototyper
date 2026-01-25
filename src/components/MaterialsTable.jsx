@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import useBopStore from '../store/bopStore';
+import { getResourceSize } from './Viewer3D';
 
 function MaterialsTable() {
   const { bopData, selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceScale, updateResourceRotation } = useBopStore();
@@ -99,6 +100,14 @@ function MaterialsTable() {
                 const scale = resource.scale || { x: 1, y: 1, z: 1 };
                 const rotationY = resource.rotation_y || 0;
 
+                // 실제 geometry 크기 계산 (기본 크기 × scale)
+                const baseSize = getResourceSize('material', null);
+                const actualSize = {
+                  x: baseSize.width * scale.x,
+                  y: baseSize.height * scale.y,
+                  z: baseSize.depth * scale.z
+                };
+
                 return (
                   <tr
                     key={`${material.material_id}-${process.process_id}-${parallelLineIndex}`}
@@ -148,11 +157,17 @@ function MaterialsTable() {
                       <input
                         type="text"
                         style={styles.input}
-                        value={`${scale.x.toFixed(2)}, ${scale.y.toFixed(2)}, ${scale.z.toFixed(2)}`}
+                        value={`${actualSize.x.toFixed(2)}, ${actualSize.y.toFixed(2)}, ${actualSize.z.toFixed(2)}`}
                         onChange={(e) => {
                           const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
                           if (values.length === 3 && !values.some(isNaN)) {
-                            updateResourceScale(process.process_id, 'material', material.material_id, { x: values[0], y: values[1], z: values[2] });
+                            // 입력된 실제 크기를 scale로 변환
+                            const newScale = {
+                              x: values[0] / baseSize.width,
+                              y: values[1] / baseSize.height,
+                              z: values[2] / baseSize.depth
+                            };
+                            updateResourceScale(process.process_id, 'material', material.material_id, newScale);
                           }
                         }}
                       />
