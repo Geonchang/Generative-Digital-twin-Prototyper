@@ -3,9 +3,12 @@ import useBopStore from '../store/bopStore';
 import { getResourceSize } from './Viewer3D';
 
 function WorkersTable() {
-  const { bopData, selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceScale, updateResourceRotation } = useBopStore();
+  const { bopData, selectedResourceKey, setSelectedResource,
+    updateResourceLocation, updateResourceScale, updateResourceRotation,
+    addWorker, updateWorker, deleteWorker } = useBopStore();
   const selectedRowRef = useRef(null);
   const [editingCell, setEditingCell] = useState(null);
+  const [selectedMasterId, setSelectedMasterId] = useState(null);
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -17,11 +20,39 @@ function WorkersTable() {
     }
   }, [selectedResourceKey]);
 
+  const handleAddWorker = () => {
+    addWorker();
+    const workers = useBopStore.getState().bopData?.workers;
+    if (workers && workers.length > 0) {
+      setSelectedMasterId(workers[workers.length - 1].worker_id);
+    }
+  };
+
+  const handleDeleteWorker = () => {
+    if (!selectedMasterId) return;
+    if (window.confirm('선택한 작업자를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.')) {
+      deleteWorker(selectedMasterId);
+      setSelectedMasterId(null);
+    }
+  };
+
   if (!bopData || !bopData.workers || bopData.workers.length === 0) {
     return (
       <div style={styles.container}>
+        <div style={styles.header}>
+          <h2 style={styles.title}>작업자 마스터</h2>
+          <div style={styles.count}>총 0명</div>
+        </div>
+        <div style={styles.actionBar}>
+          <button style={styles.actionButton} onClick={handleAddWorker}>
+            + 작업자 추가
+          </button>
+        </div>
         <div style={styles.emptyState}>
           <p>작업자 데이터가 없습니다.</p>
+          <button style={styles.actionButton} onClick={handleAddWorker}>
+            + 작업자 추가
+          </button>
         </div>
       </div>
     );
@@ -65,6 +96,23 @@ function WorkersTable() {
         <div style={styles.count}>총 {bopData.workers.length}명</div>
       </div>
 
+      {/* Action Bar */}
+      <div style={styles.actionBar}>
+        <button style={styles.actionButton} onClick={handleAddWorker}>
+          + 작업자 추가
+        </button>
+        <button
+          style={{
+            ...styles.actionButtonDanger,
+            ...(selectedMasterId ? {} : styles.actionButtonDisabled)
+          }}
+          disabled={!selectedMasterId}
+          onClick={handleDeleteWorker}
+        >
+          선택 작업자 삭제
+        </button>
+      </div>
+
       {/* Table */}
       <div style={styles.tableWrapper}>
         <table style={styles.table}>
@@ -82,14 +130,43 @@ function WorkersTable() {
           <tbody>
             {bopData.workers.flatMap((worker) => {
               const usedProcesses = getProcessesUsingWorker(worker.worker_id);
+              const isMasterSelected = selectedMasterId === worker.worker_id;
 
               if (usedProcesses.length === 0) {
                 return (
-                  <tr key={worker.worker_id} style={styles.row}>
+                  <tr
+                    key={worker.worker_id}
+                    style={{
+                      ...styles.row,
+                      ...(isMasterSelected ? styles.rowMasterSelected : {}),
+                    }}
+                    onClick={() => setSelectedMasterId(worker.worker_id)}
+                  >
                     <td style={styles.td}><strong>{worker.worker_id}</strong></td>
-                    <td style={styles.td}>{worker.name}</td>
                     <td style={styles.td}>
-                      {worker.skill_level ? (
+                      {isMasterSelected ? (
+                        <input
+                          type="text"
+                          style={styles.editInput}
+                          value={worker.name}
+                          onChange={(e) => updateWorker(worker.worker_id, { name: e.target.value })}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : worker.name}
+                    </td>
+                    <td style={styles.td}>
+                      {isMasterSelected ? (
+                        <select
+                          style={styles.editSelect}
+                          value={worker.skill_level || ''}
+                          onChange={(e) => updateWorker(worker.worker_id, { skill_level: e.target.value })}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="Senior">Senior</option>
+                          <option value="Mid">Mid</option>
+                          <option value="Junior">Junior</option>
+                        </select>
+                      ) : worker.skill_level ? (
                         <span style={{ ...styles.skillBadge, backgroundColor: getSkillLevelColor(worker.skill_level) }}>
                           {worker.skill_level}
                         </span>
@@ -103,9 +180,7 @@ function WorkersTable() {
               }
 
               return usedProcesses.map(({ process, resource }, idx) => {
-                // process_id is now unique (e.g., "P001-0", "P001-1")
                 const lineLabel = process.process_id;
-
                 const resourceKey = `worker:${worker.worker_id}:${process.process_id}`;
                 const isSelected = selectedResourceKey === resourceKey;
 
@@ -113,7 +188,6 @@ function WorkersTable() {
                 const scale = resource.scale || { x: 1, y: 1, z: 1 };
                 const rotationY = resource.rotation_y || 0;
 
-                // 실제 geometry 크기 계산 (기본 크기 × scale)
                 const baseSize = getResourceSize('worker', null);
                 const actualSize = {
                   x: baseSize.width * scale.x,
@@ -128,10 +202,12 @@ function WorkersTable() {
                     style={{
                       ...styles.row,
                       ...(isSelected ? styles.rowSelected : {}),
+                      ...(isMasterSelected && !isSelected ? styles.rowMasterSelected : {}),
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedResource('worker', worker.worker_id, process.process_id);
+                      setSelectedMasterId(worker.worker_id);
                     }}
                   >
                     {idx === 0 && (
@@ -140,10 +216,29 @@ function WorkersTable() {
                           <strong>{worker.worker_id}</strong>
                         </td>
                         <td style={styles.td} rowSpan={usedProcesses.length}>
-                          {worker.name}
+                          {isMasterSelected ? (
+                            <input
+                              type="text"
+                              style={styles.editInput}
+                              value={worker.name}
+                              onChange={(e) => updateWorker(worker.worker_id, { name: e.target.value })}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : worker.name}
                         </td>
                         <td style={styles.td} rowSpan={usedProcesses.length}>
-                          {worker.skill_level ? (
+                          {isMasterSelected ? (
+                            <select
+                              style={styles.editSelect}
+                              value={worker.skill_level || ''}
+                              onChange={(e) => updateWorker(worker.worker_id, { skill_level: e.target.value })}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <option value="Senior">Senior</option>
+                              <option value="Mid">Mid</option>
+                              <option value="Junior">Junior</option>
+                            </select>
+                          ) : worker.skill_level ? (
                             <span style={{ ...styles.skillBadge, backgroundColor: getSkillLevelColor(worker.skill_level) }}>
                               {worker.skill_level}
                             </span>
@@ -177,7 +272,6 @@ function WorkersTable() {
                         onChange={(e) => {
                           const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
                           if (values.length === 3 && !values.some(isNaN)) {
-                            // 입력된 실제 크기를 scale로 변환
                             const newScale = {
                               x: values[0] / baseSize.width,
                               y: values[1] / baseSize.height,
@@ -229,6 +323,7 @@ const styles = {
     height: '100%',
     color: '#999',
     fontSize: '14px',
+    gap: '12px',
   },
   header: {
     padding: '20px',
@@ -248,6 +343,37 @@ const styles = {
     fontSize: '14px',
     color: '#4a90e2',
     fontWeight: 'bold',
+  },
+  actionBar: {
+    display: 'flex',
+    gap: '8px',
+    padding: '10px 20px',
+    borderBottom: '1px solid #ddd',
+    backgroundColor: '#fafafa',
+  },
+  actionButton: {
+    padding: '6px 14px',
+    backgroundColor: '#4a90e2',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  actionButtonDanger: {
+    padding: '6px 14px',
+    backgroundColor: '#e74c3c',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
   },
   tableWrapper: {
     flex: 1,
@@ -281,6 +407,10 @@ const styles = {
     backgroundColor: '#e8f5e9',
     borderLeft: '3px solid #2e7d32',
   },
+  rowMasterSelected: {
+    backgroundColor: '#f3e5f5',
+    borderLeft: '3px solid #9c27b0',
+  },
   td: {
     padding: '8px 6px',
     verticalAlign: 'middle',
@@ -292,6 +422,24 @@ const styles = {
     border: '1px solid #ddd',
     borderRadius: '3px',
     fontFamily: 'monospace',
+  },
+  editInput: {
+    width: '100%',
+    padding: '4px 6px',
+    fontSize: '12px',
+    border: '1px solid #9c27b0',
+    borderRadius: '3px',
+    boxSizing: 'border-box',
+    backgroundColor: '#fce4ec',
+  },
+  editSelect: {
+    width: '100%',
+    padding: '4px 6px',
+    fontSize: '11px',
+    border: '1px solid #9c27b0',
+    borderRadius: '3px',
+    backgroundColor: '#fce4ec',
+    cursor: 'pointer',
   },
   skillBadge: {
     display: 'inline-block',

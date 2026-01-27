@@ -3,9 +3,12 @@ import useBopStore from '../store/bopStore';
 import { getResourceSize } from './Viewer3D';
 
 function MaterialsTable() {
-  const { bopData, selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceScale, updateResourceRotation } = useBopStore();
+  const { bopData, selectedResourceKey, setSelectedResource,
+    updateResourceLocation, updateResourceScale, updateResourceRotation,
+    addMaterial, updateMaterial, deleteMaterial } = useBopStore();
   const selectedRowRef = useRef(null);
   const [editingCell, setEditingCell] = useState(null);
+  const [selectedMasterId, setSelectedMasterId] = useState(null);
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -17,11 +20,39 @@ function MaterialsTable() {
     }
   }, [selectedResourceKey]);
 
+  const handleAddMaterial = () => {
+    addMaterial();
+    const materials = useBopStore.getState().bopData?.materials;
+    if (materials && materials.length > 0) {
+      setSelectedMasterId(materials[materials.length - 1].material_id);
+    }
+  };
+
+  const handleDeleteMaterial = () => {
+    if (!selectedMasterId) return;
+    if (window.confirm('선택한 자재를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.')) {
+      deleteMaterial(selectedMasterId);
+      setSelectedMasterId(null);
+    }
+  };
+
   if (!bopData || !bopData.materials || bopData.materials.length === 0) {
     return (
       <div style={styles.container}>
+        <div style={styles.header}>
+          <h2 style={styles.title}>자재 마스터</h2>
+          <div style={styles.count}>총 0종</div>
+        </div>
+        <div style={styles.actionBar}>
+          <button style={styles.actionButton} onClick={handleAddMaterial}>
+            + 자재 추가
+          </button>
+        </div>
         <div style={styles.emptyState}>
           <p>자재 데이터가 없습니다.</p>
+          <button style={styles.actionButton} onClick={handleAddMaterial}>
+            + 자재 추가
+          </button>
         </div>
       </div>
     );
@@ -57,6 +88,23 @@ function MaterialsTable() {
         <div style={styles.count}>총 {bopData.materials.length}종</div>
       </div>
 
+      {/* Action Bar */}
+      <div style={styles.actionBar}>
+        <button style={styles.actionButton} onClick={handleAddMaterial}>
+          + 자재 추가
+        </button>
+        <button
+          style={{
+            ...styles.actionButtonDanger,
+            ...(selectedMasterId ? {} : styles.actionButtonDisabled)
+          }}
+          disabled={!selectedMasterId}
+          onClick={handleDeleteMaterial}
+        >
+          선택 자재 삭제
+        </button>
+      </div>
+
       {/* Table */}
       <div style={styles.tableWrapper}>
         <table style={styles.table}>
@@ -75,22 +123,50 @@ function MaterialsTable() {
           <tbody>
             {bopData.materials.flatMap((material) => {
               const usage = getMaterialUsage(material.material_id);
+              const isMasterSelected = selectedMasterId === material.material_id;
 
               if (usage.length === 0) {
                 return (
-                  <tr key={material.material_id} style={styles.row}>
+                  <tr
+                    key={material.material_id}
+                    style={{
+                      ...styles.row,
+                      ...(isMasterSelected ? styles.rowMasterSelected : {}),
+                    }}
+                    onClick={() => setSelectedMasterId(material.material_id)}
+                  >
                     <td style={styles.td}><strong>{material.material_id}</strong></td>
-                    <td style={styles.td}>{material.name}</td>
-                    <td style={styles.td}><span style={styles.unit}>{material.unit}</span></td>
+                    <td style={styles.td}>
+                      {isMasterSelected ? (
+                        <input
+                          type="text"
+                          style={styles.editInput}
+                          value={material.name}
+                          onChange={(e) => updateMaterial(material.material_id, { name: e.target.value })}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : material.name}
+                    </td>
+                    <td style={styles.td}>
+                      {isMasterSelected ? (
+                        <input
+                          type="text"
+                          style={styles.editInput}
+                          value={material.unit}
+                          onChange={(e) => updateMaterial(material.material_id, { unit: e.target.value })}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span style={styles.unit}>{material.unit}</span>
+                      )}
+                    </td>
                     <td style={styles.td} colSpan={5}><span style={styles.notUsed}>미사용</span></td>
                   </tr>
                 );
               }
 
               return usage.map(({ process, resource }, idx) => {
-                // process_id is now unique (e.g., "P001-0", "P001-1")
                 const lineLabel = process.process_id;
-
                 const resourceKey = `material:${material.material_id}:${process.process_id}`;
                 const isSelected = selectedResourceKey === resourceKey;
 
@@ -98,7 +174,6 @@ function MaterialsTable() {
                 const scale = resource.scale || { x: 1, y: 1, z: 1 };
                 const rotationY = resource.rotation_y || 0;
 
-                // 실제 geometry 크기 계산 (기본 크기 × scale)
                 const baseSize = getResourceSize('material', null);
                 const actualSize = {
                   x: baseSize.width * scale.x,
@@ -113,10 +188,12 @@ function MaterialsTable() {
                     style={{
                       ...styles.row,
                       ...(isSelected ? styles.rowSelected : {}),
+                      ...(isMasterSelected && !isSelected ? styles.rowMasterSelected : {}),
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedResource('material', material.material_id, process.process_id);
+                      setSelectedMasterId(material.material_id);
                     }}
                   >
                     {idx === 0 && (
@@ -125,10 +202,28 @@ function MaterialsTable() {
                           <strong>{material.material_id}</strong>
                         </td>
                         <td style={styles.td} rowSpan={usage.length}>
-                          {material.name}
+                          {isMasterSelected ? (
+                            <input
+                              type="text"
+                              style={styles.editInput}
+                              value={material.name}
+                              onChange={(e) => updateMaterial(material.material_id, { name: e.target.value })}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : material.name}
                         </td>
                         <td style={styles.td} rowSpan={usage.length}>
-                          <span style={styles.unit}>{material.unit}</span>
+                          {isMasterSelected ? (
+                            <input
+                              type="text"
+                              style={styles.editInput}
+                              value={material.unit}
+                              onChange={(e) => updateMaterial(material.material_id, { unit: e.target.value })}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span style={styles.unit}>{material.unit}</span>
+                          )}
                         </td>
                       </>
                     )}
@@ -159,7 +254,6 @@ function MaterialsTable() {
                         onChange={(e) => {
                           const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
                           if (values.length === 3 && !values.some(isNaN)) {
-                            // 입력된 실제 크기를 scale로 변환
                             const newScale = {
                               x: values[0] / baseSize.width,
                               y: values[1] / baseSize.height,
@@ -211,6 +305,7 @@ const styles = {
     height: '100%',
     color: '#999',
     fontSize: '14px',
+    gap: '12px',
   },
   header: {
     padding: '20px',
@@ -230,6 +325,37 @@ const styles = {
     fontSize: '14px',
     color: '#4a90e2',
     fontWeight: 'bold',
+  },
+  actionBar: {
+    display: 'flex',
+    gap: '8px',
+    padding: '10px 20px',
+    borderBottom: '1px solid #ddd',
+    backgroundColor: '#fafafa',
+  },
+  actionButton: {
+    padding: '6px 14px',
+    backgroundColor: '#4a90e2',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  actionButtonDanger: {
+    padding: '6px 14px',
+    backgroundColor: '#e74c3c',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
   },
   tableWrapper: {
     flex: 1,
@@ -263,6 +389,10 @@ const styles = {
     backgroundColor: '#fff3e0',
     borderLeft: '3px solid #ff9800',
   },
+  rowMasterSelected: {
+    backgroundColor: '#f3e5f5',
+    borderLeft: '3px solid #9c27b0',
+  },
   td: {
     padding: '8px 6px',
     verticalAlign: 'middle',
@@ -274,6 +404,15 @@ const styles = {
     border: '1px solid #ddd',
     borderRadius: '3px',
     fontFamily: 'monospace',
+  },
+  editInput: {
+    width: '100%',
+    padding: '4px 6px',
+    fontSize: '12px',
+    border: '1px solid #9c27b0',
+    borderRadius: '3px',
+    boxSizing: 'border-box',
+    backgroundColor: '#fce4ec',
   },
   unit: {
     color: '#666',

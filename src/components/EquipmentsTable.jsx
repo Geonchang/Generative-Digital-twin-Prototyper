@@ -3,9 +3,12 @@ import useBopStore from '../store/bopStore';
 import { getResourceSize } from './Viewer3D';
 
 function EquipmentsTable() {
-  const { bopData, selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceScale, updateResourceRotation } = useBopStore();
+  const { bopData, selectedResourceKey, setSelectedResource,
+    updateResourceLocation, updateResourceScale, updateResourceRotation,
+    addEquipment, updateEquipment, deleteEquipment } = useBopStore();
   const selectedRowRef = useRef(null);
-  const [editingCell, setEditingCell] = useState(null); // {equipmentId, processId, parallelIndex, field}
+  const [editingCell, setEditingCell] = useState(null);
+  const [selectedMasterId, setSelectedMasterId] = useState(null);
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -17,11 +20,39 @@ function EquipmentsTable() {
     }
   }, [selectedResourceKey]);
 
+  const handleAddEquipment = () => {
+    addEquipment();
+    const equipments = useBopStore.getState().bopData?.equipments;
+    if (equipments && equipments.length > 0) {
+      setSelectedMasterId(equipments[equipments.length - 1].equipment_id);
+    }
+  };
+
+  const handleDeleteEquipment = () => {
+    if (!selectedMasterId) return;
+    if (window.confirm('선택한 장비를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.')) {
+      deleteEquipment(selectedMasterId);
+      setSelectedMasterId(null);
+    }
+  };
+
   if (!bopData || !bopData.equipments || bopData.equipments.length === 0) {
     return (
       <div style={styles.container}>
+        <div style={styles.header}>
+          <h2 style={styles.title}>장비 마스터</h2>
+          <div style={styles.count}>총 0개</div>
+        </div>
+        <div style={styles.actionBar}>
+          <button style={styles.actionButton} onClick={handleAddEquipment}>
+            + 장비 추가
+          </button>
+        </div>
         <div style={styles.emptyState}>
           <p>장비 데이터가 없습니다.</p>
+          <button style={styles.actionButton} onClick={handleAddEquipment}>
+            + 장비 추가
+          </button>
         </div>
       </div>
     );
@@ -82,6 +113,23 @@ function EquipmentsTable() {
         <div style={styles.count}>총 {bopData.equipments.length}개</div>
       </div>
 
+      {/* Action Bar */}
+      <div style={styles.actionBar}>
+        <button style={styles.actionButton} onClick={handleAddEquipment}>
+          + 장비 추가
+        </button>
+        <button
+          style={{
+            ...styles.actionButtonDanger,
+            ...(selectedMasterId ? {} : styles.actionButtonDisabled)
+          }}
+          disabled={!selectedMasterId}
+          onClick={handleDeleteEquipment}
+        >
+          선택 장비 삭제
+        </button>
+      </div>
+
       {/* Table */}
       <div style={styles.tableWrapper}>
         <table style={styles.table}>
@@ -99,16 +147,47 @@ function EquipmentsTable() {
           <tbody>
             {bopData.equipments.flatMap((equipment) => {
               const usedProcesses = getProcessesUsingEquipment(equipment.equipment_id);
+              const isMasterSelected = selectedMasterId === equipment.equipment_id;
 
               if (usedProcesses.length === 0) {
                 return (
-                  <tr key={equipment.equipment_id} style={styles.row}>
+                  <tr
+                    key={equipment.equipment_id}
+                    style={{
+                      ...styles.row,
+                      ...(isMasterSelected ? styles.rowMasterSelected : {}),
+                    }}
+                    onClick={() => setSelectedMasterId(equipment.equipment_id)}
+                  >
                     <td style={styles.td}><strong>{equipment.equipment_id}</strong></td>
-                    <td style={styles.td}>{equipment.name}</td>
                     <td style={styles.td}>
-                      <span style={{ ...styles.typeBadge, backgroundColor: getEquipmentTypeColor(equipment.type) }}>
-                        {getEquipmentTypeLabel(equipment.type)}
-                      </span>
+                      {isMasterSelected ? (
+                        <input
+                          type="text"
+                          style={styles.editInput}
+                          value={equipment.name}
+                          onChange={(e) => updateEquipment(equipment.equipment_id, { name: e.target.value })}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : equipment.name}
+                    </td>
+                    <td style={styles.td}>
+                      {isMasterSelected ? (
+                        <select
+                          style={styles.editSelect}
+                          value={equipment.type}
+                          onChange={(e) => updateEquipment(equipment.equipment_id, { type: e.target.value })}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="robot">로봇</option>
+                          <option value="machine">기계</option>
+                          <option value="manual_station">수작업대</option>
+                        </select>
+                      ) : (
+                        <span style={{ ...styles.typeBadge, backgroundColor: getEquipmentTypeColor(equipment.type) }}>
+                          {getEquipmentTypeLabel(equipment.type)}
+                        </span>
+                      )}
                     </td>
                     <td style={styles.td} colSpan={4}><span style={styles.notUsed}>미사용</span></td>
                   </tr>
@@ -116,9 +195,7 @@ function EquipmentsTable() {
               }
 
               return usedProcesses.map(({ process, resource }, idx) => {
-                // process_id is now unique (e.g., "P001-0", "P001-1")
                 const lineLabel = process.process_id;
-
                 const resourceKey = `equipment:${equipment.equipment_id}:${process.process_id}`;
                 const isSelected = selectedResourceKey === resourceKey;
 
@@ -126,7 +203,6 @@ function EquipmentsTable() {
                 const scale = resource.scale || { x: 1, y: 1, z: 1 };
                 const rotationY = resource.rotation_y || 0;
 
-                // 실제 geometry 크기 계산 (기본 크기 × scale)
                 const baseSize = getResourceSize('equipment', equipment.type);
                 const actualSize = {
                   x: baseSize.width * scale.x,
@@ -141,10 +217,12 @@ function EquipmentsTable() {
                     style={{
                       ...styles.row,
                       ...(isSelected ? styles.rowSelected : {}),
+                      ...(isMasterSelected && !isSelected ? styles.rowMasterSelected : {}),
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedResource('equipment', equipment.equipment_id, process.process_id);
+                      setSelectedMasterId(equipment.equipment_id);
                     }}
                   >
                     {idx === 0 && (
@@ -153,12 +231,33 @@ function EquipmentsTable() {
                           <strong>{equipment.equipment_id}</strong>
                         </td>
                         <td style={styles.td} rowSpan={usedProcesses.length}>
-                          {equipment.name}
+                          {isMasterSelected ? (
+                            <input
+                              type="text"
+                              style={styles.editInput}
+                              value={equipment.name}
+                              onChange={(e) => updateEquipment(equipment.equipment_id, { name: e.target.value })}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : equipment.name}
                         </td>
                         <td style={styles.td} rowSpan={usedProcesses.length}>
-                          <span style={{ ...styles.typeBadge, backgroundColor: getEquipmentTypeColor(equipment.type) }}>
-                            {getEquipmentTypeLabel(equipment.type)}
-                          </span>
+                          {isMasterSelected ? (
+                            <select
+                              style={styles.editSelect}
+                              value={equipment.type}
+                              onChange={(e) => updateEquipment(equipment.equipment_id, { type: e.target.value })}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <option value="robot">로봇</option>
+                              <option value="machine">기계</option>
+                              <option value="manual_station">수작업대</option>
+                            </select>
+                          ) : (
+                            <span style={{ ...styles.typeBadge, backgroundColor: getEquipmentTypeColor(equipment.type) }}>
+                              {getEquipmentTypeLabel(equipment.type)}
+                            </span>
+                          )}
                         </td>
                       </>
                     )}
@@ -186,7 +285,6 @@ function EquipmentsTable() {
                         onChange={(e) => {
                           const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
                           if (values.length === 3 && !values.some(isNaN)) {
-                            // 입력된 실제 크기를 scale로 변환
                             const newScale = {
                               x: values[0] / baseSize.width,
                               y: values[1] / baseSize.height,
@@ -238,6 +336,7 @@ const styles = {
     height: '100%',
     color: '#999',
     fontSize: '14px',
+    gap: '12px',
   },
   header: {
     padding: '20px',
@@ -257,6 +356,37 @@ const styles = {
     fontSize: '14px',
     color: '#4a90e2',
     fontWeight: 'bold',
+  },
+  actionBar: {
+    display: 'flex',
+    gap: '8px',
+    padding: '10px 20px',
+    borderBottom: '1px solid #ddd',
+    backgroundColor: '#fafafa',
+  },
+  actionButton: {
+    padding: '6px 14px',
+    backgroundColor: '#4a90e2',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  actionButtonDanger: {
+    padding: '6px 14px',
+    backgroundColor: '#e74c3c',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
   },
   tableWrapper: {
     flex: 1,
@@ -290,6 +420,10 @@ const styles = {
     backgroundColor: '#e3f2fd',
     borderLeft: '3px solid #4a90e2',
   },
+  rowMasterSelected: {
+    backgroundColor: '#f3e5f5',
+    borderLeft: '3px solid #9c27b0',
+  },
   td: {
     padding: '8px 6px',
     verticalAlign: 'middle',
@@ -301,6 +435,24 @@ const styles = {
     border: '1px solid #ddd',
     borderRadius: '3px',
     fontFamily: 'monospace',
+  },
+  editInput: {
+    width: '100%',
+    padding: '4px 6px',
+    fontSize: '12px',
+    border: '1px solid #9c27b0',
+    borderRadius: '3px',
+    boxSizing: 'border-box',
+    backgroundColor: '#fce4ec',
+  },
+  editSelect: {
+    width: '100%',
+    padding: '4px 6px',
+    fontSize: '11px',
+    border: '1px solid #9c27b0',
+    borderRadius: '3px',
+    backgroundColor: '#fce4ec',
+    cursor: 'pointer',
   },
   typeBadge: {
     display: 'inline-block',
