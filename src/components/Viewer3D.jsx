@@ -1251,17 +1251,25 @@ function Scene() {
       if (Array.isArray(process.successor_ids) && process.successor_ids.length > 0) {
         process.successor_ids.forEach(successorId => {
           if (successorId) {
-            let successorProcess = getProcessById(successorId);
+            const successorProcess = getProcessById(successorId);
+            if (!successorProcess) return;
 
-            // If successor is a parent process, use the first child instead
-            if (successorProcess && successorProcess.is_parent) {
-              const firstChildId = successorProcess.children?.[0];
-              if (firstChildId) {
-                successorProcess = getProcessById(firstChildId);
-              }
-            }
-
-            if (successorProcess && !successorProcess.is_parent) {
+            // If successor is a parent process, draw arrows to ALL children
+            if (successorProcess.is_parent) {
+              (successorProcess.children || []).forEach(childId => {
+                const childProcess = getProcessById(childId);
+                if (childProcess && !childProcess.is_parent) {
+                  arrows.push(
+                    <ProcessFlowArrow
+                      key={`${key}-arrow-${childId}`}
+                      fromProcess={process}
+                      toProcess={childProcess}
+                      parallelIndex={0}
+                    />
+                  );
+                }
+              });
+            } else {
               arrows.push(
                 <ProcessFlowArrow
                   key={`${key}-arrow-${successorId}`}

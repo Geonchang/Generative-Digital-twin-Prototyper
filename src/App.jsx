@@ -1,12 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import Viewer3D from './components/Viewer3D';
 import TabbedPanel from './components/TabbedPanel';
 import UnifiedChatPanel from './components/UnifiedChatPanel';
 import useBopStore from './store/bopStore';
 import { mockBopData } from './data/mockBopData';
 
+const MIN_LEFT = 200;
+const MIN_CENTER = 300;
+const MIN_RIGHT = 200;
+const DIVIDER_WIDTH = 4;
+
 function App() {
   const { bopData, setBopData } = useBopStore();
+
+  const [leftWidth, setLeftWidth] = useState(400);
+  const [rightWidth, setRightWidth] = useState(400);
+  const [dragging, setDragging] = useState(null); // 'left' | 'right' | null
+  const containerRef = useRef(null);
 
   // Load mock data on initial mount if no BOP data exists
   useEffect(() => {
@@ -17,20 +27,73 @@ function App() {
     }
   }, [bopData, setBopData]);
 
+  const handleMouseMove = useCallback((e) => {
+    if (!dragging || !containerRef.current) return;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const totalWidth = containerRect.width;
+
+    if (dragging === 'left') {
+      let newLeft = e.clientX - containerRect.left;
+      newLeft = Math.max(MIN_LEFT, newLeft);
+      const maxLeft = totalWidth - DIVIDER_WIDTH * 2 - MIN_CENTER - rightWidth;
+      newLeft = Math.min(newLeft, maxLeft);
+      setLeftWidth(newLeft);
+    } else if (dragging === 'right') {
+      let newRight = containerRect.right - e.clientX;
+      newRight = Math.max(MIN_RIGHT, newRight);
+      const maxRight = totalWidth - DIVIDER_WIDTH * 2 - MIN_CENTER - leftWidth;
+      newRight = Math.min(newRight, maxRight);
+      setRightWidth(newRight);
+    }
+  }, [dragging, leftWidth, rightWidth]);
+
+  const handleMouseUp = useCallback(() => {
+    setDragging(null);
+  }, []);
+
+  useEffect(() => {
+    if (!dragging) return;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [dragging, handleMouseMove, handleMouseUp]);
+
   return (
-    <div style={styles.container}>
+    <div style={styles.container} ref={containerRef}>
       {/* 왼쪽: 탭 패널 (BOP, 장비, 작업자, 자재) */}
-      <div style={styles.tableSection}>
+      <div style={{ ...styles.tableSection, width: leftWidth }}>
         <TabbedPanel />
       </div>
+
+      {/* 좌측 디바이더 */}
+      <div
+        data-divider
+        style={styles.divider}
+        onMouseDown={() => setDragging('left')}
+      />
 
       {/* 중간: 3D 뷰어 */}
       <div style={styles.viewerSection}>
         <Viewer3D />
       </div>
 
+      {/* 우측 디바이더 */}
+      <div
+        data-divider
+        style={styles.divider}
+        onMouseDown={() => setDragging('right')}
+      />
+
       {/* 오른쪽: AI 어시스턴트 패널 */}
-      <div style={styles.controlSection}>
+      <div style={{ ...styles.controlSection, width: rightWidth }}>
         <UnifiedChatPanel />
       </div>
     </div>
@@ -45,24 +108,43 @@ const styles = {
     overflow: 'hidden',
   },
   viewerSection: {
-    flex: '1.5',
+    flex: 1,
     position: 'relative',
-    minWidth: '400px',
+    minWidth: MIN_CENTER,
+    overflow: 'hidden',
   },
   tableSection: {
-    flex: '1',
-    borderLeft: '1px solid #ddd',
+    flexShrink: 0,
     borderRight: '1px solid #ddd',
-    minWidth: '350px',
+    minWidth: MIN_LEFT,
     overflow: 'hidden',
   },
   controlSection: {
-    width: '400px',
+    flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
     backgroundColor: 'white',
+    borderLeft: '1px solid #ddd',
     overflow: 'hidden',
   },
+  divider: {
+    width: DIVIDER_WIDTH,
+    cursor: 'col-resize',
+    backgroundColor: 'transparent',
+    flexShrink: 0,
+    zIndex: 10,
+    transition: 'background-color 0.15s',
+  },
 };
+
+// Add hover effect via CSS-in-JS workaround: handled inline with onMouseEnter/Leave
+// Instead, we use a simple CSS class injected once
+const styleSheet = document.createElement('style');
+styleSheet.textContent = `
+  [data-divider]:hover {
+    background-color: rgba(59, 130, 246, 0.5) !important;
+  }
+`;
+document.head.appendChild(styleSheet);
 
 export default App

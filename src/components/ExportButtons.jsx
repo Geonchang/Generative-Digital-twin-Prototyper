@@ -1,47 +1,34 @@
-// TODO: implement
-
 import { useState } from 'react';
 import useBopStore from '../store/bopStore';
 import { api } from '../services/api';
 
 function ExportButtons() {
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { bopData } = useBopStore();
+  const { bopData, exportBopData } = useBopStore();
 
-  const handleExportExcel = async () => {
-    if (!bopData || !bopData.steps || bopData.steps.length === 0) {
+  const handleExportExcel = () => {
+    if (!bopData || !bopData.processes || bopData.processes.length === 0) {
       setError('먼저 BOP를 생성해주세요');
       return;
     }
-
-    setLoading(true);
     setError('');
-
     try {
-      await api.exportExcel(bopData);
+      api.exportExcel(exportBopData());
     } catch (err) {
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
-  const handleExport3D = async () => {
-    if (!bopData || !bopData.steps || bopData.steps.length === 0) {
+  const handleExport3D = () => {
+    if (!bopData || !bopData.processes || bopData.processes.length === 0) {
       setError('먼저 BOP를 생성해주세요');
       return;
     }
-
-    setLoading(true);
     setError('');
-
     try {
-      await api.export3D(bopData);
+      api.export3D(exportBopData());
     } catch (err) {
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   };
 

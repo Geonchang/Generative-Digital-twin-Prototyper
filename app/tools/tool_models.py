@@ -1,0 +1,109 @@
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any, List
+from enum import Enum
+from datetime import datetime
+
+
+class ExecutionType(str, Enum):
+    PYTHON = "python"
+    EXECUTABLE = "executable"
+
+
+class SchemaType(str, Enum):
+    CSV = "csv"
+    JSON = "json"
+    ARGS = "args"
+    STDIN = "stdin"
+
+
+class InputSchema(BaseModel):
+    type: SchemaType = Field(..., description="입력 형식 타입")
+    columns: Optional[List[str]] = Field(default=None, description="CSV: 컬럼명 목록")
+    fields: Optional[List[str]] = Field(default=None, description="JSON: 필드명 목록")
+    args_format: Optional[str] = Field(default=None, description="ARGS: 인수 패턴")
+    description: str = Field(..., description="입력 형식 설명")
+
+
+class OutputSchema(BaseModel):
+    type: SchemaType = Field(..., description="출력 형식 타입")
+    columns: Optional[List[str]] = Field(default=None, description="CSV: 컬럼명 목록")
+    fields: Optional[List[str]] = Field(default=None, description="JSON: 필드명 목록")
+    description: str = Field(..., description="출력 형식 설명")
+
+
+class ToolMetadata(BaseModel):
+    tool_id: str = Field(..., description="고유 도구 식별자 (slug)")
+    tool_name: str = Field(..., description="도구 표시 이름")
+    description: str = Field(..., description="도구 설명")
+    execution_type: ExecutionType = Field(..., description="python 또는 executable")
+    file_name: str = Field(..., description="업로드된 원본 파일명")
+    input_schema: InputSchema
+    output_schema: OutputSchema
+    created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class AdapterCode(BaseModel):
+    tool_id: str
+    pre_process_code: str = Field(..., description="convert_bop_to_input(bop_json) -> str")
+    post_process_code: str = Field(..., description="apply_result_to_bop(bop_json, tool_output) -> dict")
+
+
+class ToolRegistryEntry(BaseModel):
+    metadata: ToolMetadata
+    adapter: AdapterCode
+
+
+# === API Request/Response ===
+
+class AnalyzeRequest(BaseModel):
+    source_code: str = Field(..., description="분석할 소스 코드")
+    file_name: str = Field(default="script.py", description="원본 파일명")
+    sample_input: Optional[str] = Field(default=None, description="예제 입력 데이터")
+
+
+class AnalyzeResponse(BaseModel):
+    tool_name: str
+    description: str
+    execution_type: ExecutionType
+    input_schema: InputSchema
+    output_schema: OutputSchema
+
+
+class RegisterRequest(BaseModel):
+    tool_name: str
+    description: str
+    execution_type: ExecutionType
+    file_name: str
+    source_code: str
+    input_schema: InputSchema
+    output_schema: OutputSchema
+    sample_input: Optional[str] = None
+
+
+class RegisterResponse(BaseModel):
+    tool_id: str
+    tool_name: str
+    message: str
+    adapter_preview: Optional[Dict[str, str]] = None
+
+
+class ExecuteRequest(BaseModel):
+    tool_id: str
+    bop_data: Dict[str, Any] = Field(..., description="현재 BOP JSON 데이터")
+
+
+class ExecuteResponse(BaseModel):
+    success: bool
+    message: str
+    updated_bop: Optional[Dict[str, Any]] = None
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+    execution_time_sec: Optional[float] = None
+
+
+class ToolListItem(BaseModel):
+    tool_id: str
+    tool_name: str
+    description: str
+    execution_type: ExecutionType
+    created_at: str

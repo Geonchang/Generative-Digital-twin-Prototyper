@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from app.models import GenerateRequest, ChatRequest, BOPData, UnifiedChatRequest, UnifiedChatResponse
 from app.llm_service import generate_bop_from_text, modify_bop, unified_chat
+from app.tools.router import router as tools_router
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from io import BytesIO
@@ -18,6 +19,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(tools_router)
 
 
 @app.get("/")

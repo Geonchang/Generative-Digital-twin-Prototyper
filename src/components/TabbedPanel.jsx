@@ -2,6 +2,7 @@ import BopTable from './BopTable';
 import EquipmentsTable from './EquipmentsTable';
 import WorkersTable from './WorkersTable';
 import MaterialsTable from './MaterialsTable';
+import ToolsPanel from './ToolsPanel';
 import useBopStore from '../store/bopStore';
 
 function TabbedPanel() {
@@ -12,6 +13,7 @@ function TabbedPanel() {
     { id: 'equipments', label: '장비', icon: '🤖' },
     { id: 'workers', label: '작업자', icon: '👷' },
     { id: 'materials', label: '자재', icon: '📦' },
+    { id: 'tools', label: '도구', icon: '🔧' },
   ];
 
   const renderContent = () => {
@@ -24,6 +26,8 @@ function TabbedPanel() {
         return <WorkersTable />;
       case 'materials':
         return <MaterialsTable />;
+      case 'tools':
+        return <ToolsPanel />;
       default:
         return <BopTable />;
     }

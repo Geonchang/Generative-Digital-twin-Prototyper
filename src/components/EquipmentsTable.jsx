@@ -265,48 +265,19 @@ function EquipmentsTable() {
                       <span style={styles.processChip}>{lineLabel}</span>
                     </td>
                     <td style={styles.td}>
-                      <input
-                        type="text"
-                        style={styles.input}
-                        value={`${relLoc.x.toFixed(1)}, ${relLoc.z.toFixed(1)}`}
-                        onChange={(e) => {
-                          const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
-                          if (values.length === 2 && !values.some(isNaN)) {
-                            updateResourceLocation(process.process_id, 'equipment', equipment.equipment_id, { x: values[0], y: 0, z: values[1] });
-                          }
-                        }}
-                      />
+                      <div style={styles.locationCell}>
+                        ({relLoc.x.toFixed(1)}, {relLoc.z.toFixed(1)})
+                      </div>
                     </td>
                     <td style={styles.td}>
-                      <input
-                        type="text"
-                        style={styles.input}
-                        value={`${actualSize.x.toFixed(2)}, ${actualSize.y.toFixed(2)}, ${actualSize.z.toFixed(2)}`}
-                        onChange={(e) => {
-                          const values = e.target.value.split(',').map(v => parseFloat(v.trim()));
-                          if (values.length === 3 && !values.some(isNaN)) {
-                            const newScale = {
-                              x: values[0] / baseSize.width,
-                              y: values[1] / baseSize.height,
-                              z: values[2] / baseSize.depth
-                            };
-                            updateResourceScale(process.process_id, 'equipment', equipment.equipment_id, newScale);
-                          }
-                        }}
-                      />
+                      <div style={styles.locationCell}>
+                        {actualSize.x.toFixed(2)}, {actualSize.y.toFixed(2)}, {actualSize.z.toFixed(2)}
+                      </div>
                     </td>
                     <td style={styles.td}>
-                      <input
-                        type="text"
-                        style={styles.input}
-                        value={(rotationY * 180 / Math.PI).toFixed(1)}
-                        onChange={(e) => {
-                          const deg = parseFloat(e.target.value);
-                          if (!isNaN(deg)) {
-                            updateResourceRotation(process.process_id, 'equipment', equipment.equipment_id, deg * Math.PI / 180);
-                          }
-                        }}
-                      />
+                      <div style={styles.locationCell}>
+                        {(rotationY * 180 / Math.PI).toFixed(1)}°
+                      </div>
                     </td>
                   </tr>
                 );
@@ -434,6 +405,11 @@ const styles = {
     fontSize: '11px',
     border: '1px solid #ddd',
     borderRadius: '3px',
+    fontFamily: 'monospace',
+  },
+  locationCell: {
+    fontSize: '11px',
+    color: '#666',
     fontFamily: 'monospace',
   },
   editInput: {

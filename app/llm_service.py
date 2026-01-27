@@ -11,7 +11,7 @@ from app.models import BOPData
 load_dotenv()
 
 # Gemini API 키 설정
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
 
 
 def validate_bop_data(bop_data: dict) -> Tuple[bool, str]:

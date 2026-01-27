@@ -6,7 +6,7 @@ function UnifiedChatPanel() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { bopData, messages, setBopData, addMessage } = useBopStore();
+  const { messages, setBopData, addMessage, exportBopData } = useBopStore();
   const messagesEndRef = useRef(null);
 
   // 메시지 추가 시 자동 스크롤
@@ -29,8 +29,12 @@ function UnifiedChatPanel() {
     addMessage('user', userMessage);
 
     try {
-      // 통합 채팅 API 호출
-      const response = await api.unifiedChat(userMessage, bopData);
+      // collapsed BOP 데이터와 최신 대화 히스토리 획득
+      const collapsedBop = exportBopData();
+      const currentMessages = useBopStore.getState().messages;
+
+      // 통합 채팅 API 호출 (Gemini 직접 호출)
+      const response = await api.unifiedChat(userMessage, collapsedBop, currentMessages);
 
       console.log('[DEBUG] API Response:', response);
       console.log('[DEBUG] BOP Data exists:', !!response.bop_data);

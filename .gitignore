@@ -30,6 +30,10 @@ yarn-error.log*
 # Environment variables
 .env
 
+# Tool registry data
+data/tool_registry/
+uploads/
+
 # Temporary files
 nul
 error_capture1.png
