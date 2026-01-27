@@ -23,6 +23,8 @@ function ToolsPanel() {
   const [selectedTool, setSelectedTool] = useState(null);
   const [executing, setExecuting] = useState(false);
   const [execResult, setExecResult] = useState(null);
+  const [toolParams, setToolParams] = useState({});
+  const [pendingResult, setPendingResult] = useState(null);
 
   // Error
   const [error, setError] = useState('');
@@ -110,7 +112,14 @@ function ToolsPanel() {
   const openDetail = (tool) => {
     setSelectedTool(tool);
     setExecResult(null);
+    setPendingResult(null);
     setError('');
+    // 파라미터 기본값 초기화
+    const defaults = {};
+    (tool.params_schema || []).forEach(p => {
+      if (p.default != null) defaults[p.key] = p.default;
+    });
+    setToolParams(defaults);
     setView('detail');
   };
 
@@ -118,6 +127,7 @@ function ToolsPanel() {
     if (!selectedTool) return;
     setExecuting(true);
     setExecResult(null);
+    setPendingResult(null);
     setError('');
     try {
       const collapsedBop = exportBopData();
@@ -126,17 +136,36 @@ function ToolsPanel() {
         setExecuting(false);
         return;
       }
-      const result = await api.executeTool(selectedTool.tool_id, collapsedBop);
+      // 빈 문자열을 number로 변환하고 빈 값은 제거
+      const cleanParams = {};
+      const schema = selectedTool.params_schema || [];
+      schema.forEach(p => {
+        const val = toolParams[p.key];
+        if (val !== '' && val != null) {
+          cleanParams[p.key] = p.type === 'number' ? Number(val) : val;
+        }
+      });
+      const result = await api.executeTool(
+        selectedTool.tool_id,
+        collapsedBop,
+        Object.keys(cleanParams).length > 0 ? cleanParams : null
+      );
       setExecResult(result);
       if (result.success && result.updated_bop) {
-        setBopData(result.updated_bop);
-        addMessage('assistant', `"${selectedTool.tool_name}" 도구 실행 완료: ${result.message}`);
+        setPendingResult(result);
       }
     } catch (err) {
       setExecResult({ success: false, message: err.message });
     } finally {
       setExecuting(false);
     }
+  };
+
+  const handleApplyToBop = () => {
+    if (!pendingResult || !pendingResult.updated_bop) return;
+    setBopData(pendingResult.updated_bop);
+    addMessage('assistant', `"${selectedTool.tool_name}" 도구 결과가 BOP에 반영되었습니다.`);
+    setPendingResult(null);
   };
 
   const handleDelete = async () => {
@@ -284,6 +313,31 @@ function ToolsPanel() {
     </div>
   );
 
+  const renderToolOutput = (toolOutput) => {
+    if (!toolOutput) return null;
+    try {
+      const parsed = JSON.parse(toolOutput);
+      return (
+        <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+          {Object.entries(parsed).map(([key, value]) => (
+            <div key={key} style={{ marginBottom: 6 }}>
+              <span style={{ fontWeight: 600, color: '#555' }}>{key}: </span>
+              {typeof value === 'object' ? (
+                <pre style={{ ...styles.codePreview, maxHeight: 120, marginTop: 2 }}>
+                  {JSON.stringify(value, null, 2)}
+                </pre>
+              ) : (
+                <span style={{ color: '#333' }}>{String(value)}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    } catch {
+      return <pre style={styles.codePreview}>{toolOutput}</pre>;
+    }
+  };
+
   const renderDetail = () => (
     <div style={styles.content}>
       <div style={styles.header}>
@@ -308,9 +362,35 @@ function ToolsPanel() {
         </div>
       </div>
 
+      {/* Parameter Input Form */}
+      {selectedTool?.params_schema?.length > 0 && (
+        <div style={styles.section}>
+          <label style={styles.label}>파라미터 설정</label>
+          <div style={styles.resultCard}>
+            {selectedTool.params_schema.map(p => (
+              <div key={p.key} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>{p.label}</span>
+                  {p.required && <span style={{ color: '#c0392b', fontSize: 11 }}>*</span>}
+                </div>
+                {p.description && (
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{p.description}</div>
+                )}
+                <input
+                  style={styles.paramInput}
+                  type={p.type === 'number' ? 'number' : 'text'}
+                  placeholder={p.default != null ? `기본값: ${p.default}` : '(선택)'}
+                  value={toolParams[p.key] ?? ''}
+                  onChange={e => setToolParams(prev => ({ ...prev, [p.key]: e.target.value }))}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Execute */}
       <div style={styles.section}>
-        <label style={styles.label}>BOP에 대해 실행</label>
         <button
           style={styles.primaryBtn}
           onClick={handleExecute}
@@ -333,10 +413,21 @@ function ToolsPanel() {
             </div>
             <div style={{ fontSize: 13, marginBottom: 6 }}>{execResult.message}</div>
             {execResult.execution_time_sec != null && (
-              <div style={{ fontSize: 12, color: '#888' }}>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>
                 실행 시간: {execResult.execution_time_sec.toFixed(1)}초
               </div>
             )}
+
+            {/* Tool Output Preview */}
+            {execResult.success && execResult.tool_output && (
+              <div style={{ marginTop: 8, borderTop: '1px solid #e0e0e0', paddingTop: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
+                  결과 미리보기
+                </div>
+                {renderToolOutput(execResult.tool_output)}
+              </div>
+            )}
+
             {execResult.stdout && (
               <details style={{ marginTop: 8 }}>
                 <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>stdout</summary>
@@ -350,6 +441,15 @@ function ToolsPanel() {
               </details>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Apply to BOP Button */}
+      {pendingResult && (
+        <div style={styles.section}>
+          <button style={styles.applyBtn} onClick={handleApplyToBop}>
+            BOP에 반영
+          </button>
         </div>
       )}
 
@@ -469,6 +569,25 @@ const styles = {
     borderRadius: '4px',
     fontSize: '12px',
     cursor: 'pointer',
+  },
+  applyBtn: {
+    padding: '10px 20px',
+    backgroundColor: '#50c878',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    width: '100%',
+  },
+  paramInput: {
+    width: '100%',
+    padding: '6px 10px',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '13px',
+    boxSizing: 'border-box',
   },
   dangerBtn: {
     padding: '8px 16px',

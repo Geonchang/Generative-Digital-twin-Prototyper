@@ -146,11 +146,13 @@ export const api = {
     return res.json();
   },
 
-  async executeTool(toolId, bopData) {
+  async executeTool(toolId, bopData, params = null) {
+    const body = { tool_id: toolId, bop_data: bopData };
+    if (params) body.params = params;
     const res = await fetch('/api/tools/execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tool_id: toolId, bop_data: bopData }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

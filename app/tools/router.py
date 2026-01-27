@@ -93,7 +93,7 @@ async def delete_tool_endpoint(tool_id: str):
 async def execute_tool_endpoint(req: ExecuteRequest):
     """FR-4: 등록된 도구를 BOP 데이터에 대해 실행합니다."""
     try:
-        result = await execute_tool(req.tool_id, req.bop_data)
+        result = await execute_tool(req.tool_id, req.bop_data, req.params)
         return ExecuteResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"실행 실패: {str(e)}")

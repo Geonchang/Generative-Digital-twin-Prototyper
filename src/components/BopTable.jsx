@@ -382,13 +382,13 @@ function BopTable() {
               <th style={{ ...styles.th, minWidth: '150px' }}>Name</th>
               <th style={{ ...styles.th, minWidth: '100px' }}>Cycle Time</th>
               <th style={{ ...styles.th, minWidth: '80px' }}>Parallel</th>
-              <th style={{ ...styles.th, minWidth: '120px' }}>Location (x,z)</th>
-              <th style={{ ...styles.th, width: '80px' }}>Rotation (Y)</th>
               <th style={{ ...styles.th, minWidth: '150px' }}>Equipments</th>
               <th style={{ ...styles.th, minWidth: '120px' }}>Workers</th>
               <th style={{ ...styles.th, minWidth: '200px' }}>Materials</th>
               <th style={{ ...styles.th, minWidth: '120px' }}>전공정 (Pred.)</th>
               <th style={{ ...styles.th, minWidth: '120px' }}>후공정 (Succ.)</th>
+              <th style={{ ...styles.th, minWidth: '120px' }}>Location (x,z)</th>
+              <th style={{ ...styles.th, width: '80px' }}>Rotation (Y)</th>
             </tr>
           </thead>
           <tbody>
@@ -485,16 +485,6 @@ function BopTable() {
                           <span style={styles.parallelCount}>#{process.parallel_index + 1}</span>
                         </td>
                         <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
-                          </div>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
-                          </div>
-                        </td>
-                        <td style={styles.td}>
                           {renderResourceCell(process, isThisRowSelected, 'equipment', equipments, bopData.equipments, 'equipment_id')}
                         </td>
                         <td style={styles.td}>
@@ -508,6 +498,16 @@ function BopTable() {
                         </td>
                         <td style={styles.td}>
                           {renderLinkCell(process, isThisRowSelected, 'successor')}
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
+                          </div>
                         </td>
                       </>
                     ) : isParallelGroup ? (
@@ -565,16 +565,6 @@ function BopTable() {
                           <span style={styles.parallelCount}>#{process.parallel_index + 1}</span>
                         </td>
                         <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
-                          </div>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
-                          </div>
-                        </td>
-                        <td style={styles.td}>
                           {renderResourceCell(process, isThisRowSelected, 'equipment', equipments, bopData.equipments, 'equipment_id')}
                         </td>
                         <td style={styles.td}>
@@ -588,6 +578,16 @@ function BopTable() {
                         </td>
                         <td style={styles.td}>
                           {renderLinkCell(process, isThisRowSelected, 'successor')}
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
+                          </div>
                         </td>
                       </>
                     ) : (
@@ -650,17 +650,7 @@ function BopTable() {
                           )}
                         </td>
                         <td style={styles.td}>
-                          <span>1</span>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
-                          </div>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
-                          </div>
+                          <span style={styles.parallelCount}>#1</span>
                         </td>
                         <td style={styles.td}>
                           {renderResourceCell(process, isThisRowSelected, 'equipment', equipments, bopData.equipments, 'equipment_id')}
@@ -676,6 +666,16 @@ function BopTable() {
                         </td>
                         <td style={styles.td}>
                           {renderLinkCell(process, isThisRowSelected, 'successor')}
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
+                          </div>
+                        </td>
+                        <td style={styles.td}>
+                          <div style={styles.locationCell}>
+                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
+                          </div>
                         </td>
                       </>
                     )}

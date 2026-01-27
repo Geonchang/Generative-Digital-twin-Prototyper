@@ -10,12 +10,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent  # project root
 REGISTRY_DIR = BASE_DIR / "data" / "tool_registry"
 UPLOADS_DIR = BASE_DIR / "uploads" / "scripts"
 WORKDIR_BASE = BASE_DIR / "uploads" / "workdir"
+LOGS_DIR = BASE_DIR / "data" / "tool_logs"
 
 
 def _ensure_dirs():
     REGISTRY_DIR.mkdir(parents=True, exist_ok=True)
     UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     WORKDIR_BASE.mkdir(parents=True, exist_ok=True)
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def generate_tool_id(tool_name: str) -> str:
@@ -67,6 +69,7 @@ def list_tools() -> List[ToolListItem]:
                     description=meta["description"],
                     execution_type=meta["execution_type"],
                     created_at=meta.get("created_at", ""),
+                    params_schema=meta.get("params_schema"),
                 ))
     return tools
 

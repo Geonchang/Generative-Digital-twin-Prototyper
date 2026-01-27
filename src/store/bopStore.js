@@ -244,15 +244,15 @@ function collapseParallelProcesses(bopData) {
   if (!bopData || !bopData.processes) return bopData;
 
   const collapsedProcesses = [];
-  const processedParents = new Set();
+  const collapsedGroups = new Set();  // Track which parallel groups have been collapsed
 
   bopData.processes.forEach(process => {
     if (process.is_parent) {
       // Skip parent processes (they're just logical grouping)
-      processedParents.add(process.process_id);
+      // Do NOT mark as collapsed here — children handle that
     } else if (process.parent_id) {
       // Child process - group with siblings
-      if (!processedParents.has(process.parent_id)) {
+      if (!collapsedGroups.has(process.parent_id)) {
         // Find all siblings
         const siblings = bopData.processes
           .filter(p => p.parent_id === process.parent_id)
@@ -274,7 +274,7 @@ function collapseParallelProcesses(bopData) {
           predecessor_ids: siblings[0].predecessor_ids || [],
           successor_ids: siblings[0].successor_ids || [],
           resources: siblings.flatMap((sibling, index) =>
-            sibling.resources.map(r => ({
+            (sibling.resources || []).map(r => ({
               ...r,
               parallel_line_index: index // Re-add parallel_line_index
             }))
@@ -282,7 +282,7 @@ function collapseParallelProcesses(bopData) {
         };
 
         collapsedProcesses.push(collapsedProcess);
-        processedParents.add(process.parent_id);
+        collapsedGroups.add(process.parent_id);
       }
     } else {
       // Independent process (no parent)

@@ -31,6 +31,15 @@ class OutputSchema(BaseModel):
     description: str = Field(..., description="출력 형식 설명")
 
 
+class ParamDef(BaseModel):
+    key: str = Field(..., description="파라미터 키")
+    label: str = Field(..., description="표시 라벨")
+    type: str = Field(default="number", description="입력 타입 (number, text, select 등)")
+    default: Optional[Any] = Field(default=None, description="기본값")
+    required: bool = Field(default=False, description="필수 여부")
+    description: str = Field(default="", description="파라미터 설명")
+
+
 class ToolMetadata(BaseModel):
     tool_id: str = Field(..., description="고유 도구 식별자 (slug)")
     tool_name: str = Field(..., description="도구 표시 이름")
@@ -39,6 +48,7 @@ class ToolMetadata(BaseModel):
     file_name: str = Field(..., description="업로드된 원본 파일명")
     input_schema: InputSchema
     output_schema: OutputSchema
+    params_schema: Optional[List[ParamDef]] = Field(default=None, description="도구별 추가 파라미터 정의")
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -90,12 +100,14 @@ class RegisterResponse(BaseModel):
 class ExecuteRequest(BaseModel):
     tool_id: str
     bop_data: Dict[str, Any] = Field(..., description="현재 BOP JSON 데이터")
+    params: Optional[Dict[str, Any]] = Field(default=None, description="도구별 추가 파라미터")
 
 
 class ExecuteResponse(BaseModel):
     success: bool
     message: str
     updated_bop: Optional[Dict[str, Any]] = None
+    tool_output: Optional[str] = None
     stdout: Optional[str] = None
     stderr: Optional[str] = None
     execution_time_sec: Optional[float] = None
@@ -107,3 +119,4 @@ class ToolListItem(BaseModel):
     description: str
     execution_type: ExecutionType
     created_at: str
+    params_schema: Optional[List[ParamDef]] = None
