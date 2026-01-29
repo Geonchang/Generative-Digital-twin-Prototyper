@@ -62,6 +62,15 @@ def _run_preprocessor(code: str, bop_data: dict, params: Optional[Dict[str, Any]
     # Use a single dict for globals so that functions defined in exec()
     # can access module-level imports (import puts names into globals).
     namespace = {"__builtins__": _safe_builtins()}
+    # Pre-inject common stdlib modules that adapters typically need
+    import json as json_mod
+    import csv as csv_mod
+    import io as io_mod
+    import math as math_mod
+    namespace["json"] = json_mod
+    namespace["csv"] = csv_mod
+    namespace["io"] = io_mod
+    namespace["math"] = math_mod
     exec(code, namespace)
     fn = namespace.get("convert_bop_to_input")
     if not fn:
@@ -79,6 +88,15 @@ def _run_preprocessor(code: str, bop_data: dict, params: Optional[Dict[str, Any]
 
 def _run_postprocessor(code: str, bop_data: dict, tool_output: str) -> dict:
     namespace = {"__builtins__": _safe_builtins()}
+    # Pre-inject common stdlib modules that adapters typically need
+    import json as json_mod
+    import csv as csv_mod
+    import io as io_mod
+    import math as math_mod
+    namespace["json"] = json_mod
+    namespace["csv"] = csv_mod
+    namespace["io"] = io_mod
+    namespace["math"] = math_mod
     exec(code, namespace)
     fn = namespace.get("apply_result_to_bop")
     if not fn:

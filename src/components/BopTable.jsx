@@ -294,18 +294,13 @@ function BopTable() {
         processedIds.add(process.process_id);
         children.forEach(c => processedIds.add(c.process_id));
       }
-    } else if (!process.parent_id) {
-      // Independent process (no parent)
-      processGroups.push({
-        parent: null,
-        children: [process]
-      });
-      processedIds.add(process.process_id);
     }
   });
 
   const selectedProcess = bopData?.processes?.find(p => p.process_id === selectedProcessKey);
-  const isParallelChild = selectedProcess?.parent_id != null;
+  // "병렬 삭제" is only enabled when the selected child has 2+ siblings
+  const canRemoveParallel = selectedProcess?.parent_id != null &&
+    bopData.processes.filter(p => p.parent_id === selectedProcess.parent_id).length > 1;
 
   return (
     <div style={styles.container}>
@@ -360,9 +355,9 @@ function BopTable() {
         <button
           style={{
             ...styles.actionButtonDanger,
-            ...((selectedProcessKey && isParallelChild) ? {} : styles.actionButtonDisabled)
+            ...((selectedProcessKey && canRemoveParallel) ? {} : styles.actionButtonDisabled)
           }}
-          disabled={!selectedProcessKey || !isParallelChild}
+          disabled={!selectedProcessKey || !canRemoveParallel}
           onClick={() => {
             if (window.confirm('선택한 병렬 라인을 삭제하시겠습니까?')) {
               removeParallelLine(selectedProcessKey);
@@ -482,7 +477,7 @@ function BopTable() {
                           )}
                         </td>
                         <td style={styles.td}>
-                          <span style={styles.parallelCount}>#{process.parallel_index + 1}</span>
+                          <span style={styles.parallelCount}>#{process.parallel_index}</span>
                         </td>
                         <td style={styles.td}>
                           {renderResourceCell(process, isThisRowSelected, 'equipment', equipments, bopData.equipments, 'equipment_id')}
@@ -537,7 +532,7 @@ function BopTable() {
                             </>
                           ) : (
                             <span style={styles.parallelLineText}>
-                              └ #{process.parallel_index + 1}
+                              └ #{process.parallel_index}
                             </span>
                           )}
                         </td>
@@ -562,7 +557,7 @@ function BopTable() {
                           )}
                         </td>
                         <td style={styles.td}>
-                          <span style={styles.parallelCount}>#{process.parallel_index + 1}</span>
+                          <span style={styles.parallelCount}>#{process.parallel_index}</span>
                         </td>
                         <td style={styles.td}>
                           {renderResourceCell(process, isThisRowSelected, 'equipment', equipments, bopData.equipments, 'equipment_id')}

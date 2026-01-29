@@ -3,7 +3,7 @@ import useBopStore from '../store/bopStore';
 import { api } from '../services/api';
 
 function ToolsPanel() {
-  const { exportBopData, setBopData, addMessage } = useBopStore();
+  const { exportBopData, setBopData, addMessage, normalizeAllProcesses } = useBopStore();
 
   // Navigation
   const [view, setView] = useState('list'); // 'list' | 'upload' | 'detail'
@@ -25,11 +25,93 @@ function ToolsPanel() {
   const [execResult, setExecResult] = useState(null);
   const [toolParams, setToolParams] = useState({});
   const [pendingResult, setPendingResult] = useState(null);
+  const [originalBop, setOriginalBop] = useState(null);
+  const [bopChanges, setBopChanges] = useState(null);
 
   // Error
   const [error, setError] = useState('');
 
   const fileInputRef = useRef(null);
+
+  // BOP 변경 사항 계산
+  const computeBopChanges = (original, updated) => {
+    if (!original || !updated) return null;
+
+    const changes = [];
+    const fieldNames = {
+      processes: '공정',
+      equipments: '설비',
+      workers: '작업자',
+      materials: '자재',
+      obstacles: '장애물'
+    };
+
+    // 배열 비교 (processes, equipments, workers, materials, obstacles)
+    const arrayFields = ['processes', 'equipments', 'workers', 'materials', 'obstacles'];
+    arrayFields.forEach(field => {
+      const origArr = original[field] || [];
+      const updArr = updated[field] || [];
+
+      const added = updArr.length - origArr.length;
+      if (added > 0) {
+        changes.push({ type: 'add', field: fieldNames[field] || field, count: added });
+      } else if (added < 0) {
+        changes.push({ type: 'remove', field: fieldNames[field] || field, count: -added });
+      }
+
+      // 기존 항목 수정 체크 (ID 기반 비교)
+      if (field === 'processes') {
+        // 공정: ID로 매칭하여 비교
+        let modified = 0;
+        const modifiedDetails = [];
+        origArr.forEach(origProc => {
+          const updProc = updArr.find(p => p.process_id === origProc.process_id);
+          if (updProc && JSON.stringify(origProc) !== JSON.stringify(updProc)) {
+            modified++;
+            // parallel_count 변경 감지
+            if (origProc.parallel_count !== updProc.parallel_count) {
+              modifiedDetails.push(`${origProc.name}: 병렬 ${origProc.parallel_count || 1} → ${updProc.parallel_count || 1}`);
+            }
+            // cycle_time 변경 감지
+            if (origProc.cycle_time_sec !== updProc.cycle_time_sec) {
+              modifiedDetails.push(`${origProc.name}: CT ${origProc.cycle_time_sec}s → ${updProc.cycle_time_sec}s`);
+            }
+          }
+        });
+        if (modified > 0) {
+          changes.push({
+            type: 'modify',
+            field: fieldNames[field],
+            count: modified,
+            details: modifiedDetails.length > 0 ? modifiedDetails : null
+          });
+        }
+      } else {
+        // 다른 필드: 순서대로 비교
+        const minLen = Math.min(origArr.length, updArr.length);
+        let modified = 0;
+        for (let i = 0; i < minLen; i++) {
+          if (JSON.stringify(origArr[i]) !== JSON.stringify(updArr[i])) {
+            modified++;
+          }
+        }
+        if (modified > 0) {
+          changes.push({ type: 'modify', field: fieldNames[field] || field, count: modified });
+        }
+      }
+    });
+
+    // 스칼라 필드 비교
+    const scalarFields = ['project_title', 'target_uph'];
+    scalarFields.forEach(field => {
+      if (original[field] !== updated[field]) {
+        const scalarNames = { project_title: '프로젝트명', target_uph: '목표 UPH' };
+        changes.push({ type: 'modify', field: scalarNames[field] || field, count: 1 });
+      }
+    });
+
+    return changes.length > 0 ? changes : null;
+  };
 
   // Load tools on mount and when returning to list
   useEffect(() => {
@@ -94,6 +176,7 @@ function ToolsPanel() {
         source_code: uploadedCode,
         input_schema: analysisResult.input_schema,
         output_schema: analysisResult.output_schema,
+        params_schema: analysisResult.params_schema || null,
       });
       // Reset and go back to list
       setUploadedCode('');
@@ -114,10 +197,16 @@ function ToolsPanel() {
     setExecResult(null);
     setPendingResult(null);
     setError('');
-    // 파라미터 기본값 초기화
+    // 파라미터 기본값 초기화 (BOP 값을 fallback으로 사용)
+    const bopData = exportBopData();
     const defaults = {};
     (tool.params_schema || []).forEach(p => {
-      if (p.default != null) defaults[p.key] = p.default;
+      if (p.default != null) {
+        defaults[p.key] = p.default;
+      } else if (bopData && bopData[p.key] != null) {
+        // BOP fallback: BOP에 같은 키가 있으면 그 값을 기본값으로 사용
+        defaults[p.key] = bopData[p.key];
+      }
     });
     setToolParams(defaults);
     setView('detail');
@@ -128,6 +217,8 @@ function ToolsPanel() {
     setExecuting(true);
     setExecResult(null);
     setPendingResult(null);
+    setOriginalBop(null);
+    setBopChanges(null);
     setError('');
     try {
       const collapsedBop = exportBopData();
@@ -152,7 +243,13 @@ function ToolsPanel() {
       );
       setExecResult(result);
       if (result.success && result.updated_bop) {
-        setPendingResult(result);
+        const changes = computeBopChanges(collapsedBop, result.updated_bop);
+        if (changes) {
+          setOriginalBop(collapsedBop);
+          setPendingResult(result);
+          setBopChanges(changes);
+        }
+        // changes가 null이면 BOP 반영 버튼이 표시되지 않음
       }
     } catch (err) {
       setExecResult({ success: false, message: err.message });
@@ -162,10 +259,32 @@ function ToolsPanel() {
   };
 
   const handleApplyToBop = () => {
-    if (!pendingResult || !pendingResult.updated_bop) return;
+    if (!pendingResult || !pendingResult.updated_bop || !bopChanges) return;
+
+    // 변경 사항 요약 생성
+    const changeSummary = bopChanges.map(c => {
+      if (c.type === 'add') return `${c.field} ${c.count}개 추가`;
+      if (c.type === 'remove') return `${c.field} ${c.count}개 삭제`;
+      if (c.type === 'modify') return `${c.field} ${c.count}개 수정`;
+      return '';
+    }).join('\n');
+
+    const confirmed = confirm(`다음 변경 사항을 BOP에 반영하시겠습니까?\n\n${changeSummary}`);
+    if (!confirmed) return;
+
     setBopData(pendingResult.updated_bop);
+    // BOP 반영 후 그리드 재계산 (모든 도구 공통 - 병렬 확장, 공정 위치 정규화)
+    setTimeout(() => normalizeAllProcesses(), 0);
     addMessage('assistant', `"${selectedTool.tool_name}" 도구 결과가 BOP에 반영되었습니다.`);
     setPendingResult(null);
+    setBopChanges(null);
+    setOriginalBop(null);
+  };
+
+  const handleCancelApply = () => {
+    setPendingResult(null);
+    setBopChanges(null);
+    setOriginalBop(null);
   };
 
   const handleDelete = async () => {
@@ -287,12 +406,32 @@ function ToolsPanel() {
                 {analysisResult.input_schema?.type} - {analysisResult.input_schema?.description}
               </span>
             </div>
+            {analysisResult.input_schema?.args_format && (
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>인자:</span>
+                <code style={styles.codeInline}>{analysisResult.input_schema.args_format}</code>
+              </div>
+            )}
             <div style={styles.resultRow}>
               <span style={styles.resultLabel}>출력:</span>
               <span style={styles.resultValue}>
                 {analysisResult.output_schema?.type} - {analysisResult.output_schema?.description}
               </span>
             </div>
+            {analysisResult.params_schema?.length > 0 && (
+              <div style={{ marginTop: 8, borderTop: '1px solid #e0e0e0', paddingTop: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
+                  추가 파라미터 ({analysisResult.params_schema.length}개)
+                </div>
+                {analysisResult.params_schema.map((p, idx) => (
+                  <div key={idx} style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                    <span style={{ fontWeight: 500 }}>{p.label}</span>
+                    <span style={{ color: '#999' }}> ({p.key}, {p.type})</span>
+                    {p.required && <span style={{ color: '#c0392b', marginLeft: 4 }}>*필수</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -379,7 +518,7 @@ function ToolsPanel() {
                 <input
                   style={styles.paramInput}
                   type={p.type === 'number' ? 'number' : 'text'}
-                  placeholder={p.default != null ? `기본값: ${p.default}` : '(선택)'}
+                  placeholder={p.default != null ? `기본값: ${p.default}` : (p.required ? '' : '(선택)')}
                   value={toolParams[p.key] ?? ''}
                   onChange={e => setToolParams(prev => ({ ...prev, [p.key]: e.target.value }))}
                 />
@@ -436,20 +575,54 @@ function ToolsPanel() {
             )}
             {execResult.stderr && (
               <details style={{ marginTop: 4 }}>
-                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#c0392b' }}>stderr</summary>
-                <pre style={{ ...styles.codePreview, borderColor: '#ffcccc' }}>{execResult.stderr}</pre>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>실행 로그</summary>
+                <pre style={{ ...styles.codePreview }}>{execResult.stderr}</pre>
               </details>
             )}
           </div>
         </div>
       )}
 
-      {/* Apply to BOP Button */}
-      {pendingResult && (
+      {/* Apply to BOP Section */}
+      {pendingResult && bopChanges && (
         <div style={styles.section}>
-          <button style={styles.applyBtn} onClick={handleApplyToBop}>
-            BOP에 반영
-          </button>
+          <label style={styles.label}>BOP 변경 사항</label>
+          <div style={{ ...styles.resultCard, borderLeft: '4px solid #f39c12', marginBottom: 12 }}>
+            {bopChanges.map((change, idx) => (
+              <div key={idx} style={{ fontSize: 13, marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    fontSize: 11,
+                    fontWeight: 600,
+                    backgroundColor: change.type === 'add' ? '#d4edda' : change.type === 'remove' ? '#f8d7da' : '#fff3cd',
+                    color: change.type === 'add' ? '#155724' : change.type === 'remove' ? '#721c24' : '#856404',
+                  }}>
+                    {change.type === 'add' ? '추가' : change.type === 'remove' ? '삭제' : '수정'}
+                  </span>
+                  <span>{change.field} {change.count}개</span>
+                </div>
+                {change.details && change.details.length > 0 && (
+                  <div style={{ marginLeft: 8, marginTop: 4, fontSize: 11, color: '#666' }}>
+                    {change.details.slice(0, 5).map((detail, i) => (
+                      <div key={i}>• {detail}</div>
+                    ))}
+                    {change.details.length > 5 && <div>• ... 외 {change.details.length - 5}개</div>}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button style={styles.applyBtn} onClick={handleApplyToBop}>
+              반영하기
+            </button>
+            <button style={styles.secondaryBtn} onClick={handleCancelApply}>
+              취소
+            </button>
+          </div>
         </div>
       )}
 
@@ -579,7 +752,7 @@ const styles = {
     fontSize: '14px',
     cursor: 'pointer',
     fontWeight: 'bold',
-    width: '100%',
+    flex: 1,
   },
   paramInput: {
     width: '100%',
@@ -646,6 +819,14 @@ const styles = {
     padding: '8px 12px',
     fontSize: '13px',
     borderBottom: '1px solid #f5c6cb',
+  },
+  codeInline: {
+    backgroundColor: '#f0f0f0',
+    padding: '2px 6px',
+    borderRadius: '3px',
+    fontSize: '11px',
+    fontFamily: 'monospace',
+    color: '#333',
   },
 };
 

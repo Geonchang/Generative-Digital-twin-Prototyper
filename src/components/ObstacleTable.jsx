@@ -1,0 +1,532 @@
+import { useEffect, useRef, useState } from 'react';
+import useBopStore from '../store/bopStore';
+
+function ObstacleTable() {
+  const {
+    bopData,
+    selectedObstacleId,
+    setSelectedObstacle,
+    addObstacle,
+    updateObstacle,
+    deleteObstacle,
+    obstacleCreationMode,
+    setObstacleCreationMode,
+    pendingObstacleType,
+    setPendingObstacleType
+  } = useBopStore();
+  const selectedRowRef = useRef(null);
+
+  const obstacleTypes = [
+    { id: 'fence', label: '펜스', icon: '🚧', color: '#ff9800' },
+    { id: 'zone', label: '구역', icon: '⚠️', color: '#f44336' },
+    { id: 'pillar', label: '기둥', icon: '🏛️', color: '#795548' },
+    { id: 'wall', label: '벽', icon: '🧱', color: '#607d8b' },
+  ];
+
+  // Auto-scroll to selected row
+  useEffect(() => {
+    if (selectedRowRef.current && selectedObstacleId) {
+      selectedRowRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }, [selectedObstacleId]);
+
+  const handleAddObstacle = () => {
+    addObstacle();
+  };
+
+  const handleDeleteObstacle = () => {
+    if (!selectedObstacleId) return;
+    if (window.confirm('선택한 장애물을 삭제하시겠습니까?')) {
+      deleteObstacle(selectedObstacleId);
+    }
+  };
+
+  const handleToggleCreationMode = () => {
+    setObstacleCreationMode(!obstacleCreationMode);
+  };
+
+  const obstacles = bopData?.obstacles || [];
+
+  if (obstacles.length === 0 && !obstacleCreationMode) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <h2 style={styles.title}>장애물</h2>
+          <div style={styles.count}>총 0개</div>
+        </div>
+        {/* Type Selection Bar */}
+        <div style={styles.typeSelectionBar}>
+          <span style={styles.typeSelectionLabel}>유형 선택:</span>
+          <div style={styles.typeButtonGroup}>
+            {obstacleTypes.map((type) => (
+              <button
+                key={type.id}
+                style={{
+                  ...styles.typeButton,
+                  ...(pendingObstacleType === type.id ? {
+                    ...styles.typeButtonActive,
+                    borderColor: type.color,
+                    backgroundColor: `${type.color}20`,
+                  } : {}),
+                }}
+                onClick={() => setPendingObstacleType(type.id)}
+              >
+                <span style={styles.typeButtonIcon}>{type.icon}</span>
+                <span>{type.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={styles.actionBar}>
+          <button style={styles.actionButton} onClick={handleAddObstacle}>
+            + {obstacleTypes.find(t => t.id === pendingObstacleType)?.label || '장애물'} 추가
+          </button>
+          <button
+            style={{
+              ...styles.actionButtonSecondary,
+              ...(obstacleCreationMode ? styles.actionButtonActive : {})
+            }}
+            onClick={handleToggleCreationMode}
+          >
+            {obstacleCreationMode ? '생성 모드 종료' : '3D에서 생성'}
+          </button>
+        </div>
+        <div style={styles.emptyState}>
+          <p>장애물 데이터가 없습니다.</p>
+          <p style={{ fontSize: '12px', color: '#999' }}>
+            위에서 유형을 선택하고 "3D에서 생성" 버튼을 클릭하여<br />
+            바닥면에 두 점을 찍어 장애물 영역을 지정하세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const getObstacleTypeLabel = (type) => {
+    switch (type) {
+      case 'fence': return '펜스';
+      case 'zone': return '구역';
+      case 'pillar': return '기둥';
+      case 'wall': return '벽';
+      default: return type;
+    }
+  };
+
+  const getObstacleTypeColor = (type) => {
+    switch (type) {
+      case 'fence': return '#ff9800';
+      case 'zone': return '#f44336';
+      case 'pillar': return '#795548';
+      case 'wall': return '#607d8b';
+      default: return '#888';
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      {/* Header */}
+      <div style={styles.header}>
+        <h2 style={styles.title}>장애물</h2>
+        <div style={styles.count}>총 {obstacles.length}개</div>
+      </div>
+
+      {/* Type Selection Bar */}
+      <div style={styles.typeSelectionBar}>
+        <span style={styles.typeSelectionLabel}>유형 선택:</span>
+        <div style={styles.typeButtonGroup}>
+          {obstacleTypes.map((type) => (
+            <button
+              key={type.id}
+              style={{
+                ...styles.typeButton,
+                ...(pendingObstacleType === type.id ? {
+                  ...styles.typeButtonActive,
+                  borderColor: type.color,
+                  backgroundColor: `${type.color}20`,
+                } : {}),
+              }}
+              onClick={() => setPendingObstacleType(type.id)}
+            >
+              <span style={styles.typeButtonIcon}>{type.icon}</span>
+              <span>{type.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Action Bar */}
+      <div style={styles.actionBar}>
+        <button style={styles.actionButton} onClick={handleAddObstacle}>
+          + {obstacleTypes.find(t => t.id === pendingObstacleType)?.label || '장애물'} 추가
+        </button>
+        <button
+          style={{
+            ...styles.actionButtonSecondary,
+            ...(obstacleCreationMode ? styles.actionButtonActive : {})
+          }}
+          onClick={handleToggleCreationMode}
+        >
+          {obstacleCreationMode ? '생성 모드 종료' : '3D에서 생성'}
+        </button>
+        <button
+          style={{
+            ...styles.actionButtonDanger,
+            ...(selectedObstacleId ? {} : styles.actionButtonDisabled)
+          }}
+          disabled={!selectedObstacleId}
+          onClick={handleDeleteObstacle}
+        >
+          선택 삭제
+        </button>
+      </div>
+
+      {/* Creation Mode Notice */}
+      {obstacleCreationMode && (
+        <div style={styles.creationModeNotice}>
+          <strong>{obstacleTypes.find(t => t.id === pendingObstacleType)?.icon} {obstacleTypes.find(t => t.id === pendingObstacleType)?.label}</strong> 생성 중 - 3D 뷰에서 바닥면을 클릭하여 두 꼭지점을 지정하세요.
+        </div>
+      )}
+
+      {/* Table */}
+      <div style={styles.tableWrapper}>
+        <table style={styles.table}>
+          <thead>
+            <tr>
+              <th style={{ ...styles.th, width: '80px' }}>ID</th>
+              <th style={{ ...styles.th, minWidth: '120px' }}>이름</th>
+              <th style={{ ...styles.th, width: '70px' }}>유형</th>
+              <th style={{ ...styles.th, width: '100px' }}>위치 (X, Z)</th>
+              <th style={{ ...styles.th, width: '140px' }}>크기 (W, H, D)</th>
+              <th style={{ ...styles.th, width: '70px' }}>회전</th>
+            </tr>
+          </thead>
+          <tbody>
+            {obstacles.map((obstacle) => {
+              const isSelected = selectedObstacleId === obstacle.obstacle_id;
+              const pos = obstacle.position || { x: 0, y: 0, z: 0 };
+              const size = obstacle.size || { width: 1, height: 1, depth: 1 };
+              const rotationY = obstacle.rotation_y || 0;
+
+              return (
+                <tr
+                  key={obstacle.obstacle_id}
+                  ref={isSelected ? selectedRowRef : null}
+                  style={{
+                    ...styles.row,
+                    ...(isSelected ? styles.rowSelected : {}),
+                  }}
+                  onClick={() => setSelectedObstacle(obstacle.obstacle_id)}
+                >
+                  <td style={styles.td}>
+                    <strong>{obstacle.obstacle_id}</strong>
+                  </td>
+                  <td style={styles.td}>
+                    {isSelected ? (
+                      <input
+                        type="text"
+                        style={styles.editInput}
+                        value={obstacle.name}
+                        onChange={(e) => updateObstacle(obstacle.obstacle_id, { name: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : obstacle.name}
+                  </td>
+                  <td style={styles.td}>
+                    {isSelected ? (
+                      <select
+                        style={styles.editSelect}
+                        value={obstacle.type}
+                        onChange={(e) => updateObstacle(obstacle.obstacle_id, { type: e.target.value })}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <option value="fence">펜스</option>
+                        <option value="zone">구역</option>
+                        <option value="pillar">기둥</option>
+                        <option value="wall">벽</option>
+                      </select>
+                    ) : (
+                      <span style={{ ...styles.typeBadge, backgroundColor: getObstacleTypeColor(obstacle.type) }}>
+                        {getObstacleTypeLabel(obstacle.type)}
+                      </span>
+                    )}
+                  </td>
+                  <td style={styles.td}>
+                    <div style={styles.locationCell}>
+                      ({pos.x.toFixed(1)}, {pos.z.toFixed(1)})
+                    </div>
+                  </td>
+                  <td style={styles.td}>
+                    {isSelected ? (
+                      <div style={styles.sizeInputGroup}>
+                        <input
+                          type="number"
+                          style={styles.sizeInput}
+                          value={size.width}
+                          step="0.1"
+                          min="0.1"
+                          onChange={(e) => updateObstacle(obstacle.obstacle_id, {
+                            size: { ...size, width: parseFloat(e.target.value) || 0.1 }
+                          })}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <input
+                          type="number"
+                          style={styles.sizeInput}
+                          value={size.height}
+                          step="0.1"
+                          min="0.1"
+                          onChange={(e) => updateObstacle(obstacle.obstacle_id, {
+                            size: { ...size, height: parseFloat(e.target.value) || 0.1 }
+                          })}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <input
+                          type="number"
+                          style={styles.sizeInput}
+                          value={size.depth}
+                          step="0.1"
+                          min="0.1"
+                          onChange={(e) => updateObstacle(obstacle.obstacle_id, {
+                            size: { ...size, depth: parseFloat(e.target.value) || 0.1 }
+                          })}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    ) : (
+                      <div style={styles.locationCell}>
+                        {size.width.toFixed(1)}, {size.height.toFixed(1)}, {size.depth.toFixed(1)}
+                      </div>
+                    )}
+                  </td>
+                  <td style={styles.td}>
+                    <div style={styles.locationCell}>
+                      {(rotationY * 180 / Math.PI).toFixed(1)}°
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: 'white',
+    overflow: 'hidden',
+  },
+  emptyState: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    color: '#999',
+    fontSize: '14px',
+    gap: '8px',
+    textAlign: 'center',
+    lineHeight: '1.6',
+  },
+  typeSelectionBar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 20px',
+    borderBottom: '1px solid #eee',
+    backgroundColor: '#fafafa',
+  },
+  typeSelectionLabel: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#555',
+  },
+  typeButtonGroup: {
+    display: 'flex',
+    gap: '8px',
+  },
+  typeButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '6px 12px',
+    border: '2px solid #ddd',
+    borderRadius: '8px',
+    backgroundColor: 'white',
+    fontSize: '12px',
+    fontWeight: '500',
+    color: '#555',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  typeButtonActive: {
+    fontWeight: '700',
+    color: '#333',
+  },
+  typeButtonIcon: {
+    fontSize: '14px',
+  },
+  header: {
+    padding: '20px',
+    borderBottom: '2px solid #ddd',
+    backgroundColor: '#f9f9f9',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  title: {
+    margin: 0,
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  count: {
+    fontSize: '14px',
+    color: '#ff9800',
+    fontWeight: 'bold',
+  },
+  actionBar: {
+    display: 'flex',
+    gap: '8px',
+    padding: '10px 20px',
+    borderBottom: '1px solid #ddd',
+    backgroundColor: '#fafafa',
+  },
+  actionButton: {
+    padding: '6px 14px',
+    backgroundColor: '#ff9800',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  actionButtonSecondary: {
+    padding: '6px 14px',
+    backgroundColor: '#607d8b',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  actionButtonActive: {
+    backgroundColor: '#4caf50',
+    boxShadow: '0 0 8px rgba(76, 175, 80, 0.5)',
+  },
+  actionButtonDanger: {
+    padding: '6px 14px',
+    backgroundColor: '#e74c3c',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  },
+  creationModeNotice: {
+    padding: '12px 20px',
+    backgroundColor: '#e8f5e9',
+    color: '#2e7d32',
+    fontSize: '13px',
+    fontWeight: '500',
+    borderBottom: '1px solid #c8e6c9',
+  },
+  tableWrapper: {
+    flex: 1,
+    overflow: 'auto',
+    padding: '0',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '13px',
+  },
+  th: {
+    position: 'sticky',
+    top: 0,
+    backgroundColor: '#f5f5f5',
+    padding: '12px 8px',
+    textAlign: 'left',
+    fontWeight: 'bold',
+    borderBottom: '2px solid #ddd',
+    fontSize: '12px',
+    color: '#555',
+    zIndex: 1,
+  },
+  row: {
+    backgroundColor: 'white',
+    borderBottom: '1px solid #ddd',
+    transition: 'background-color 0.2s',
+    cursor: 'pointer',
+  },
+  rowSelected: {
+    backgroundColor: '#fff3e0',
+    borderLeft: '3px solid #ff9800',
+  },
+  td: {
+    padding: '8px 6px',
+    verticalAlign: 'middle',
+  },
+  locationCell: {
+    fontSize: '11px',
+    color: '#666',
+    fontFamily: 'monospace',
+  },
+  editInput: {
+    width: '100%',
+    padding: '4px 6px',
+    fontSize: '12px',
+    border: '1px solid #ff9800',
+    borderRadius: '3px',
+    boxSizing: 'border-box',
+    backgroundColor: '#fff3e0',
+  },
+  editSelect: {
+    width: '100%',
+    padding: '4px 6px',
+    fontSize: '11px',
+    border: '1px solid #ff9800',
+    borderRadius: '3px',
+    backgroundColor: '#fff3e0',
+    cursor: 'pointer',
+  },
+  sizeInputGroup: {
+    display: 'flex',
+    gap: '4px',
+  },
+  sizeInput: {
+    width: '40px',
+    padding: '2px 4px',
+    fontSize: '11px',
+    border: '1px solid #ff9800',
+    borderRadius: '3px',
+    backgroundColor: '#fff3e0',
+    fontFamily: 'monospace',
+  },
+  typeBadge: {
+    display: 'inline-block',
+    padding: '4px 10px',
+    color: 'white',
+    fontSize: '11px',
+    borderRadius: '12px',
+    fontWeight: 'bold',
+  },
+};
+
+export default ObstacleTable;

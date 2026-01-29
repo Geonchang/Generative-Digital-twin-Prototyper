@@ -1,7 +1,8 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, Text, Line, TransformControls } from '@react-three/drei';
 import useBopStore from '../store/bopStore';
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect, Suspense } from 'react';
+import { RobotModel, ConveyorModel, BoxModel, ScannerModel, WorkerModel } from './Models3D';
 
 // Helper function: Get resource size based on type (exported for tables)
 export function getResourceSize(resourceType, equipmentType) {
@@ -30,7 +31,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
   const [transformMode, setTransformMode] = useState('translate'); // 'translate', 'rotate'
   const [activeAxis, setActiveAxis] = useState(null); // 현재 드래그 중인 축 ('X', 'Y', 'Z', 'XY', etc.)
   const [hoveredAxis, setHoveredAxis] = useState(null); // 마우스 hover 중인 축
-  const { bopData, updateProcessLocation, updateProcessRotation } = useBopStore();
+  const { bopData, updateProcessLocation, updateProcessRotation, obstacleCreationMode } = useBopStore();
 
   const groupRef = useRef();
   const transformControlsRef = useRef();
@@ -330,17 +331,16 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
         rotation={[-Math.PI / 2, 0, 0]}
         renderOrder={-10}
         onPointerOver={() => {
-          if (!isDraggingTransformRef.current) {
+          if (!isDraggingTransformRef.current && !obstacleCreationMode) {
             setHovered(true);
           }
         }}
         onPointerOut={() => {
-          if (!isDraggingTransformRef.current) {
-            setHovered(false);
-          }
+          // 항상 hovered를 해제 (드래그 중에도)
+          setHovered(false);
         }}
         onClick={(e) => {
-          if (!isDraggingTransformRef.current) {
+          if (!isDraggingTransformRef.current && !obstacleCreationMode) {
             e.stopPropagation();
             onSelect();
           }
@@ -441,12 +441,12 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
 }
 
 // Resource Marker Component with auto-layout
-function ResourceMarker({ resource, processLocation, processBoundingCenter, processRotation, parallelIndex, equipmentData, workerData, materialData, resourceIndex, totalResources, processId, onTransformMouseDown, onTransformMouseUp }) {
+function ResourceMarker({ resource, processLocation, processBoundingCenter, processRotation, parallelIndex, equipmentData, workerData, materialData, resourceIndex, totalResources, processId, onTransformMouseDown, onTransformMouseUp, isDraggingTransformRef }) {
   const [hovered, setHovered] = useState(false);
   const [transformMode, setTransformMode] = useState('translate'); // 'translate', 'rotate', 'scale'
   const [activeAxis, setActiveAxis] = useState(null); // 현재 드래그 중인 축 ('X', 'Y', 'Z', 'XY', etc.)
   const [hoveredAxis, setHoveredAxis] = useState(null); // 마우스 hover 중인 축
-  const { selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceRotation, updateResourceScale } = useBopStore();
+  const { selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceRotation, updateResourceScale, obstacleCreationMode, use3DModels } = useBopStore();
 
   const groupRef = useRef();
   const transformControlsRef = useRef();
@@ -510,6 +510,27 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   };
 
   const getGeometry = () => {
+    // 3D 모델 사용 시
+    if (use3DModels) {
+      if (resource.resource_type === 'equipment' && equipmentData) {
+        switch (equipmentData.type) {
+          case 'robot':
+            return { type: 'glb', model: 'robot', args: [0.3, 0.3, 1.8, 8], yOffset: 0 };
+          case 'machine':
+            return { type: 'glb', model: 'conveyor', args: [0.8, 1.2, 0.8], yOffset: 0 };
+          case 'manual_station':
+            return { type: 'glb', model: 'scanner', args: [0.6, 1.0, 0.6], yOffset: 0 };
+          default:
+            return { type: 'box', args: [0.4, 0.4, 0.4], yOffset: 0.2 };
+        }
+      } else if (resource.resource_type === 'worker') {
+        return { type: 'glb', model: 'worker', args: [0.25, 0.25, 1.6, 8], yOffset: 0 };
+      } else if (resource.resource_type === 'material') {
+        return { type: 'glb', model: 'box', args: [0.4, 0.25, 0.4], yOffset: 0 };
+      }
+    }
+
+    // 기본 도형 사용 시
     if (resource.resource_type === 'equipment' && equipmentData) {
       switch (equipmentData.type) {
         case 'robot':
@@ -558,6 +579,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
 
   // Click handler
   const handleClick = (e) => {
+    if (obstacleCreationMode) return; // 장애물 생성 모드에서는 선택 불가
     e.stopPropagation();
     setSelectedResource(resource.resource_type, resource.resource_id, processId);
   };
@@ -860,26 +882,66 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
         scale={[scale.x, scale.y, scale.z]}
       >
       {/* Resource mesh */}
-      <mesh
-        position={[0, geometry.yOffset, 0]}
-        renderOrder={1}
-        onPointerOver={() => setHovered(true)}
-        onPointerOut={() => setHovered(false)}
-        onClick={handleClick}
-      >
-        {geometry.type === 'cylinder' ? (
-          <cylinderGeometry args={geometry.args} />
-        ) : (
-          <boxGeometry args={geometry.args} />
-        )}
-        <meshStandardMaterial
-          color={color}
-          emissive={isSelected || hovered ? '#ffeb3b' : '#000000'}
-          emissiveIntensity={isSelected ? 0.8 : (hovered ? 0.5 : 0)}
-          metalness={0.3}
-          roughness={0.7}
-        />
-      </mesh>
+      {geometry.type === 'glb' ? (
+        <group
+          position={[0, geometry.yOffset, 0]}
+          onPointerOver={() => {
+            if (!isDraggingTransformRef?.current && !obstacleCreationMode) setHovered(true);
+          }}
+          onPointerOut={() => {
+            setHovered(false);
+          }}
+          onClick={handleClick}
+        >
+          <Suspense fallback={
+            <mesh>
+              <boxGeometry args={[0.5, 0.5, 0.5]} />
+              <meshStandardMaterial color="#888888" />
+            </mesh>
+          }>
+            {geometry.model === 'robot' && (
+              <RobotModel color={isSelected || hovered ? '#ffeb3b' : color} />
+            )}
+            {geometry.model === 'conveyor' && (
+              <ConveyorModel color={isSelected || hovered ? '#ffeb3b' : color} />
+            )}
+            {geometry.model === 'scanner' && (
+              <ScannerModel color={isSelected || hovered ? '#ffeb3b' : color} />
+            )}
+            {geometry.model === 'box' && (
+              <BoxModel color={isSelected || hovered ? '#ffeb3b' : color} />
+            )}
+            {geometry.model === 'worker' && (
+              <WorkerModel highlighted={isSelected || hovered} />
+            )}
+          </Suspense>
+        </group>
+      ) : (
+        <mesh
+          position={[0, geometry.yOffset, 0]}
+          renderOrder={1}
+          onPointerOver={() => {
+            if (!isDraggingTransformRef?.current && !obstacleCreationMode) setHovered(true);
+          }}
+          onPointerOut={() => {
+            setHovered(false);
+          }}
+          onClick={handleClick}
+        >
+          {geometry.type === 'cylinder' ? (
+            <cylinderGeometry args={geometry.args} />
+          ) : (
+            <boxGeometry args={geometry.args} />
+          )}
+          <meshStandardMaterial
+            color={color}
+            emissive={isSelected || hovered ? '#ffeb3b' : '#000000'}
+            emissiveIntensity={isSelected ? 0.8 : (hovered ? 0.5 : 0)}
+            metalness={0.3}
+            roughness={0.7}
+          />
+        </mesh>
+      )}
 
       {/* Resource label */}
       {(isSelected || hovered) && (
@@ -1067,13 +1129,223 @@ function ProcessFlowArrow({ fromProcess, toProcess, parallelIndex }) {
   );
 }
 
+// Obstacle Box Component
+function ObstacleBox({ obstacle, isSelected, onSelect, onTransformMouseDown, onTransformMouseUp, isDraggingTransformRef }) {
+  const [hovered, setHovered] = useState(false);
+  const [transformMode, setTransformMode] = useState('translate'); // 'translate', 'rotate'
+  const { updateObstacle, obstacleCreationMode } = useBopStore();
+
+  const groupRef = useRef();
+  const transformControlsRef = useRef();
+
+  const pos = obstacle.position || { x: 0, y: 0, z: 0 };
+  const size = obstacle.size || { width: 1, height: 1, depth: 1 };
+  const rotationY = obstacle.rotation_y || 0;
+
+  // Color based on obstacle type
+  const getColor = () => {
+    if (isSelected) return '#ffeb3b';
+    if (hovered) return '#ffd54f';
+    switch (obstacle.type) {
+      case 'fence': return '#ff9800';
+      case 'zone': return '#f44336';
+      case 'pillar': return '#795548';
+      case 'wall': return '#607d8b';
+      default: return '#ff9800';
+    }
+  };
+
+  // Opacity based on type (zones are more transparent)
+  const getOpacity = () => {
+    if (obstacle.type === 'zone') return 0.4;
+    return 0.8;
+  };
+
+  // Transform change handler
+  const handleObjectChange = () => {
+    if (!groupRef.current) return;
+
+    if (transformMode === 'translate') {
+      groupRef.current.position.y = size.height / 2; // Keep on floor
+    } else if (transformMode === 'rotate') {
+      groupRef.current.rotation.x = 0;
+      groupRef.current.rotation.z = 0;
+    }
+  };
+
+  // Transform end handler
+  const handleTransformEnd = () => {
+    if (!groupRef.current) return;
+
+    if (transformMode === 'translate') {
+      const newPosition = {
+        x: groupRef.current.position.x,
+        y: 0,
+        z: groupRef.current.position.z
+      };
+      updateObstacle(obstacle.obstacle_id, { position: newPosition });
+    } else if (transformMode === 'rotate') {
+      updateObstacle(obstacle.obstacle_id, { rotation_y: groupRef.current.rotation.y });
+    }
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (!isSelected) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === 't' || e.key === 'T') {
+        setTransformMode('translate');
+      } else if (e.key === 'r' || e.key === 'R') {
+        setTransformMode('rotate');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSelected]);
+
+  return (
+    <>
+      <group
+        ref={groupRef}
+        position={[pos.x, size.height / 2, pos.z]}
+        rotation={[0, rotationY, 0]}
+      >
+        {/* Obstacle mesh */}
+        <mesh
+          onPointerOver={() => {
+            if (!isDraggingTransformRef?.current && !obstacleCreationMode) setHovered(true);
+          }}
+          onPointerOut={() => {
+            // 항상 hovered를 해제 (드래그 중에도)
+            setHovered(false);
+          }}
+          onClick={(e) => {
+            if (!isDraggingTransformRef?.current && !obstacleCreationMode) {
+              e.stopPropagation();
+              onSelect();
+            }
+          }}
+        >
+          <boxGeometry args={[size.width, size.height, size.depth]} />
+          <meshStandardMaterial
+            color={getColor()}
+            transparent={true}
+            opacity={getOpacity()}
+            emissive={isSelected ? '#ffeb3b' : '#000000'}
+            emissiveIntensity={isSelected ? 0.5 : 0}
+          />
+        </mesh>
+
+        {/* Obstacle label */}
+        {(isSelected || hovered) && (
+          <Text
+            position={[0, size.height / 2 + 0.3, 0]}
+            fontSize={0.2}
+            color="#333"
+            anchorX="center"
+            anchorY="middle"
+          >
+            {obstacle.name}
+          </Text>
+        )}
+
+        {/* Transform mode indicator */}
+        {isSelected && (
+          <Text
+            position={[0, size.height / 2 + 0.6, 0]}
+            fontSize={0.18}
+            color={transformMode === 'translate' ? '#4a90e2' : '#ff6b6b'}
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.02}
+            outlineColor="#ffffff"
+          >
+            {transformMode === 'translate' ? '이동 (T)' : '회전 (R)'}
+          </Text>
+        )}
+      </group>
+
+      {/* TransformControls */}
+      {isSelected && (
+        <TransformControls
+          ref={transformControlsRef}
+          object={groupRef}
+          mode={transformMode}
+          space="world"
+          size={1.2}
+          showX={transformMode === 'translate'}
+          showY={transformMode === 'rotate'}
+          showZ={transformMode === 'translate'}
+          rotationSnap={transformMode === 'rotate' ? Math.PI / 180 * 5 : null}
+          onObjectChange={handleObjectChange}
+          onMouseDown={onTransformMouseDown}
+          onMouseUp={(e) => {
+            handleTransformEnd();
+            onTransformMouseUp(e);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+// Obstacle Preview Component (for Two-Click creation)
+function ObstaclePreview({ firstClick, currentPointer, obstacleType }) {
+  if (!firstClick || !currentPointer) return null;
+
+  const centerX = (firstClick.x + currentPointer.x) / 2;
+  const centerZ = (firstClick.z + currentPointer.z) / 2;
+  const width = Math.abs(currentPointer.x - firstClick.x);
+  const depth = Math.abs(currentPointer.z - firstClick.z);
+
+  // Height based on obstacle type
+  const getHeight = () => {
+    switch (obstacleType) {
+      case 'fence': return 1.5;
+      case 'zone': return 0.05;
+      case 'pillar': return 3;
+      case 'wall': return 2.5;
+      default: return 2;
+    }
+  };
+
+  // Color based on obstacle type
+  const getColor = () => {
+    switch (obstacleType) {
+      case 'fence': return '#ff9800';
+      case 'zone': return '#f44336';
+      case 'pillar': return '#795548';
+      case 'wall': return '#607d8b';
+      default: return '#ff9800';
+    }
+  };
+
+  const height = getHeight();
+  const color = getColor();
+
+  return (
+    <mesh position={[centerX, height / 2, centerZ]}>
+      <boxGeometry args={[Math.max(0.5, width), height, Math.max(0.5, depth)]} />
+      <meshStandardMaterial
+        color={color}
+        transparent={true}
+        opacity={0.4}
+        wireframe={false}
+      />
+    </mesh>
+  );
+}
+
 // Background plane for click detection
-function BackgroundPlane({ onBackgroundClick, gridSize, centerX, centerZ }) {
+function BackgroundPlane({ onBackgroundClick, onPointerMove, gridSize, centerX, centerZ }) {
   return (
     <mesh
       position={[centerX, -0.01, centerZ]}
       rotation={[-Math.PI / 2, 0, 0]}
       onClick={onBackgroundClick}
+      onPointerMove={onPointerMove}
     >
       <planeGeometry args={[gridSize * 2, gridSize * 2]} />
       <meshBasicMaterial transparent opacity={0} />
@@ -1086,35 +1358,53 @@ function Scene() {
     bopData,
     selectedProcessKey,
     selectedResourceKey,
+    selectedObstacleId,
     setSelectedProcess,
+    setSelectedObstacle,
     clearSelection,
     getEquipmentById,
     getWorkerById,
     getMaterialById,
-    getProcessById
+    getProcessById,
+    obstacleCreationMode,
+    obstacleCreationFirstClick,
+    setObstacleCreationFirstClick,
+    createObstacleFromTwoClicks,
+    pendingObstacleType
   } = useBopStore();
 
+  const [currentPointer, setCurrentPointer] = useState(null);
+
   const orbitControlsRef = useRef();
-  const initialGridConfig = useRef(null);
   const isDraggingTransform = useRef(false);
 
-  // BOP 프로젝트가 변경되면 그리드 설정 리셋
-  useEffect(() => {
-    const projectTitle = bopData?.project_title;
-    const processCount = bopData?.processes?.length || 0;
-
-    // 프로젝트나 공정 개수가 변경되면 그리드 재계산
-    if (projectTitle !== initialGridConfig.current?.projectTitle ||
-        processCount !== initialGridConfig.current?.processCount) {
-      initialGridConfig.current = null;
-    }
-  }, [bopData?.project_title, bopData?.processes?.length]);
-
-  // 빈 공간 클릭 시 선택 해제
+  // 빈 공간 클릭 시 선택 해제 또는 장애물 생성
   const handleBackgroundClick = useCallback((e) => {
     e.stopPropagation();
+
+    // Obstacle creation mode: Two-Click logic
+    if (obstacleCreationMode) {
+      const point = { x: e.point.x, z: e.point.z };
+
+      if (!obstacleCreationFirstClick) {
+        // First click: save the starting corner
+        setObstacleCreationFirstClick(point);
+      } else {
+        // Second click: create obstacle
+        createObstacleFromTwoClicks(obstacleCreationFirstClick, point);
+      }
+      return;
+    }
+
     clearSelection();
-  }, [clearSelection]);
+  }, [clearSelection, obstacleCreationMode, obstacleCreationFirstClick, setObstacleCreationFirstClick, createObstacleFromTwoClicks]);
+
+  // Pointer move handler for obstacle preview
+  const handlePointerMove = useCallback((e) => {
+    if (obstacleCreationMode && obstacleCreationFirstClick) {
+      setCurrentPointer({ x: e.point.x, z: e.point.z });
+    }
+  }, [obstacleCreationMode, obstacleCreationFirstClick]);
 
   // TransformControls 드래그 시작/종료 시 OrbitControls 제어
   const handleTransformMouseDown = useCallback(() => {
@@ -1159,66 +1449,60 @@ function Scene() {
     );
   }
 
-  // 동적 그리드 크기 및 중심 계산 (초기 렌더링 시에만 계산)
-  const { size: gridSize, centerX: gridCenterX, centerZ: gridCenterZ } = useMemo(() => {
-    // 이미 초기 설정이 저장되어 있으면 그것을 사용
-    if (initialGridConfig.current) {
-      return initialGridConfig.current;
-    }
+  // 동적 그리드 크기 및 중심 계산 - 전체 콘텐츠 바운딩 박스 + 마진
+  const { size: gridSize, width: gridWidth, depth: gridDepth, centerX: gridCenterX, centerZ: gridCenterZ } = useMemo(() => {
+    const MARGIN_X = 3; // X축 마진 (미터)
+    const MARGIN_Z = 3; // Z축 마진 (미터)
+    const MIN_SIZE = 30;
 
     if (!bopData.processes || bopData.processes.length === 0) {
-      return { size: 30, centerX: 0, centerZ: 0 };
+      return { size: MIN_SIZE, width: MIN_SIZE, depth: MIN_SIZE, centerX: 0, centerZ: 0 };
     }
 
+    // 전체 콘텐츠의 바운딩 박스 계산
     let maxX = -Infinity;
     let minX = Infinity;
     let maxZ = -Infinity;
     let minZ = Infinity;
 
     bopData.processes.forEach(process => {
-      // Skip parent processes (no location)
       if (process.is_parent) return;
-
-      // X축: 공정 흐름 방향 (동적 크기이므로 여유 공간 확보)
-      const processMaxX = process.location.x + 3;
-      const processMinX = process.location.x - 3;
-
-      // Z축: 병렬 공정 분리 방향 (이제 각 프로세스가 독립적이므로 간단하게)
-      const processMaxZ = process.location.z + 2;
-      const processMinZ = process.location.z - 2;
-
-      maxX = Math.max(maxX, processMaxX);
-      minX = Math.min(minX, processMinX);
-      maxZ = Math.max(maxZ, processMaxZ);
-      minZ = Math.min(minZ, processMinZ);
+      const loc = process.location;
+      maxX = Math.max(maxX, loc.x + 2);
+      minX = Math.min(minX, loc.x - 2);
+      maxZ = Math.max(maxZ, loc.z + 2);
+      minZ = Math.min(minZ, loc.z - 2);
     });
 
-    // Legend 위치도 고려 (x=-3, z=-5 근처)
-    minX = Math.min(minX, -5);
-    minZ = Math.min(minZ, -7);
+    (bopData.obstacles || []).forEach(obstacle => {
+      const pos = obstacle.position || { x: 0, z: 0 };
+      const size = obstacle.size || { width: 1, depth: 1 };
+      maxX = Math.max(maxX, pos.x + size.width / 2);
+      minX = Math.min(minX, pos.x - size.width / 2);
+      maxZ = Math.max(maxZ, pos.z + size.depth / 2);
+      minZ = Math.min(minZ, pos.z - size.depth / 2);
+    });
 
-    // 중심 계산
+    // 바운딩 박스가 유효하지 않으면 기본값
+    if (!isFinite(maxX) || !isFinite(minX)) {
+      return { size: MIN_SIZE, width: MIN_SIZE, depth: MIN_SIZE, centerX: 0, centerZ: 0 };
+    }
+
+    // 마진 추가 (X, Z 별도)
+    minX -= MARGIN_X;
+    maxX += MARGIN_X;
+    minZ -= MARGIN_Z;
+    maxZ += MARGIN_Z;
+
+    // 중심과 크기 계산
     const centerX = (maxX + minX) / 2;
     const centerZ = (maxZ + minZ) / 2;
+    const width = Math.max(MIN_SIZE, Math.ceil(maxX - minX));
+    const depth = Math.max(MIN_SIZE, Math.ceil(maxZ - minZ));
+    const size = Math.max(width, depth); // 카메라 거리 등에 사용
 
-    // 크기 계산 (여유 공간 +10m)
-    const width = Math.abs(maxX - minX) + 10;
-    const depth = Math.abs(maxZ - minZ) + 10;
-    const size = Math.max(30, Math.ceil(Math.max(width, depth)));
-
-    const config = {
-      size,
-      centerX,
-      centerZ,
-      projectTitle: bopData.project_title,
-      processCount: bopData.processes.length
-    };
-
-    // 초기 설정 저장
-    initialGridConfig.current = config;
-
-    return config;
-  }, [bopData.processes]);
+    return { size, width, depth, centerX, centerZ };
+  }, [bopData.processes, bopData.obstacles]);
 
   // Render processes and their resources
   const renderedElements = useMemo(() => {
@@ -1344,13 +1628,33 @@ function Scene() {
             totalResources={resources.length}
             onTransformMouseDown={handleTransformMouseDown}
             onTransformMouseUp={handleTransformMouseUp}
+            isDraggingTransformRef={isDraggingTransform}
           />
         );
       });
     });
 
+    // Render obstacles
+    const obstacles = bopData.obstacles || [];
+    obstacles.forEach((obstacle) => {
+      const obstacleKey = `obstacle-${obstacle.obstacle_id}`;
+      const isObstacleSelected = selectedObstacleId === obstacle.obstacle_id;
+
+      elements.push(
+        <ObstacleBox
+          key={obstacleKey}
+          obstacle={obstacle}
+          isSelected={isObstacleSelected}
+          onSelect={() => setSelectedObstacle(obstacle.obstacle_id)}
+          onTransformMouseDown={handleTransformMouseDown}
+          onTransformMouseUp={handleTransformMouseUp}
+          isDraggingTransformRef={isDraggingTransform}
+        />
+      );
+    });
+
     return [...elements, ...arrows];
-  }, [bopData.processes, selectedProcessKey, selectedResourceKey, setSelectedProcess, getEquipmentById, getWorkerById, getMaterialById, getProcessById, handleTransformMouseDown, handleTransformMouseUp]);
+  }, [bopData.processes, bopData.obstacles, selectedProcessKey, selectedResourceKey, selectedObstacleId, setSelectedProcess, setSelectedObstacle, getEquipmentById, getWorkerById, getMaterialById, getProcessById, handleTransformMouseDown, handleTransformMouseUp]);
 
   return (
     <>
@@ -1362,15 +1666,58 @@ function Scene() {
       {/* Background plane for click detection */}
       <BackgroundPlane
         onBackgroundClick={handleBackgroundClick}
+        onPointerMove={handlePointerMove}
         gridSize={gridSize}
         centerX={gridCenterX}
         centerZ={gridCenterZ}
       />
 
+      {/* Obstacle creation preview */}
+      {obstacleCreationMode && obstacleCreationFirstClick && (
+        <ObstaclePreview
+          firstClick={obstacleCreationFirstClick}
+          currentPointer={currentPointer}
+          obstacleType={pendingObstacleType}
+        />
+      )}
+
+      {/* Obstacle creation mode indicator */}
+      {obstacleCreationMode && (
+        <group position={[gridCenterX, 5, gridCenterZ]}>
+          <Text
+            position={[0, 0.3, 0]}
+            fontSize={0.3}
+            color="#ff9800"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.02}
+            outlineColor="#ffffff"
+          >
+            {pendingObstacleType === 'fence' ? '🚧 펜스' :
+             pendingObstacleType === 'zone' ? '⚠️ 구역' :
+             pendingObstacleType === 'pillar' ? '🏛️ 기둥' :
+             pendingObstacleType === 'wall' ? '🧱 벽' : '장애물'} 생성 모드
+          </Text>
+          <Text
+            position={[0, -0.2, 0]}
+            fontSize={0.35}
+            color="#4caf50"
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.03}
+            outlineColor="#ffffff"
+          >
+            {obstacleCreationFirstClick
+              ? '두 번째 꼭지점을 클릭하세요'
+              : '첫 번째 꼭지점을 클릭하세요'}
+          </Text>
+        </group>
+      )}
+
       {/* Grid - 객체들의 중심에 배치 */}
       <Grid
         position={[gridCenterX, 0, gridCenterZ]}
-        args={[gridSize, gridSize]}
+        args={[gridWidth, gridDepth]}
         cellSize={1}
         cellColor="#dddddd"
         sectionColor="#aaaaaa"
@@ -1439,12 +1786,21 @@ function Scene() {
         <Text position={[0.5, 0.5, 0]} fontSize={0.15} color="#333" anchorX="left">
           Material
         </Text>
+
+        {/* Obstacle */}
+        <mesh position={[0, 0.1, 0]}>
+          <boxGeometry args={[0.3, 0.15, 0.05]} />
+          <meshStandardMaterial color="#ff9800" transparent opacity={0.8} />
+        </mesh>
+        <Text position={[0.5, 0.1, 0]} fontSize={0.15} color="#333" anchorX="left">
+          Obstacle
+        </Text>
       </group>
 
-      {/* Camera controls */}
+      {/* Camera controls - 타겟 고정 (0, 0, 0) */}
       <OrbitControls
         ref={orbitControlsRef}
-        target={[gridCenterX, 0, gridCenterZ]}
+        target={[0, 0, 0]}
         enableDamping={false}
         minDistance={5}
         maxDistance={gridSize * 1.5}
@@ -1454,11 +1810,35 @@ function Scene() {
 }
 
 function Viewer3D() {
+  const { use3DModels, toggleUse3DModels } = useBopStore();
+
   return (
-    <div style={{ width: '100%', height: '100%', backgroundColor: '#f5f5f5' }}>
+    <div style={{ width: '100%', height: '100%', backgroundColor: '#f5f5f5', position: 'relative' }}>
       <Canvas camera={{ position: [15, 10, 15], fov: 50 }}>
-        <Scene />
+        <Suspense fallback={null}>
+          <Scene />
+        </Suspense>
       </Canvas>
+
+      {/* 3D 모델 토글 버튼 */}
+      <button
+        onClick={toggleUse3DModels}
+        style={{
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          padding: '8px 12px',
+          backgroundColor: use3DModels ? '#4a90e2' : '#666',
+          color: 'white',
+          border: 'none',
+          borderRadius: 4,
+          fontSize: 12,
+          cursor: 'pointer',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        }}
+      >
+        {use3DModels ? '3D 모델 ON' : '3D 모델 OFF'}
+      </button>
     </div>
   );
 }

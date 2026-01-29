@@ -1,3 +1,7 @@
+import json
+import logging
+from io import BytesIO
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -6,8 +10,11 @@ from app.llm_service import generate_bop_from_text, modify_bop, unified_chat
 from app.tools.router import router as tools_router
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
-from io import BytesIO
-import json
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 app = FastAPI(title="Backend API", version="1.0.0")
 

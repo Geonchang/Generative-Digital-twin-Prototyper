@@ -77,6 +77,7 @@ class AnalyzeResponse(BaseModel):
     execution_type: ExecutionType
     input_schema: InputSchema
     output_schema: OutputSchema
+    params_schema: Optional[List[ParamDef]] = None
 
 
 class RegisterRequest(BaseModel):
@@ -87,6 +88,7 @@ class RegisterRequest(BaseModel):
     source_code: str
     input_schema: InputSchema
     output_schema: OutputSchema
+    params_schema: Optional[List[ParamDef]] = None
     sample_input: Optional[str] = None
 
 

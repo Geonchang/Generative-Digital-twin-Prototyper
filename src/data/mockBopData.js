@@ -89,7 +89,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "worker",
-          "resource_id": "W002",
+          "resource_id": "W009",
           "quantity": 1,
           "relative_location": { "x": 1.0, "y": 0, "z": 0.5 },
           "rotation_y": 0,
@@ -349,7 +349,8 @@ export const mockBopData = {
     { "worker_id": "W005", "name": "최준호", "skill_level": "Senior" },
     { "worker_id": "W006", "name": "강미라", "skill_level": "Junior" },
     { "worker_id": "W007", "name": "홍길동", "skill_level": "Senior" },
-    { "worker_id": "W008", "name": "윤지원", "skill_level": "Mid" }
+    { "worker_id": "W008", "name": "윤지원", "skill_level": "Mid" },
+    { "worker_id": "W009", "name": "한지민", "skill_level": "Senior" }
   ],
   "materials": [
     { "material_id": "M-STEEL-001", "name": "알루미늄 합금 프레임", "unit": "kg" },
@@ -359,5 +360,6 @@ export const mockBopData = {
     { "material_id": "M-WHEEL-001", "name": "26인치 휠 세트", "unit": "ea" },
     { "material_id": "M-BRAKE-001", "name": "디스크 브레이크 세트", "unit": "ea" },
     { "material_id": "M-BOX-001", "name": "포장 박스", "unit": "ea" }
-  ]
+  ],
+  "obstacles": []
 };

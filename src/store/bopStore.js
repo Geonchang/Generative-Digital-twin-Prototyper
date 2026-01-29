@@ -175,67 +175,107 @@ function expandParallelProcesses(bopData) {
   if (!bopData || !bopData.processes) return bopData;
 
   const expandedProcesses = [];
+  let additionalEquipments = [];
+  let additionalWorkers = [];
+  // Build a mutable bopData reference for cumulative ID generation
+  const mutableBopData = {
+    equipments: [...(bopData.equipments || [])],
+    workers: [...(bopData.workers || [])]
+  };
 
   bopData.processes.forEach(process => {
     const parallelCount = process.parallel_count || 1;
 
-    if (parallelCount > 1) {
-      // Create parent process (logical grouping)
-      const parentProcess = {
-        process_id: process.process_id,
+    // ALL processes become parent + child(ren) structure
+    const parentProcess = {
+      process_id: process.process_id,
+      name: process.name,
+      description: process.description,
+      cycle_time_sec: process.cycle_time_sec,
+      is_parent: true,
+      children: Array.from({ length: parallelCount }, (_, i) =>
+        `${process.process_id}-${String(i + 1).padStart(2, '0')}`
+      ),
+      predecessor_ids: process.predecessor_ids || [],
+      successor_ids: process.successor_ids || []
+    };
+    expandedProcesses.push(parentProcess);
+
+    // Compute line 0 resources once for fallback cloning
+    const line0Resources = (process.resources || [])
+      .filter(r =>
+        r.parallel_line_index === undefined ||
+        r.parallel_line_index === null ||
+        r.parallel_line_index === 0
+      )
+      .map(r => {
+        const { parallel_line_index, ...rest } = r;
+        return rest;
+      });
+
+    // Create child processes (actual parallel lines)
+    for (let i = 0; i < parallelCount; i++) {
+      // Filter resources assigned to this parallel line
+      // - Material (1:N shared): unindexed materials go to ALL lines
+      // - Equipment/Worker (1:1): unindexed ones go to line 0 only; line i>0 only gets explicit assignments
+      const stripPLI = r => { const { parallel_line_index, ...rest } = r; return rest; };
+      let res = (process.resources || [])
+        .filter(r => {
+          const isUnindexed = r.parallel_line_index === undefined || r.parallel_line_index === null;
+          // Materials without index are shared across all lines
+          if (r.resource_type === 'material' && isUnindexed) return true;
+          // Line 0: include unindexed equipment/workers + explicitly assigned
+          if (i === 0) return isUnindexed || r.parallel_line_index === 0;
+          // Line i>0: only explicitly assigned
+          return r.parallel_line_index === i;
+        })
+        .map(stripPLI);
+
+      // If no equipment/workers for this line (i>0), clone them from line #0
+      // Also copy materials from line 0 if this line has none (1:N sharing)
+      if (i > 0) {
+        const hasEqOrWorker = res.some(r => r.resource_type === 'equipment' || r.resource_type === 'worker');
+        if (!hasEqOrWorker) {
+          const line0EqWorkers = line0Resources.filter(r => r.resource_type !== 'material');
+          const { clonedResources, newEquipments, newWorkers } =
+            cloneResourcesForNewLine(line0EqWorkers, mutableBopData);
+          const hasMaterials = res.some(r => r.resource_type === 'material');
+          const materialCopies = hasMaterials ? [] :
+            line0Resources.filter(r => r.resource_type === 'material').map(r => ({ ...r }));
+          res = [...clonedResources, ...materialCopies, ...res];
+          additionalEquipments.push(...newEquipments);
+          additionalWorkers.push(...newWorkers);
+          mutableBopData.equipments.push(...newEquipments);
+          mutableBopData.workers.push(...newWorkers);
+        }
+      }
+
+      const childProcess = {
+        process_id: `${process.process_id}-${String(i + 1).padStart(2, '0')}`,
         name: process.name,
         description: process.description,
         cycle_time_sec: process.cycle_time_sec,
-        is_parent: true,
-        children: Array.from({ length: parallelCount }, (_, i) => `${process.process_id}-${i}`),
+        parent_id: process.process_id,
+        parallel_index: i + 1,  // 1-based
+        location: {
+          x: process.location.x,
+          y: process.location.y || 0,
+          z: process.location.z + i * 5  // Z-offset: 5m per parallel process
+        },
+        rotation_y: process.rotation_y || 0,
         predecessor_ids: process.predecessor_ids || [],
-        successor_ids: process.successor_ids || []
+        successor_ids: process.successor_ids || [],
+        resources: res
       };
-      expandedProcesses.push(parentProcess);
-
-      // Create child processes (actual parallel processes)
-      for (let i = 0; i < parallelCount; i++) {
-        const childProcess = {
-          process_id: `${process.process_id}-${i}`,
-          name: process.name,
-          description: process.description,
-          cycle_time_sec: process.cycle_time_sec,
-          parent_id: process.process_id,
-          parallel_index: i,
-          location: {
-            x: process.location.x,
-            y: process.location.y || 0,
-            z: process.location.z + i * 5  // Z-offset: 5m per parallel process
-          },
-          rotation_y: process.rotation_y || 0,
-          predecessor_ids: process.predecessor_ids || [],
-          successor_ids: process.successor_ids || [],
-          resources: (process.resources || [])
-            .filter(r =>
-              r.parallel_line_index === undefined ||
-              r.parallel_line_index === null ||
-              r.parallel_line_index === i
-            )
-            .map(r => {
-              // Remove parallel_line_index from resources
-              const { parallel_line_index, ...rest } = r;
-              return rest;
-            })
-        };
-        expandedProcesses.push(childProcess);
-      }
-    } else {
-      // Single process (no parallel lines)
-      expandedProcesses.push({
-        ...process,
-        parallel_count: undefined // Remove parallel_count
-      });
+      expandedProcesses.push(childProcess);
     }
   });
 
   return {
     ...bopData,
-    processes: expandedProcesses
+    processes: expandedProcesses,
+    equipments: [...(bopData.equipments || []), ...additionalEquipments],
+    workers: [...(bopData.workers || []), ...additionalWorkers]
   };
 }
 
@@ -334,6 +374,60 @@ function generateNextMaterialId(materials) {
   return `M-NEW-${String(maxNum + 1).padStart(3, '0')}`;
 }
 
+function generateNextObstacleId(obstacles) {
+  let maxNum = 0;
+  (obstacles || []).forEach(o => {
+    const match = o.obstacle_id.match(/^OBS(\d+)/);
+    if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
+  });
+  return `OBS${String(maxNum + 1).padStart(3, '0')}`;
+}
+
+// Clone resources for a new parallel line:
+// - equipment: create new master entry with new ID (1:1)
+// - worker: create new master entry with new ID (1:1)
+// - material: share same ID (1:N)
+function cloneResourcesForNewLine(sourceResources, bopData) {
+  const newEquipments = [];
+  const newWorkers = [];
+  // Track cumulative lists to avoid ID collisions within a single call
+  let allEquipments = [...(bopData.equipments || [])];
+  let allWorkers = [...(bopData.workers || [])];
+
+  const clonedResources = (sourceResources || []).map(r => {
+    if (r.resource_type === 'equipment') {
+      const original = allEquipments.find(e => e.equipment_id === r.resource_id);
+      const newId = generateNextEquipmentId(allEquipments);
+      const newEquip = {
+        equipment_id: newId,
+        name: original ? `${original.name} (복제)` : `장비 ${newId}`,
+        type: original ? original.type : 'machine'
+      };
+      newEquipments.push(newEquip);
+      allEquipments.push(newEquip);
+      return { ...r, resource_id: newId };
+    }
+
+    if (r.resource_type === 'worker') {
+      const original = allWorkers.find(w => w.worker_id === r.resource_id);
+      const newId = generateNextWorkerId(allWorkers);
+      const newWorker = {
+        worker_id: newId,
+        name: original ? `${original.name} (복제)` : `작업자 ${newId}`,
+        skill_level: original ? original.skill_level : 'Mid'
+      };
+      newWorkers.push(newWorker);
+      allWorkers.push(newWorker);
+      return { ...r, resource_id: newId };
+    }
+
+    // material: share same ID
+    return { ...r };
+  });
+
+  return { clonedResources, newEquipments, newWorkers };
+}
+
 // Helper: get base ID and all member IDs for a process (handles parallel groups)
 function getGroupIds(processes, processId) {
   const proc = processes.find(p => p.process_id === processId);
@@ -359,7 +453,18 @@ const useBopStore = create((set) => ({
   selectedResourceKey: null,
 
   // Active tab state
-  activeTab: 'bop', // 'bop' | 'equipments' | 'workers' | 'materials'
+  activeTab: 'bop', // 'bop' | 'equipments' | 'workers' | 'materials' | 'obstacles'
+
+  // Obstacle selection state
+  selectedObstacleId: null,
+
+  // Obstacle creation mode (Two-Click)
+  obstacleCreationMode: false,
+  obstacleCreationFirstClick: null, // { x, z }
+  pendingObstacleType: 'fence', // 생성 대기 중인 장애물 유형
+
+  // 3D Model toggle (true: GLB/FBX models, false: basic geometry)
+  use3DModels: false,
 
   // Chat messages
   messages: [], // { role: 'user' | 'assistant', content: string, timestamp: Date }
@@ -388,7 +493,7 @@ const useBopStore = create((set) => ({
     set({ selectedProcessKey: processId, selectedResourceKey: null, activeTab: 'bop' });
   },
 
-  clearSelection: () => set({ selectedProcessKey: null, selectedResourceKey: null }),
+  clearSelection: () => set({ selectedProcessKey: null, selectedResourceKey: null, selectedObstacleId: null }),
 
   // Set active tab
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -651,6 +756,7 @@ const useBopStore = create((set) => ({
 
     const processes = state.bopData.processes;
     const newId = generateNextProcessId(processes);
+    const childId = `${newId}-01`;
 
     // Default position: rightmost process x + 5
     let newX = 0;
@@ -661,11 +767,25 @@ const useBopStore = create((set) => ({
     });
     newX += 5;
 
-    const newProcess = {
+    // Create parent + child pair (all processes are parent+child)
+    const newParent = {
       process_id: newId,
       name,
       description,
       cycle_time_sec,
+      is_parent: true,
+      children: [childId],
+      predecessor_ids: [],
+      successor_ids: []
+    };
+
+    const newChild = {
+      process_id: childId,
+      name,
+      description,
+      cycle_time_sec,
+      parent_id: newId,
+      parallel_index: 1,
       location: { x: newX, y: 0, z: 0 },
       rotation_y: 0,
       predecessor_ids: [],
@@ -685,15 +805,18 @@ const useBopStore = create((set) => ({
           : afterProc;
         const oldSuccIds = [...(baseProc.successor_ids || [])];
 
-        newProcess.predecessor_ids = [baseId];
-        newProcess.successor_ids = oldSuccIds;
+        // Set links on both parent and child
+        newParent.predecessor_ids = [baseId];
+        newParent.successor_ids = oldSuccIds;
+        newChild.predecessor_ids = [baseId];
+        newChild.successor_ids = oldSuccIds;
 
         // Position after the reference process
         const refProc = afterProc.is_parent
           ? processes.find(p => p.parent_id === baseId)
           : afterProc;
         if (refProc?.location) {
-          newProcess.location.x = refProc.location.x + 5;
+          newChild.location.x = refProc.location.x + 5;
         }
 
         // Reconnect links
@@ -724,11 +847,11 @@ const useBopStore = create((set) => ({
       }
     }
 
-    updatedProcesses.push(newProcess);
+    updatedProcesses.push(newParent, newChild);
 
     return {
       bopData: { ...state.bopData, processes: updatedProcesses },
-      selectedProcessKey: newId,
+      selectedProcessKey: childId,
       activeTab: 'bop'
     };
   }),
@@ -826,6 +949,7 @@ const useBopStore = create((set) => ({
   }),
 
   // Add a parallel line to a process or parallel group.
+  // All processes are parent+child, so resolve parentId and add a new child.
   addParallelLine: (processId) => set((state) => {
     if (!state.bopData) return state;
 
@@ -833,156 +957,62 @@ const useBopStore = create((set) => ({
     const target = processes.find(p => p.process_id === processId);
     if (!target) return state;
 
-    // --- Scenario C: parent process → delegate using its own ID as parentId ---
-    if (target.is_parent) {
-      const parentId = target.process_id;
-      const siblings = processes
-        .filter(p => p.parent_id === parentId)
-        .sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0));
-      if (siblings.length === 0) return state;
+    // Resolve parentId: target is either parent or child
+    const parentId = target.is_parent ? target.process_id : target.parent_id;
+    if (!parentId) return state;
 
-      const nextIndex = Math.max(...siblings.map(s => s.parallel_index ?? 0)) + 1;
-      const newChildId = `${parentId}-${nextIndex}`;
-      const firstSibling = siblings[0];
+    const siblings = processes
+      .filter(p => p.parent_id === parentId)
+      .sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0));
+    if (siblings.length === 0) return state;
 
-      const newChild = {
-        process_id: newChildId,
-        name: firstSibling.name,
-        description: firstSibling.description,
-        cycle_time_sec: firstSibling.cycle_time_sec,
-        parent_id: parentId,
-        parallel_index: nextIndex,
-        location: {
-          x: firstSibling.location.x,
-          y: firstSibling.location.y || 0,
-          z: firstSibling.location.z + nextIndex * 5
-        },
-        rotation_y: firstSibling.rotation_y || 0,
-        predecessor_ids: firstSibling.predecessor_ids || [],
-        successor_ids: firstSibling.successor_ids || [],
-        resources: []
-      };
+    const nextIndex = Math.max(...siblings.map(s => s.parallel_index ?? 1)) + 1;
+    const newChildId = `${parentId}-${String(nextIndex).padStart(2, '0')}`;
+    const firstSibling = siblings[0];
 
-      const updatedProcesses = processes.map(p => {
-        if (p.process_id === parentId && p.is_parent) {
-          return { ...p, children: [...(p.children || []), newChildId] };
-        }
-        return p;
-      });
-      updatedProcesses.push(newChild);
+    const { clonedResources, newEquipments, newWorkers } =
+      cloneResourcesForNewLine(firstSibling.resources || [], state.bopData);
 
-      return {
-        bopData: { ...state.bopData, processes: updatedProcesses },
-        selectedProcessKey: newChildId,
-        activeTab: 'bop'
-      };
-    }
-
-    // --- Scenario B: child of parallel group ---
-    if (target.parent_id) {
-      const parentId = target.parent_id;
-      const siblings = processes
-        .filter(p => p.parent_id === parentId)
-        .sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0));
-
-      const nextIndex = Math.max(...siblings.map(s => s.parallel_index ?? 0)) + 1;
-      const newChildId = `${parentId}-${nextIndex}`;
-      const firstSibling = siblings[0];
-
-      const newChild = {
-        process_id: newChildId,
-        name: firstSibling.name,
-        description: firstSibling.description,
-        cycle_time_sec: firstSibling.cycle_time_sec,
-        parent_id: parentId,
-        parallel_index: nextIndex,
-        location: {
-          x: firstSibling.location.x,
-          y: firstSibling.location.y || 0,
-          z: firstSibling.location.z + nextIndex * 5
-        },
-        rotation_y: firstSibling.rotation_y || 0,
-        predecessor_ids: firstSibling.predecessor_ids || [],
-        successor_ids: firstSibling.successor_ids || [],
-        resources: []
-      };
-
-      const updatedProcesses = processes.map(p => {
-        if (p.process_id === parentId && p.is_parent) {
-          return { ...p, children: [...(p.children || []), newChildId] };
-        }
-        return p;
-      });
-      updatedProcesses.push(newChild);
-
-      return {
-        bopData: { ...state.bopData, processes: updatedProcesses },
-        selectedProcessKey: newChildId,
-        activeTab: 'bop'
-      };
-    }
-
-    // --- Scenario A: independent process → convert to parallel group ---
-    const child0Id = `${processId}-0`;
-    const child1Id = `${processId}-1`;
-
-    const child0 = {
-      process_id: child0Id,
-      name: target.name,
-      description: target.description,
-      cycle_time_sec: target.cycle_time_sec,
-      parent_id: processId,
-      parallel_index: 0,
-      location: { ...(target.location || { x: 0, y: 0, z: 0 }) },
-      rotation_y: target.rotation_y || 0,
-      predecessor_ids: target.predecessor_ids || [],
-      successor_ids: target.successor_ids || [],
-      resources: [...(target.resources || []).map(r => ({ ...r }))]
-    };
-
-    const child1 = {
-      process_id: child1Id,
-      name: target.name,
-      description: target.description,
-      cycle_time_sec: target.cycle_time_sec,
-      parent_id: processId,
-      parallel_index: 1,
+    const newChild = {
+      process_id: newChildId,
+      name: firstSibling.name,
+      description: firstSibling.description,
+      cycle_time_sec: firstSibling.cycle_time_sec,
+      parent_id: parentId,
+      parallel_index: nextIndex,
       location: {
-        x: (target.location || { x: 0 }).x,
-        y: (target.location || { y: 0 }).y || 0,
-        z: ((target.location || { z: 0 }).z) + 5
+        x: firstSibling.location.x,
+        y: firstSibling.location.y || 0,
+        z: firstSibling.location.z + (nextIndex - 1) * 5
       },
-      rotation_y: target.rotation_y || 0,
-      predecessor_ids: target.predecessor_ids || [],
-      successor_ids: target.successor_ids || [],
-      resources: []
+      rotation_y: firstSibling.rotation_y || 0,
+      predecessor_ids: firstSibling.predecessor_ids || [],
+      successor_ids: firstSibling.successor_ids || [],
+      resources: clonedResources
     };
 
-    // Convert the original process into a parent
-    const parentProcess = {
-      process_id: processId,
-      name: target.name,
-      description: target.description,
-      cycle_time_sec: target.cycle_time_sec,
-      is_parent: true,
-      children: [child0Id, child1Id],
-      predecessor_ids: target.predecessor_ids || [],
-      successor_ids: target.successor_ids || []
-    };
-
-    const updatedProcesses = processes.map(p =>
-      p.process_id === processId ? parentProcess : p
-    );
-    updatedProcesses.push(child0, child1);
+    const updatedProcesses = processes.map(p => {
+      if (p.process_id === parentId && p.is_parent) {
+        return { ...p, children: [...(p.children || []), newChildId] };
+      }
+      return p;
+    });
+    updatedProcesses.push(newChild);
 
     return {
-      bopData: { ...state.bopData, processes: updatedProcesses },
-      selectedProcessKey: child1Id,
+      bopData: {
+        ...state.bopData,
+        processes: updatedProcesses,
+        equipments: [...(state.bopData.equipments || []), ...newEquipments],
+        workers: [...(state.bopData.workers || []), ...newWorkers]
+      },
+      selectedProcessKey: newChildId,
       activeTab: 'bop'
     };
   }),
 
   // Remove a parallel line from a parallel group.
+  // Always keeps parent+child structure; re-indexes remaining children sequentially.
   removeParallelLine: (processId) => set((state) => {
     if (!state.bopData) return state;
 
@@ -990,115 +1020,76 @@ const useBopStore = create((set) => ({
     const target = processes.find(p => p.process_id === processId);
     if (!target) return state;
 
-    // Scenario A & D: independent or parent → no-op
+    // Only children can be removed (not parent)
     if (!target.parent_id) return state;
 
     const parentId = target.parent_id;
     const siblings = processes.filter(p => p.parent_id === parentId);
 
-    // --- Scenario B: 3+ lines → remove one child ---
-    if (siblings.length > 2) {
-      let updatedProcesses = processes.filter(p => p.process_id !== processId);
+    // Can't remove if only 1 child left
+    if (siblings.length <= 1) return state;
 
-      // Re-index remaining siblings (keep IDs, just update parallel_index)
-      const remainingSiblings = updatedProcesses
-        .filter(p => p.parent_id === parentId)
-        .sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0));
+    // Remove the target child
+    let updatedProcesses = processes.filter(p => p.process_id !== processId);
 
-      const reindexedIds = new Set(remainingSiblings.map(s => s.process_id));
+    // Sort remaining siblings for re-indexing
+    const remainingSiblings = updatedProcesses
+      .filter(p => p.parent_id === parentId)
+      .sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0));
 
-      updatedProcesses = updatedProcesses.map(p => {
-        // Update parent's children array
-        if (p.process_id === parentId && p.is_parent) {
-          return {
-            ...p,
-            children: remainingSiblings.map(s => s.process_id)
-          };
-        }
-        // Re-assign parallel_index
-        if (reindexedIds.has(p.process_id)) {
-          const newIdx = remainingSiblings.findIndex(s => s.process_id === p.process_id);
-          return { ...p, parallel_index: newIdx };
-        }
-        return p;
-      });
-
-      // Clear selection if deleted process was selected
-      const newSelectedProcess = state.selectedProcessKey === processId
-        ? null
-        : state.selectedProcessKey;
-
-      // Clear resource selection if it belonged to the deleted process
-      let newSelectedResource = state.selectedResourceKey;
-      if (newSelectedResource && newSelectedResource.endsWith(`:${processId}`)) {
-        newSelectedResource = null;
+    // Build ID mapping: oldId → newId (for re-indexing)
+    const idMap = {};
+    const newChildrenIds = [];
+    remainingSiblings.forEach((s, idx) => {
+      const newIdx = idx + 1;  // 1-based
+      const newId = `${parentId}-${String(newIdx).padStart(2, '0')}`;
+      newChildrenIds.push(newId);
+      if (s.process_id !== newId) {
+        idMap[s.process_id] = newId;
       }
-
-      return {
-        bopData: { ...state.bopData, processes: updatedProcesses },
-        selectedProcessKey: newSelectedProcess,
-        selectedResourceKey: newSelectedResource
-      };
-    }
-
-    // --- Scenario C: exactly 2 lines → dissolve group ---
-    const remaining = siblings.find(s => s.process_id !== processId);
-    if (!remaining) return state;
-
-    const parent = processes.find(p => p.process_id === parentId);
-    if (!parent) return state;
-
-    // Convert remaining child to independent process using parent's ID
-    const oldChildId = remaining.process_id;
-    const independentProcess = {
-      ...remaining,
-      process_id: parentId,  // restore parent's original ID
-      parent_id: undefined,
-      parallel_index: undefined,
-      predecessor_ids: parent.predecessor_ids || [],
-      successor_ids: parent.successor_ids || []
-    };
-    // Clean up undefined keys
-    delete independentProcess.parent_id;
-    delete independentProcess.parallel_index;
-
-    // Remove parent + both children, then add independent
-    let updatedProcesses = processes.filter(
-      p => p.process_id !== parentId && p.process_id !== processId && p.process_id !== oldChildId
-    );
-
-    // Replace references to old child ID in predecessor/successor links
-    updatedProcesses = updatedProcesses.map(p => {
-      let changed = false;
-      let newPred = p.predecessor_ids;
-      let newSucc = p.successor_ids;
-
-      if (newPred && newPred.includes(oldChildId)) {
-        newPred = newPred.map(id => id === oldChildId ? parentId : id);
-        changed = true;
-      }
-      if (newSucc && newSucc.includes(oldChildId)) {
-        newSucc = newSucc.map(id => id === oldChildId ? parentId : id);
-        changed = true;
-      }
-
-      return changed ? { ...p, predecessor_ids: newPred, successor_ids: newSucc } : p;
     });
 
-    updatedProcesses.push(independentProcess);
+    // Apply re-indexing: update parent's children, rename child IDs and parallel_index
+    updatedProcesses = updatedProcesses.map(p => {
+      // Update parent's children array
+      if (p.process_id === parentId && p.is_parent) {
+        return { ...p, children: newChildrenIds };
+      }
+      // Re-index siblings: update process_id and parallel_index
+      if (p.parent_id === parentId) {
+        const sortedIdx = remainingSiblings.findIndex(s => s.process_id === p.process_id);
+        if (sortedIdx >= 0) {
+          const newIdx = sortedIdx + 1;
+          return {
+            ...p,
+            process_id: `${parentId}-${String(newIdx).padStart(2, '0')}`,
+            parallel_index: newIdx
+          };
+        }
+      }
+      return p;
+    });
 
-    // Update selection
+    // Update selection if it was the deleted or renamed process
     let newSelectedProcess = state.selectedProcessKey;
-    if (newSelectedProcess === processId || newSelectedProcess === oldChildId) {
-      newSelectedProcess = parentId;
+    if (newSelectedProcess === processId) {
+      newSelectedProcess = null;
+    } else if (idMap[newSelectedProcess]) {
+      newSelectedProcess = idMap[newSelectedProcess];
     }
 
-    // Clear resource selection if it belonged to deleted/renamed processes
+    // Update resource selection if it referenced deleted or renamed process
     let newSelectedResource = state.selectedResourceKey;
     if (newSelectedResource) {
-      if (newSelectedResource.endsWith(`:${processId}`) ||
-          newSelectedResource.endsWith(`:${oldChildId}`)) {
+      if (newSelectedResource.endsWith(`:${processId}`)) {
         newSelectedResource = null;
+      } else {
+        for (const [oldId, newId] of Object.entries(idMap)) {
+          if (newSelectedResource.endsWith(`:${oldId}`)) {
+            newSelectedResource = newSelectedResource.replace(`:${oldId}`, `:${newId}`);
+            break;
+          }
+        }
       }
     }
 
@@ -1486,6 +1477,187 @@ const useBopStore = create((set) => ({
     return {
       bopData: { ...state.bopData, materials: updatedMaterials, processes: updatedProcesses },
       selectedResourceKey: null
+    };
+  }),
+
+  // ===================================================================
+  // Obstacle CRUD
+  // ===================================================================
+
+  // Select an obstacle (with auto tab switching)
+  setSelectedObstacle: (obstacleId) => set({
+    selectedObstacleId: obstacleId,
+    selectedProcessKey: null,
+    selectedResourceKey: null,
+    activeTab: 'obstacles'
+  }),
+
+  clearObstacleSelection: () => set({ selectedObstacleId: null }),
+
+  // Get obstacle by ID
+  getObstacleById: (obstacleId) => {
+    const state = useBopStore.getState();
+    if (!state.bopData || !state.bopData.obstacles) return null;
+    return state.bopData.obstacles.find(o => o.obstacle_id === obstacleId);
+  },
+
+  // Add a new obstacle
+  addObstacle: (data = {}) => set((state) => {
+    if (!state.bopData) return state;
+
+    const obstacles = state.bopData.obstacles || [];
+    const newId = data.obstacle_id || generateNextObstacleId(obstacles);
+
+    // Prevent duplicate ID
+    if (obstacles.some(o => o.obstacle_id === newId)) return state;
+
+    const obstacleType = data.type || state.pendingObstacleType || 'fence';
+
+    // Default size based on obstacle type
+    const getDefaultSize = (type) => {
+      switch (type) {
+        case 'fence': return { width: 3, height: 1.5, depth: 0.1 };
+        case 'zone': return { width: 3, height: 0.05, depth: 3 };
+        case 'pillar': return { width: 0.5, height: 3, depth: 0.5 };
+        case 'wall': return { width: 4, height: 2.5, depth: 0.2 };
+        default: return { width: 2, height: 2, depth: 0.1 };
+      }
+    };
+
+    // Type-specific name
+    const getDefaultName = (type) => {
+      switch (type) {
+        case 'fence': return '안전 펜스';
+        case 'zone': return '위험 구역';
+        case 'pillar': return '기둥';
+        case 'wall': return '벽';
+        default: return '새 장애물';
+      }
+    };
+
+    const newObstacle = {
+      obstacle_id: newId,
+      name: data.name || getDefaultName(obstacleType),
+      type: obstacleType,
+      position: data.position || { x: 0, y: 0, z: 0 },
+      size: data.size || getDefaultSize(obstacleType),
+      rotation_y: data.rotation_y || 0
+    };
+
+    return {
+      bopData: { ...state.bopData, obstacles: [...obstacles, newObstacle] },
+      selectedObstacleId: newId,
+      activeTab: 'obstacles'
+    };
+  }),
+
+  // Update obstacle properties
+  updateObstacle: (obstacleId, fields) => set((state) => {
+    if (!state.bopData) return state;
+
+    const allowedFields = ['name', 'type', 'position', 'size', 'rotation_y'];
+    const updatedObstacles = (state.bopData.obstacles || []).map(obstacle => {
+      if (obstacle.obstacle_id === obstacleId) {
+        const updates = {};
+        for (const key of allowedFields) {
+          if (fields[key] !== undefined) updates[key] = fields[key];
+        }
+        return { ...obstacle, ...updates };
+      }
+      return obstacle;
+    });
+
+    return {
+      bopData: { ...state.bopData, obstacles: updatedObstacles }
+    };
+  }),
+
+  // Delete an obstacle
+  deleteObstacle: (obstacleId) => set((state) => {
+    if (!state.bopData) return state;
+
+    const updatedObstacles = (state.bopData.obstacles || []).filter(
+      o => o.obstacle_id !== obstacleId
+    );
+
+    return {
+      bopData: { ...state.bopData, obstacles: updatedObstacles },
+      selectedObstacleId: state.selectedObstacleId === obstacleId ? null : state.selectedObstacleId
+    };
+  }),
+
+  // ===================================================================
+  // Obstacle Two-Click Creation
+  // ===================================================================
+
+  setObstacleCreationMode: (enabled, type = null) => set((state) => ({
+    obstacleCreationMode: enabled,
+    obstacleCreationFirstClick: null,
+    pendingObstacleType: type || state.pendingObstacleType
+  })),
+
+  // Toggle 3D models on/off
+  toggleUse3DModels: () => set((state) => ({
+    use3DModels: !state.use3DModels
+  })),
+
+  setPendingObstacleType: (type) => set({ pendingObstacleType: type }),
+
+  setObstacleCreationFirstClick: (point) => set({
+    obstacleCreationFirstClick: point
+  }),
+
+  // Create obstacle from two corner points
+  createObstacleFromTwoClicks: (corner1, corner2) => set((state) => {
+    if (!state.bopData) return state;
+
+    const obstacles = state.bopData.obstacles || [];
+    const newId = generateNextObstacleId(obstacles);
+    const obstacleType = state.pendingObstacleType || 'fence';
+
+    // Calculate center and size from two corners
+    const centerX = (corner1.x + corner2.x) / 2;
+    const centerZ = (corner1.z + corner2.z) / 2;
+    const width = Math.abs(corner2.x - corner1.x);
+    const depth = Math.abs(corner2.z - corner1.z);
+
+    // Default height based on obstacle type
+    const getDefaultHeight = (type) => {
+      switch (type) {
+        case 'fence': return 1.5;
+        case 'zone': return 0.05;
+        case 'pillar': return 3;
+        case 'wall': return 2.5;
+        default: return 2;
+      }
+    };
+
+    // Type-specific name
+    const getDefaultName = (type) => {
+      switch (type) {
+        case 'fence': return '안전 펜스';
+        case 'zone': return '위험 구역';
+        case 'pillar': return '기둥';
+        case 'wall': return '벽';
+        default: return '새 장애물';
+      }
+    };
+
+    const newObstacle = {
+      obstacle_id: newId,
+      name: getDefaultName(obstacleType),
+      type: obstacleType,
+      position: { x: centerX, y: 0, z: centerZ },
+      size: { width: Math.max(0.5, width), height: getDefaultHeight(obstacleType), depth: Math.max(0.5, depth) },
+      rotation_y: 0
+    };
+
+    return {
+      bopData: { ...state.bopData, obstacles: [...obstacles, newObstacle] },
+      selectedObstacleId: newId,
+      activeTab: 'obstacles',
+      obstacleCreationMode: false,
+      obstacleCreationFirstClick: null
     };
   })
 }));

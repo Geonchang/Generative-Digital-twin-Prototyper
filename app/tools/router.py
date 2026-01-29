@@ -1,5 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from typing import List
+import traceback
+import logging
+
+log = logging.getLogger("tool_router")
 
 from app.tools.tool_models import (
     AnalyzeRequest, AnalyzeResponse,
@@ -34,6 +38,7 @@ async def analyze_tool(req: AnalyzeRequest):
 async def register_tool(req: RegisterRequest):
     """FR-2 + FR-3: 어댑터 코드를 생성하고 도구를 등록합니다."""
     try:
+        log.info("[register] 시작 - tool_name=%s", req.tool_name)
         tool_id = generate_tool_id(req.tool_name)
 
         metadata = ToolMetadata(
@@ -44,13 +49,18 @@ async def register_tool(req: RegisterRequest):
             file_name=req.file_name,
             input_schema=req.input_schema,
             output_schema=req.output_schema,
+            params_schema=req.params_schema,
         )
+        log.info("[register] metadata 생성 완료")
 
         # LLM으로 어댑터 코드 자동 생성
-        adapter = await synthesize_adapter(metadata)
+        log.info("[register] synthesize_adapter 호출")
+        adapter = await synthesize_adapter(metadata, source_code=req.source_code)
+        log.info("[register] adapter 생성 완료")
 
         # 레지스트리에 저장
         save_tool(metadata, adapter, req.source_code)
+        log.info("[register] 저장 완료")
 
         return RegisterResponse(
             tool_id=tool_id,
@@ -62,6 +72,7 @@ async def register_tool(req: RegisterRequest):
             },
         )
     except Exception as e:
+        log.error("[register] 오류 발생:\n%s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"등록 실패: {str(e)}")
 
 
