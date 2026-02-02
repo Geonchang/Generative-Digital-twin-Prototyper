@@ -416,9 +416,11 @@ function cloneResourcesForNewLine(sourceResources, bopData) {
     if (r.resource_type === 'equipment') {
       const original = allEquipments.find(e => e.equipment_id === r.resource_id);
       const newId = generateNextEquipmentId(allEquipments);
+      const idNumber = newId.match(/\d+/)?.[0] || '';
+      const defaultName = idNumber ? `장비 ${idNumber}` : `장비 ${newId}`;
       const newEquip = {
         equipment_id: newId,
-        name: original ? `${original.name} (복제)` : `장비 ${newId}`,
+        name: original ? `${original.name} (복제)` : defaultName,
         type: original ? original.type : 'machine'
       };
       newEquipments.push(newEquip);
@@ -429,9 +431,11 @@ function cloneResourcesForNewLine(sourceResources, bopData) {
     if (r.resource_type === 'worker') {
       const original = allWorkers.find(w => w.worker_id === r.resource_id);
       const newId = generateNextWorkerId(allWorkers);
+      const idNumber = newId.match(/\d+/)?.[0] || '';
+      const defaultName = idNumber ? `작업자 ${idNumber}` : `작업자 ${newId}`;
       const newWorker = {
         worker_id: newId,
-        name: original ? `${original.name} (복제)` : `작업자 ${newId}`,
+        name: original ? `${original.name} (복제)` : defaultName,
         skill_level: original ? original.skill_level : 'Mid'
       };
       newWorkers.push(newWorker);
@@ -461,8 +465,19 @@ function getGroupIds(processes, processId) {
 }
 
 const useBopStore = create((set) => ({
-  // Hierarchical BOP data - initially empty
-  bopData: null,
+  // Hierarchical BOP data - starts with empty structure
+  bopData: {
+    project_title: "새 프로젝트",
+    target_uph: 60,
+    processes: [],
+    equipments: [],
+    workers: [],
+    materials: [],
+    obstacles: []
+  },
+
+  // Flag to track if initial data load has happened (prevents auto-load after createNewScenario)
+  initialLoadDone: true,
 
   // Selection state (processId-parallelIndex format, e.g., "P001-0", "P001-1")
   selectedProcessKey: null,
@@ -496,6 +511,8 @@ const useBopStore = create((set) => ({
     set({ bopData: expandedData });
     console.log('[STORE] bopData updated');
   },
+
+  setInitialLoadDone: (done) => set({ initialLoadDone: done }),
 
   // Update project settings (project_title, target_uph)
   updateProjectSettings: (fields) => set((state) => {
@@ -1396,9 +1413,13 @@ const useBopStore = create((set) => ({
     // Prevent duplicate ID
     if (equipments.some(e => e.equipment_id === newId)) return state;
 
+    // Extract number from ID (e.g., "EQ001" -> "001")
+    const idNumber = newId.match(/\d+/)?.[0] || '';
+    const defaultName = idNumber ? `새 장비 ${idNumber}` : '새 장비';
+
     const newEquipment = {
       equipment_id: newId,
-      name: data.name || '새 장비',
+      name: data.name || defaultName,
       type: data.type || 'machine'
     };
 
@@ -1465,9 +1486,13 @@ const useBopStore = create((set) => ({
 
     if (workers.some(w => w.worker_id === newId)) return state;
 
+    // Extract number from ID (e.g., "W001" -> "001")
+    const idNumber = newId.match(/\d+/)?.[0] || '';
+    const defaultName = idNumber ? `새 작업자 ${idNumber}` : '새 작업자';
+
     const newWorker = {
       worker_id: newId,
-      name: data.name || '새 작업자',
+      name: data.name || defaultName,
       skill_level: data.skill_level || 'Mid'
     };
 
@@ -1534,9 +1559,13 @@ const useBopStore = create((set) => ({
 
     if (materials.some(m => m.material_id === newId)) return state;
 
+    // Extract number from ID (e.g., "M001" -> "001")
+    const idNumber = newId.match(/\d+/)?.[0] || '';
+    const defaultName = idNumber ? `새 자재 ${idNumber}` : '새 자재';
+
     const newMaterial = {
       material_id: newId,
-      name: data.name || '새 자재',
+      name: data.name || defaultName,
       unit: data.unit || 'ea'
     };
 
@@ -1770,7 +1799,94 @@ const useBopStore = create((set) => ({
       obstacleCreationMode: false,
       obstacleCreationFirstClick: null
     };
-  })
+  }),
+
+  // ===================================================================
+  // Scenario Management (localStorage)
+  // ===================================================================
+
+  // Save current BOP as a scenario
+  saveScenario: (name) => {
+    const state = useBopStore.getState();
+    if (!state.bopData) {
+      throw new Error('저장할 BOP 데이터가 없습니다.');
+    }
+
+    const scenarios = JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
+    const now = new Date().toISOString();
+
+    // Check if scenario with this name exists
+    const existingIndex = scenarios.findIndex(s => s.name === name);
+
+    if (existingIndex >= 0) {
+      // Update existing
+      scenarios[existingIndex] = {
+        ...scenarios[existingIndex],
+        updatedAt: now,
+        data: state.bopData
+      };
+    } else {
+      // Create new
+      const newScenario = {
+        id: `scenario-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        name,
+        createdAt: now,
+        updatedAt: now,
+        data: state.bopData
+      };
+      scenarios.push(newScenario);
+    }
+
+    localStorage.setItem('bop_scenarios', JSON.stringify(scenarios));
+    return scenarios;
+  },
+
+  // Load a scenario
+  loadScenario: (id) => set((state) => {
+    const scenarios = JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
+    const scenario = scenarios.find(s => s.id === id);
+
+    if (!scenario) {
+      throw new Error('시나리오를 찾을 수 없습니다.');
+    }
+
+    return {
+      bopData: scenario.data,
+      selectedProcessKey: null,
+      selectedResourceKey: null,
+      selectedObstacleId: null
+    };
+  }),
+
+  // Delete a scenario
+  deleteScenario: (id) => {
+    const scenarios = JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
+    const filtered = scenarios.filter(s => s.id !== id);
+    localStorage.setItem('bop_scenarios', JSON.stringify(filtered));
+    return filtered;
+  },
+
+  // List all scenarios
+  listScenarios: () => {
+    return JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
+  },
+
+  // Create new empty scenario
+  createNewScenario: () => set(() => ({
+    bopData: {
+      project_title: "새 프로젝트",
+      target_uph: 60,
+      processes: [],
+      equipments: [],
+      workers: [],
+      materials: [],
+      obstacles: []
+    },
+    selectedProcessKey: null,
+    selectedResourceKey: null,
+    selectedObstacleId: null,
+    activeTab: 'bop'
+  }))
 }));
 
 export default useBopStore;

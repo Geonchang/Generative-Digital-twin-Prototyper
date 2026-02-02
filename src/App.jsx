@@ -11,7 +11,7 @@ const MIN_RIGHT = 200;
 const DIVIDER_WIDTH = 4;
 
 function App() {
-  const { bopData, setBopData } = useBopStore();
+  const { bopData, setBopData, initialLoadDone, setInitialLoadDone } = useBopStore();
 
   const [leftWidth, setLeftWidth] = useState(400);
   const [rightWidth, setRightWidth] = useState(400);
@@ -31,14 +31,15 @@ function App() {
     }
   }, []); // Run once on mount
 
-  // Load mock data on initial mount if no BOP data exists
+  // Load mock data on initial mount if no BOP data exists (only on first app load)
   useEffect(() => {
-    if (!bopData) {
+    if (!bopData && !initialLoadDone) {
       console.log('[APP] Loading mock BOP data...');
       setBopData(mockBopData);
+      setInitialLoadDone(true);
       console.log('[APP] BOP data loaded and parallel processes expanded');
     }
-  }, [bopData, setBopData]);
+  }, [bopData, initialLoadDone, setBopData, setInitialLoadDone]);
 
   const handleMouseMove = useCallback((e) => {
     if (!dragging || !containerRef.current) return;

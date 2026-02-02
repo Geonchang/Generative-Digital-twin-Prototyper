@@ -3,6 +3,7 @@ import EquipmentsTable from './EquipmentsTable';
 import WorkersTable from './WorkersTable';
 import MaterialsTable from './MaterialsTable';
 import ObstacleTable from './ObstacleTable';
+import ScenariosPanel from './ScenariosPanel';
 import ToolsPanel from './ToolsPanel';
 import useBopStore from '../store/bopStore';
 
@@ -16,6 +17,7 @@ function TabbedPanel() {
     { id: 'materials', label: '자재', icon: '📦' },
     { id: 'obstacles', label: '장애물', icon: '🚧' },
     { id: 'tools', label: '도구', icon: '🔧' },
+    { id: 'scenarios', label: '시나리오', icon: '📁' },
   ];
 
   const renderContent = () => {
@@ -32,6 +34,8 @@ function TabbedPanel() {
         return <ObstacleTable />;
       case 'tools':
         return <ToolsPanel />;
+      case 'scenarios':
+        return <ScenariosPanel />;
       default:
         return <BopTable />;
     }

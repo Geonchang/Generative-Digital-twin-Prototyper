@@ -98,6 +98,7 @@ function ObstacleTable() {
                     backgroundColor: `${type.color}20`,
                   } : {}),
                 }}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setPendingObstacleType(type.id)}
               >
                 <span style={styles.typeButtonIcon}>{type.icon}</span>
@@ -174,6 +175,7 @@ function ObstacleTable() {
                   backgroundColor: `${type.color}20`,
                 } : {}),
               }}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setPendingObstacleType(type.id)}
             >
               <span style={styles.typeButtonIcon}>{type.icon}</span>
@@ -402,6 +404,7 @@ const styles = {
     gap: '4px',
     padding: '6px 12px',
     border: '2px solid #ddd',
+    borderColor: '#ddd',
     borderRadius: '8px',
     backgroundColor: 'white',
     fontSize: '12px',
@@ -409,6 +412,9 @@ const styles = {
     color: '#555',
     cursor: 'pointer',
     transition: 'all 0.2s',
+    outline: 'none',
+    boxShadow: 'none',
+    WebkitTapHighlightColor: 'transparent',
   },
   typeButtonActive: {
     fontWeight: '700',

@@ -46,8 +46,13 @@ def save_tool(metadata: ToolMetadata, adapter: AdapterCode, source_code: str) ->
 
     script_dir = UPLOADS_DIR / metadata.tool_id
     script_dir.mkdir(parents=True, exist_ok=True)
-    with open(script_dir / metadata.file_name, "w", encoding="utf-8") as f:
-        f.write(source_code)
+
+    # 줄바꿈 정규화: \r\n, \r을 모두 \n으로 통일
+    normalized_code = source_code.replace('\r\n', '\n').replace('\r', '\n')
+
+    # newline='' 사용: 줄바꿈 자동 변환 비활성화 (원본 그대로 저장)
+    with open(script_dir / metadata.file_name, "w", encoding="utf-8", newline='') as f:
+        f.write(normalized_code)
 
     return metadata.tool_id
 

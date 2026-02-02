@@ -1169,7 +1169,7 @@ function ObstacleBox({ obstacle, isSelected, onSelect, onTransformMouseDown, onT
     if (!groupRef.current) return;
 
     if (transformMode === 'translate') {
-      groupRef.current.position.y = size.height / 2; // Keep on floor
+      groupRef.current.position.y = 0; // Keep on floor
     } else if (transformMode === 'rotate') {
       groupRef.current.rotation.x = 0;
       groupRef.current.rotation.z = 0;
@@ -1212,11 +1212,12 @@ function ObstacleBox({ obstacle, isSelected, onSelect, onTransformMouseDown, onT
     <>
       <group
         ref={groupRef}
-        position={[pos.x, size.height / 2, pos.z]}
+        position={[pos.x, 0, pos.z]}
         rotation={[0, rotationY, 0]}
       >
         {/* Obstacle mesh */}
         <mesh
+          position={[0, size.height / 2, 0]}
           onPointerOver={() => {
             if (!isDraggingTransformRef?.current && !obstacleCreationMode) setHovered(true);
           }}
@@ -1244,7 +1245,7 @@ function ObstacleBox({ obstacle, isSelected, onSelect, onTransformMouseDown, onT
         {/* Obstacle label */}
         {(isSelected || hovered) && (
           <Text
-            position={[0, size.height / 2 + 0.3, 0]}
+            position={[0, size.height + 0.3, 0]}
             fontSize={0.2}
             color="#333"
             anchorX="center"
@@ -1257,7 +1258,7 @@ function ObstacleBox({ obstacle, isSelected, onSelect, onTransformMouseDown, onT
         {/* Transform mode indicator */}
         {isSelected && (
           <Text
-            position={[0, size.height / 2 + 0.6, 0]}
+            position={[0, size.height + 0.6, 0]}
             fontSize={0.18}
             color={transformMode === 'translate' ? '#4a90e2' : '#ff6b6b'}
             anchorX="center"
@@ -1432,33 +1433,13 @@ function Scene() {
     }, 300);
   }, []);
 
-  if (!bopData || !bopData.processes || bopData.processes.length === 0) {
-    return (
-      <>
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 10, 5]} intensity={1} />
-        <Grid
-          position={[0, 0, 0]}
-          args={[20, 20]}
-          cellSize={1}
-          cellColor="#dddddd"
-          sectionColor="#aaaaaa"
-        />
-        <Text position={[0, 1, 0]} fontSize={0.5} color="#999">
-          No BOP Data
-        </Text>
-        <OrbitControls />
-      </>
-    );
-  }
-
   // 동적 그리드 크기 및 중심 계산 - 전체 콘텐츠 바운딩 박스 + 마진
   const { size: gridSize, width: gridWidth, depth: gridDepth, centerX: gridCenterX, centerZ: gridCenterZ } = useMemo(() => {
     const MARGIN_X = 3; // X축 마진 (미터)
     const MARGIN_Z = 3; // Z축 마진 (미터)
     const MIN_SIZE = 30;
 
-    if (!bopData.processes || bopData.processes.length === 0) {
+    if (!bopData || !bopData.processes || bopData.processes.length === 0) {
       return { size: MIN_SIZE, width: MIN_SIZE, depth: MIN_SIZE, centerX: 0, centerZ: 0 };
     }
 
@@ -1505,12 +1486,16 @@ function Scene() {
     const size = Math.max(width, depth); // 카메라 거리 등에 사용
 
     return { size, width, depth, centerX, centerZ };
-  }, [bopData.processes, bopData.obstacles]);
+  }, [bopData]);
 
   // Render processes and their resources
   const renderedElements = useMemo(() => {
     const elements = [];
     const arrows = [];
+
+    if (!bopData || !bopData.processes) {
+      return [];
+    }
 
     bopData.processes.forEach((process) => {
       // Skip parent processes (logical grouping only)
@@ -1657,7 +1642,31 @@ function Scene() {
     });
 
     return [...elements, ...arrows];
-  }, [bopData.processes, bopData.obstacles, selectedProcessKey, selectedResourceKey, selectedObstacleId, setSelectedProcess, setSelectedObstacle, getEquipmentById, getWorkerById, getMaterialById, getProcessById, handleTransformMouseDown, handleTransformMouseUp]);
+  }, [bopData, selectedProcessKey, selectedResourceKey, selectedObstacleId, setSelectedProcess, setSelectedObstacle, getEquipmentById, getWorkerById, getMaterialById, getProcessById, handleTransformMouseDown, handleTransformMouseUp]);
+
+  // Empty state - no data (only show when both processes AND obstacles are empty AND not in creation mode)
+  const hasProcesses = bopData && bopData.processes && bopData.processes.length > 0;
+  const hasObstacles = bopData && bopData.obstacles && bopData.obstacles.length > 0;
+
+  if (!bopData || (!hasProcesses && !hasObstacles && !obstacleCreationMode)) {
+    return (
+      <>
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[10, 10, 5]} intensity={1} />
+        <Grid
+          position={[0, 0, 0]}
+          args={[20, 20]}
+          cellSize={1}
+          cellColor="#dddddd"
+          sectionColor="#aaaaaa"
+        />
+        <Text position={[0, 1, 0]} fontSize={0.5} color="#999">
+          No BOP Data
+        </Text>
+        <OrbitControls />
+      </>
+    );
+  }
 
   return (
     <>
