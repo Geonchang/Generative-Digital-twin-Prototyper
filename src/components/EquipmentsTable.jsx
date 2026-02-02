@@ -9,6 +9,7 @@ function EquipmentsTable() {
   const selectedRowRef = useRef(null);
   const [editingCell, setEditingCell] = useState(null);
   const [selectedMasterId, setSelectedMasterId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -33,6 +34,32 @@ function EquipmentsTable() {
     if (window.confirm('선택한 장비를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.')) {
       deleteEquipment(selectedMasterId);
       setSelectedMasterId(null);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    if (window.confirm(`선택한 ${selectedIds.length}개의 장비를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.`)) {
+      selectedIds.forEach(id => deleteEquipment(id));
+      setSelectedIds([]);
+      setSelectedMasterId(null);
+    }
+  };
+
+  const handleToggleSelect = (equipmentId) => {
+    setSelectedIds(prev =>
+      prev.includes(equipmentId)
+        ? prev.filter(id => id !== equipmentId)
+        : [...prev, equipmentId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    const equipments = bopData?.equipments || [];
+    if (selectedIds.length === equipments.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(equipments.map(e => e.equipment_id));
     }
   };
 
@@ -121,12 +148,12 @@ function EquipmentsTable() {
         <button
           style={{
             ...styles.actionButtonDanger,
-            ...(selectedMasterId ? {} : styles.actionButtonDisabled)
+            ...(selectedIds.length === 0 ? styles.actionButtonDisabled : {})
           }}
-          disabled={!selectedMasterId}
-          onClick={handleDeleteEquipment}
+          disabled={selectedIds.length === 0}
+          onClick={handleDeleteSelected}
         >
-          선택 장비 삭제
+          선택 항목 삭제 ({selectedIds.length})
         </button>
       </div>
 
@@ -135,6 +162,14 @@ function EquipmentsTable() {
         <table style={styles.table}>
           <thead>
             <tr>
+              <th style={{ ...styles.th, width: '40px' }}>
+                <input
+                  type="checkbox"
+                  checked={bopData.equipments.length > 0 && selectedIds.length === bopData.equipments.length}
+                  onChange={handleToggleSelectAll}
+                  style={styles.checkbox}
+                />
+              </th>
               <th style={{ ...styles.th, width: '100px' }}>장비 ID</th>
               <th style={{ ...styles.th, minWidth: '150px' }}>장비명</th>
               <th style={{ ...styles.th, width: '80px' }}>유형</th>
@@ -159,6 +194,14 @@ function EquipmentsTable() {
                     }}
                     onClick={() => setSelectedMasterId(equipment.equipment_id)}
                   >
+                    <td style={styles.td} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(equipment.equipment_id)}
+                        onChange={() => handleToggleSelect(equipment.equipment_id)}
+                        style={styles.checkbox}
+                      />
+                    </td>
                     <td style={styles.td}><strong>{equipment.equipment_id}</strong></td>
                     <td style={styles.td}>
                       {isMasterSelected ? (
@@ -227,6 +270,14 @@ function EquipmentsTable() {
                   >
                     {idx === 0 && (
                       <>
+                        <td style={styles.td} rowSpan={usedProcesses.length} onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(equipment.equipment_id)}
+                            onChange={() => handleToggleSelect(equipment.equipment_id)}
+                            style={styles.checkbox}
+                          />
+                        </td>
                         <td style={styles.td} rowSpan={usedProcesses.length}>
                           <strong>{equipment.equipment_id}</strong>
                         </td>
@@ -474,6 +525,11 @@ const styles = {
     color: '#999',
     fontSize: '12px',
     fontStyle: 'italic',
+  },
+  checkbox: {
+    cursor: 'pointer',
+    width: '16px',
+    height: '16px',
   },
 };
 

@@ -5,10 +5,12 @@ import { getResourceSize } from './Viewer3D';
 function MaterialsTable() {
   const { bopData, selectedResourceKey, setSelectedResource,
     updateResourceLocation, updateResourceScale, updateResourceRotation,
+    updateResourceQuantity,
     addMaterial, updateMaterial, deleteMaterial } = useBopStore();
   const selectedRowRef = useRef(null);
   const [editingCell, setEditingCell] = useState(null);
   const [selectedMasterId, setSelectedMasterId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -33,6 +35,32 @@ function MaterialsTable() {
     if (window.confirm('선택한 자재를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.')) {
       deleteMaterial(selectedMasterId);
       setSelectedMasterId(null);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    if (window.confirm(`선택한 ${selectedIds.length}종의 자재를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.`)) {
+      selectedIds.forEach(id => deleteMaterial(id));
+      setSelectedIds([]);
+      setSelectedMasterId(null);
+    }
+  };
+
+  const handleToggleSelect = (materialId) => {
+    setSelectedIds(prev =>
+      prev.includes(materialId)
+        ? prev.filter(id => id !== materialId)
+        : [...prev, materialId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    const materials = bopData?.materials || [];
+    if (selectedIds.length === materials.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(materials.map(m => m.material_id));
     }
   };
 
@@ -96,12 +124,12 @@ function MaterialsTable() {
         <button
           style={{
             ...styles.actionButtonDanger,
-            ...(selectedMasterId ? {} : styles.actionButtonDisabled)
+            ...(selectedIds.length === 0 ? styles.actionButtonDisabled : {})
           }}
-          disabled={!selectedMasterId}
-          onClick={handleDeleteMaterial}
+          disabled={selectedIds.length === 0}
+          onClick={handleDeleteSelected}
         >
-          선택 자재 삭제
+          선택 항목 삭제 ({selectedIds.length})
         </button>
       </div>
 
@@ -110,11 +138,19 @@ function MaterialsTable() {
         <table style={styles.table}>
           <thead>
             <tr>
+              <th style={{ ...styles.th, width: '40px' }}>
+                <input
+                  type="checkbox"
+                  checked={bopData.materials.length > 0 && selectedIds.length === bopData.materials.length}
+                  onChange={handleToggleSelectAll}
+                  style={styles.checkbox}
+                />
+              </th>
               <th style={{ ...styles.th, width: '100px' }}>자재 ID</th>
               <th style={{ ...styles.th, minWidth: '150px' }}>자재명</th>
               <th style={{ ...styles.th, width: '60px' }}>단위</th>
-              <th style={{ ...styles.th, width: '100px' }}>사용 공정</th>
               <th style={{ ...styles.th, width: '80px' }}>수량</th>
+              <th style={{ ...styles.th, width: '100px' }}>사용 공정</th>
               <th style={{ ...styles.th, width: '120px' }}>Location (x,z)</th>
               <th style={{ ...styles.th, width: '150px' }}>Size (x,y,z)</th>
               <th style={{ ...styles.th, width: '80px' }}>Rotation (Y)</th>
@@ -135,6 +171,14 @@ function MaterialsTable() {
                     }}
                     onClick={() => setSelectedMasterId(material.material_id)}
                   >
+                    <td style={styles.td} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(material.material_id)}
+                        onChange={() => handleToggleSelect(material.material_id)}
+                        style={styles.checkbox}
+                      />
+                    </td>
                     <td style={styles.td}><strong>{material.material_id}</strong></td>
                     <td style={styles.td}>
                       {isMasterSelected ? (
@@ -198,6 +242,14 @@ function MaterialsTable() {
                   >
                     {idx === 0 && (
                       <>
+                        <td style={styles.td} rowSpan={usage.length} onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(material.material_id)}
+                            onChange={() => handleToggleSelect(material.material_id)}
+                            style={styles.checkbox}
+                          />
+                        </td>
                         <td style={styles.td} rowSpan={usage.length}>
                           <strong>{material.material_id}</strong>
                         </td>
@@ -228,10 +280,30 @@ function MaterialsTable() {
                       </>
                     )}
                     <td style={styles.td}>
-                      <span style={styles.processChip}>{lineLabel}</span>
+                      {isSelected ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <input
+                            type="number"
+                            style={{ ...styles.editInput, width: '60px' }}
+                            value={resource.quantity || 0}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              if (!isNaN(val) && val >= 0) {
+                                updateResourceQuantity(process.process_id, 'material', material.material_id, val);
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            step="0.1"
+                            min="0"
+                          />
+                          <span style={styles.unit}>{material.unit}</span>
+                        </div>
+                      ) : (
+                        <span style={styles.quantity}>{resource.quantity} {material.unit}</span>
+                      )}
                     </td>
                     <td style={styles.td}>
-                      <span style={styles.quantity}>{resource.quantity} {material.unit}</span>
+                      <span style={styles.processChip}>{lineLabel}</span>
                     </td>
                     <td style={styles.td}>
                       <div style={styles.locationCell}>
@@ -412,6 +484,11 @@ const styles = {
     color: '#999',
     fontSize: '12px',
     fontStyle: 'italic',
+  },
+  checkbox: {
+    cursor: 'pointer',
+    width: '16px',
+    height: '16px',
   },
 };
 

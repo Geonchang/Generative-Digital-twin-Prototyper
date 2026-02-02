@@ -3,7 +3,7 @@ import useBopStore from '../store/bopStore';
 import { api } from '../services/api';
 
 function ToolsPanel() {
-  const { exportBopData, setBopData, addMessage, normalizeAllProcesses } = useBopStore();
+  const { exportBopData, setBopData, addMessage, normalizeAllProcesses, bopData } = useBopStore();
 
   // Navigation
   const [view, setView] = useState('list'); // 'list' | 'upload' | 'detail'
@@ -32,6 +32,8 @@ function ToolsPanel() {
   const [error, setError] = useState('');
 
   const fileInputRef = useRef(null);
+  const jsonUploadRef = useRef(null);
+  const excelUploadRef = useRef(null);
 
   // BOP 변경 사항 계산
   const computeBopChanges = (original, updated) => {
@@ -287,6 +289,489 @@ function ToolsPanel() {
     setOriginalBop(null);
   };
 
+  // === Data Import/Export ===
+
+  const handleDownloadJSON = () => {
+    const data = exportBopData();
+    if (!data) {
+      setError('다운로드할 BOP 데이터가 없습니다.');
+      return;
+    }
+
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bop_${data.project_title || 'data'}_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    addMessage('assistant', 'BOP 데이터가 JSON 파일로 다운로드되었습니다.');
+  };
+
+  const handleDownloadExcel = async () => {
+    const data = exportBopData();
+    if (!data) {
+      setError('다운로드할 BOP 데이터가 없습니다.');
+      return;
+    }
+
+    try {
+      // Dynamic import to avoid bundling xlsx if not needed
+      const XLSX = await import('xlsx');
+
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+
+      // Project Info Sheet
+      const projectInfo = [
+        ['항목', '값'],
+        ['프로젝트명', data.project_title || ''],
+        ['목표 UPH', data.target_uph || ''],
+      ];
+      const wsProject = XLSX.utils.aoa_to_sheet(projectInfo);
+      XLSX.utils.book_append_sheet(wb, wsProject, '프로젝트 정보');
+
+      // Process Structure Sheet (metadata only - no duplication)
+      if (data.processes && data.processes.length > 0) {
+        const processStructureData = [
+          ['공정 ID', '병렬수', '선행공정', '후속공정']
+        ];
+        data.processes.forEach(p => {
+          processStructureData.push([
+            p.process_id,
+            p.parallel_count || 1,
+            (p.predecessor_ids || []).join(', '),
+            (p.successor_ids || []).join(', ')
+          ]);
+        });
+        const wsStructure = XLSX.utils.aoa_to_sheet(processStructureData);
+        XLSX.utils.book_append_sheet(wb, wsStructure, '공정 구조');
+      }
+
+      // Process Details Sheet (all actual data - includes all processes)
+      if (data.processes && data.processes.length > 0) {
+        const processDetailsData = [
+          ['공정 ID', '병렬라인 ID', '병렬인덱스', '공정명', '설명', '사이클타임(초)', '위치 X', '위치 Y', '위치 Z', '회전 Y']
+        ];
+
+        data.processes.forEach(p => {
+          if (p.parallel_lines && p.parallel_lines.length > 0) {
+            // Process with parallel lines
+            p.parallel_lines.forEach(line => {
+              processDetailsData.push([
+                p.process_id,
+                line.process_id,
+                line.parallel_index,
+                line.name || '',
+                line.description || '',
+                line.cycle_time_sec || 60,
+                line.location?.x || 0,
+                line.location?.y || 0,
+                line.location?.z || 0,
+                line.rotation_y || 0
+              ]);
+            });
+          } else {
+            // Single process (no parallel) - also include here for consistency
+            processDetailsData.push([
+              p.process_id,
+              p.process_id + '-01', // Generate line ID for consistency
+              1,
+              p.name || '',
+              p.description || '',
+              p.cycle_time_sec || 60,
+              p.location?.x || 0,
+              p.location?.y || 0,
+              p.location?.z || 0,
+              p.rotation_y || 0
+            ]);
+          }
+        });
+
+        const wsDetails = XLSX.utils.aoa_to_sheet(processDetailsData);
+        XLSX.utils.book_append_sheet(wb, wsDetails, '공정 상세');
+      }
+
+      // Equipments Sheet
+      if (data.equipments && data.equipments.length > 0) {
+        const equipData = [['장비 ID', '장비명', '유형']];
+        data.equipments.forEach(e => {
+          equipData.push([e.equipment_id, e.name, e.type]);
+        });
+        const wsEquip = XLSX.utils.aoa_to_sheet(equipData);
+        XLSX.utils.book_append_sheet(wb, wsEquip, '장비');
+      }
+
+      // Workers Sheet
+      if (data.workers && data.workers.length > 0) {
+        const workerData = [['작업자 ID', '이름', '숙련도']];
+        data.workers.forEach(w => {
+          workerData.push([w.worker_id, w.name, w.skill_level || '']);
+        });
+        const wsWorker = XLSX.utils.aoa_to_sheet(workerData);
+        XLSX.utils.book_append_sheet(wb, wsWorker, '작업자');
+      }
+
+      // Materials Sheet
+      if (data.materials && data.materials.length > 0) {
+        const materialData = [['자재 ID', '자재명', '단위']];
+        data.materials.forEach(m => {
+          materialData.push([m.material_id, m.name, m.unit]);
+        });
+        const wsMaterial = XLSX.utils.aoa_to_sheet(materialData);
+        XLSX.utils.book_append_sheet(wb, wsMaterial, '자재');
+      }
+
+      // Obstacles Sheet
+      if (data.obstacles && data.obstacles.length > 0) {
+        const obstacleData = [['장애물 ID', '이름', '유형', '위치 X', '위치 Y', '위치 Z', '너비', '높이', '깊이', '회전 Y']];
+        data.obstacles.forEach(o => {
+          obstacleData.push([
+            o.obstacle_id,
+            o.name,
+            o.type,
+            o.position?.x || 0,
+            o.position?.y || 0,
+            o.position?.z || 0,
+            o.size?.width || 1,
+            o.size?.height || 1,
+            o.size?.depth || 1,
+            o.rotation_y || 0
+          ]);
+        });
+        const wsObstacle = XLSX.utils.aoa_to_sheet(obstacleData);
+        XLSX.utils.book_append_sheet(wb, wsObstacle, '장애물');
+      }
+
+      // Process-Resource Assignment Sheet
+      if (data.processes && data.processes.length > 0) {
+        const resourceData = [
+          ['공정 ID', '리소스 타입', '리소스 ID', '수량', '병렬라인', '상대위치 X', '상대위치 Y', '상대위치 Z',
+           'Scale X', 'Scale Y', 'Scale Z', '회전 Y', '역할']
+        ];
+
+        data.processes.forEach(proc => {
+          // Skip parent processes - only process children with resources
+          if (proc.is_parent || !proc.resources) return;
+
+          proc.resources.forEach(res => {
+            resourceData.push([
+              proc.process_id,
+              res.resource_type,
+              res.resource_id,
+              res.quantity || 1,
+              res.parallel_line_index ?? '',
+              res.relative_location?.x || 0,
+              res.relative_location?.y || 0,
+              res.relative_location?.z || 0,
+              res.scale?.x || 1,
+              res.scale?.y || 1,
+              res.scale?.z || 1,
+              res.rotation_y || 0,
+              res.role || ''
+            ]);
+          });
+        });
+
+        const wsResource = XLSX.utils.aoa_to_sheet(resourceData);
+        XLSX.utils.book_append_sheet(wb, wsResource, '공정-리소스 할당');
+      }
+
+      // Download
+      XLSX.writeFile(wb, `bop_${data.project_title || 'data'}_${new Date().toISOString().split('T')[0]}.xlsx`);
+      addMessage('assistant', 'BOP 데이터가 Excel 파일로 다운로드되었습니다.');
+    } catch (err) {
+      setError('Excel 다운로드 중 오류가 발생했습니다: ' + err.message);
+    }
+  };
+
+  const handleUploadJSON = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      setError('JSON 파일만 업로드 가능합니다.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+
+        // Basic validation
+        if (!data.processes || !Array.isArray(data.processes)) {
+          setError('올바른 BOP JSON 형식이 아닙니다. processes 배열이 필요합니다.');
+          return;
+        }
+
+        if (confirm('현재 작업 중인 BOP 데이터를 덮어쓰시겠습니까?')) {
+          setBopData(data);
+          setTimeout(() => normalizeAllProcesses(), 0);
+          addMessage('assistant', `"${file.name}" 파일에서 BOP 데이터를 불러왔습니다.`);
+          setError('');
+        }
+      } catch (err) {
+        setError('JSON 파일 파싱 오류: ' + err.message);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset input
+    e.target.value = '';
+  };
+
+  const handleUploadExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      setError('Excel 파일(.xlsx, .xls)만 업로드 가능합니다.');
+      return;
+    }
+
+    try {
+      const XLSX = await import('xlsx');
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const workbook = XLSX.read(ev.target.result, { type: 'binary' });
+
+          const data = {
+            processes: [],
+            equipments: [],
+            workers: [],
+            materials: [],
+            obstacles: []
+          };
+
+          // Read Project Info
+          if (workbook.SheetNames.includes('프로젝트 정보')) {
+            const ws = workbook.Sheets['프로젝트 정보'];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+            rows.forEach(row => {
+              if (row[0] === '프로젝트명') data.project_title = row[1];
+              if (row[0] === '목표 UPH') data.target_uph = Number(row[1]) || 60;
+            });
+          }
+
+          // Read Process Structure (new format)
+          let processStructureMap = {};
+          if (workbook.SheetNames.includes('공정 구조')) {
+            const ws = workbook.Sheets['공정 구조'];
+            const rows = XLSX.utils.sheet_to_json(ws);
+            rows.forEach(row => {
+              processStructureMap[row['공정 ID']] = {
+                parallel_count: Number(row['병렬수']) || 1,
+                predecessor_ids: row['선행공정'] ? row['선행공정'].split(',').map(s => s.trim()).filter(Boolean) : [],
+                successor_ids: row['후속공정'] ? row['후속공정'].split(',').map(s => s.trim()).filter(Boolean) : []
+              };
+            });
+          } else if (workbook.SheetNames.includes('공정')) {
+            // Fallback: old format
+            const ws = workbook.Sheets['공정'];
+            const rows = XLSX.utils.sheet_to_json(ws);
+            rows.forEach(row => {
+              processStructureMap[row['공정 ID']] = {
+                parallel_count: Number(row['병렬수']) || 1,
+                predecessor_ids: row['선행공정'] ? row['선행공정'].split(',').map(s => s.trim()).filter(Boolean) : [],
+                successor_ids: row['후속공정'] ? row['후속공정'].split(',').map(s => s.trim()).filter(Boolean) : []
+              };
+            });
+          }
+
+          // Read Process Details (new format) or Parallel Lines (old format)
+          const detailsSheetName = workbook.SheetNames.includes('공정 상세') ? '공정 상세' :
+                                   workbook.SheetNames.includes('병렬라인 위치') ? '병렬라인 위치' : null;
+
+          if (detailsSheetName) {
+            const ws = workbook.Sheets[detailsSheetName];
+            const rows = XLSX.utils.sheet_to_json(ws);
+
+            // Group by process_id
+            const processDetailsMap = {};
+            rows.forEach(row => {
+              const processId = row['공정 ID'];
+              if (!processDetailsMap[processId]) {
+                processDetailsMap[processId] = [];
+              }
+
+              processDetailsMap[processId].push({
+                process_id: row['병렬라인 ID'],
+                parallel_index: Number(row['병렬인덱스']) || 1,
+                name: row['공정명'] || '',
+                description: row['설명'] || '',
+                cycle_time_sec: Number(row['사이클타임(초)']) || 60,
+                location: {
+                  x: Number(row['위치 X']) || 0,
+                  y: Number(row['위치 Y']) || 0,
+                  z: Number(row['위치 Z']) || 0
+                },
+                rotation_y: Number(row['회전 Y']) || 0
+              });
+            });
+
+            // Construct processes
+            data.processes = Object.keys(processStructureMap).map(processId => {
+              const structure = processStructureMap[processId];
+              const details = processDetailsMap[processId] || [];
+
+              // Use first line's details for top-level process properties
+              const firstLine = details[0] || {
+                name: '공정',
+                description: '',
+                cycle_time_sec: 60,
+                location: { x: 0, y: 0, z: 0 },
+                rotation_y: 0
+              };
+
+              return {
+                process_id: processId,
+                name: firstLine.name,
+                description: firstLine.description,
+                cycle_time_sec: firstLine.cycle_time_sec,
+                parallel_count: structure.parallel_count,
+                location: firstLine.location,
+                rotation_y: firstLine.rotation_y,
+                predecessor_ids: structure.predecessor_ids,
+                successor_ids: structure.successor_ids,
+                parallel_lines: details.length > 0 ? details : null,
+                resources: []
+              };
+            });
+          } else {
+            // No details sheet - create basic processes from structure only
+            data.processes = Object.keys(processStructureMap).map(processId => ({
+              process_id: processId,
+              name: '공정',
+              description: '',
+              cycle_time_sec: 60,
+              parallel_count: processStructureMap[processId].parallel_count,
+              location: { x: 0, y: 0, z: 0 },
+              rotation_y: 0,
+              predecessor_ids: processStructureMap[processId].predecessor_ids,
+              successor_ids: processStructureMap[processId].successor_ids,
+              resources: []
+            }));
+          }
+
+          // Read Process-Resource Assignment
+          if (workbook.SheetNames.includes('공정-리소스 할당')) {
+            const ws = workbook.Sheets['공정-리소스 할당'];
+            const rows = XLSX.utils.sheet_to_json(ws);
+
+            // Group resources by process_id
+            rows.forEach(row => {
+              const processId = row['공정 ID'];
+              const process = data.processes.find(p => p.process_id === processId);
+
+              if (process) {
+                const resource = {
+                  resource_type: row['리소스 타입'],
+                  resource_id: row['리소스 ID'],
+                  quantity: Number(row['수량']) || 1,
+                  relative_location: {
+                    x: Number(row['상대위치 X']) || 0,
+                    y: Number(row['상대위치 Y']) || 0,
+                    z: Number(row['상대위치 Z']) || 0
+                  },
+                  scale: {
+                    x: Number(row['Scale X']) || 1,
+                    y: Number(row['Scale Y']) || 1,
+                    z: Number(row['Scale Z']) || 1
+                  },
+                  rotation_y: Number(row['회전 Y']) || 0,
+                  role: row['역할'] || ''
+                };
+
+                // Add parallel_line_index if present
+                if (row['병렬라인'] !== undefined && row['병렬라인'] !== null && row['병렬라인'] !== '') {
+                  resource.parallel_line_index = Number(row['병렬라인']);
+                }
+
+                process.resources.push(resource);
+              }
+            });
+          }
+
+          // Read Equipments
+          if (workbook.SheetNames.includes('장비')) {
+            const ws = workbook.Sheets['장비'];
+            const rows = XLSX.utils.sheet_to_json(ws);
+            data.equipments = rows.map(row => ({
+              equipment_id: row['장비 ID'],
+              name: row['장비명'],
+              type: row['유형'] || 'machine'
+            }));
+          }
+
+          // Read Workers
+          if (workbook.SheetNames.includes('작업자')) {
+            const ws = workbook.Sheets['작업자'];
+            const rows = XLSX.utils.sheet_to_json(ws);
+            data.workers = rows.map(row => ({
+              worker_id: row['작업자 ID'],
+              name: row['이름'],
+              skill_level: row['숙련도'] || ''
+            }));
+          }
+
+          // Read Materials
+          if (workbook.SheetNames.includes('자재')) {
+            const ws = workbook.Sheets['자재'];
+            const rows = XLSX.utils.sheet_to_json(ws);
+            data.materials = rows.map(row => ({
+              material_id: row['자재 ID'],
+              name: row['자재명'],
+              unit: row['단위'] || 'ea'
+            }));
+          }
+
+          // Read Obstacles
+          if (workbook.SheetNames.includes('장애물')) {
+            const ws = workbook.Sheets['장애물'];
+            const rows = XLSX.utils.sheet_to_json(ws);
+            data.obstacles = rows.map(row => ({
+              obstacle_id: row['장애물 ID'],
+              name: row['이름'],
+              type: row['유형'] || 'fence',
+              position: {
+                x: Number(row['위치 X']) || 0,
+                y: Number(row['위치 Y']) || 0,
+                z: Number(row['위치 Z']) || 0
+              },
+              size: {
+                width: Number(row['너비']) || 1,
+                height: Number(row['높이']) || 1,
+                depth: Number(row['깊이']) || 1
+              },
+              rotation_y: Number(row['회전 Y']) || 0
+            }));
+          }
+
+          if (confirm('현재 작업 중인 BOP 데이터를 덮어쓰시겠습니까?')) {
+            setBopData(data);
+            setTimeout(() => normalizeAllProcesses(), 0);
+            addMessage('assistant', `"${file.name}" 파일에서 BOP 데이터를 불러왔습니다.`);
+            setError('');
+          }
+        } catch (err) {
+          setError('Excel 파일 파싱 오류: ' + err.message);
+        }
+      };
+      reader.readAsBinaryString(file);
+    } catch (err) {
+      setError('Excel 업로드 중 오류가 발생했습니다: ' + err.message);
+    }
+
+    // Reset input
+    e.target.value = '';
+  };
+
   const handleDelete = async () => {
     if (!selectedTool) return;
     if (!confirm(`"${selectedTool.tool_name}" 도구를 삭제하시겠습니까?`)) return;
@@ -308,6 +793,50 @@ function ToolsPanel() {
         <button style={styles.primaryBtn} onClick={() => { setView('upload'); setError(''); }}>
           + 도구 업로드
         </button>
+      </div>
+
+      {/* Data Import/Export Section */}
+      <div style={styles.dataSection}>
+        <div style={styles.dataSectionHeader}>
+          <span style={styles.dataSectionTitle}>📂 데이터 관리</span>
+        </div>
+        <div style={styles.dataButtons}>
+          <div style={styles.dataButtonGroup}>
+            <span style={styles.dataButtonLabel}>내보내기:</span>
+            <button style={styles.dataBtn} onClick={handleDownloadJSON}>
+              JSON 다운로드
+            </button>
+            <button style={styles.dataBtn} onClick={handleDownloadExcel}>
+              Excel 다운로드
+            </button>
+          </div>
+          <div style={styles.dataButtonGroup}>
+            <span style={styles.dataButtonLabel}>가져오기:</span>
+            <input
+              ref={jsonUploadRef}
+              type="file"
+              accept=".json"
+              onChange={handleUploadJSON}
+              style={{ display: 'none' }}
+            />
+            <button style={styles.dataBtn} onClick={() => jsonUploadRef.current?.click()}>
+              JSON 업로드
+            </button>
+            <input
+              ref={excelUploadRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleUploadExcel}
+              style={{ display: 'none' }}
+            />
+            <button style={styles.dataBtn} onClick={() => excelUploadRef.current?.click()}>
+              Excel 업로드
+            </button>
+          </div>
+        </div>
+        <div style={styles.dataInfo}>
+          현재 BOP 데이터를 파일로 저장하거나, 이전에 저장한 파일을 불러올 수 있습니다.
+        </div>
       </div>
 
       {listLoading && <div style={styles.info}>불러오는 중...</div>}
@@ -827,6 +1356,58 @@ const styles = {
     fontSize: '11px',
     fontFamily: 'monospace',
     color: '#333',
+  },
+  dataSection: {
+    backgroundColor: '#f9f9f9',
+    border: '1px solid #e0e0e0',
+    borderRadius: '6px',
+    padding: '14px',
+    marginBottom: '16px',
+  },
+  dataSectionHeader: {
+    marginBottom: '12px',
+  },
+  dataSectionTitle: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  dataButtons: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    marginBottom: '10px',
+  },
+  dataButtonGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+  },
+  dataButtonLabel: {
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#555',
+    minWidth: '70px',
+  },
+  dataBtn: {
+    padding: '6px 12px',
+    backgroundColor: '#fff',
+    color: '#4a90e2',
+    border: '1px solid #4a90e2',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+  },
+  dataInfo: {
+    fontSize: '11px',
+    color: '#888',
+    lineHeight: '1.5',
+    marginTop: '8px',
+    paddingTop: '10px',
+    borderTop: '1px solid #e0e0e0',
   },
 };
 

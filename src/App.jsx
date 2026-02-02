@@ -18,6 +18,19 @@ function App() {
   const [dragging, setDragging] = useState(null); // 'left' | 'right' | null
   const containerRef = useRef(null);
 
+  // Set initial panel widths based on 4:4:2 ratio
+  useEffect(() => {
+    if (containerRef.current) {
+      const totalWidth = containerRef.current.offsetWidth;
+      // Ratio 4:4:2 = left:center:right
+      // Total parts = 4 + 4 + 2 = 10
+      const leftRatio = 0.4; // 4/10
+      const rightRatio = 0.2; // 2/10
+      setLeftWidth(Math.floor(totalWidth * leftRatio));
+      setRightWidth(Math.floor(totalWidth * rightRatio));
+    }
+  }, []); // Run once on mount
+
   // Load mock data on initial mount if no BOP data exists
   useEffect(() => {
     if (!bopData) {

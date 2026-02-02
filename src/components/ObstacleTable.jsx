@@ -15,6 +15,7 @@ function ObstacleTable() {
     setPendingObstacleType
   } = useBopStore();
   const selectedRowRef = useRef(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   const obstacleTypes = [
     { id: 'fence', label: '펜스', icon: '🚧', color: '#ff9800' },
@@ -41,6 +42,31 @@ function ObstacleTable() {
     if (!selectedObstacleId) return;
     if (window.confirm('선택한 장애물을 삭제하시겠습니까?')) {
       deleteObstacle(selectedObstacleId);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    if (window.confirm(`선택한 ${selectedIds.length}개의 장애물을 삭제하시겠습니까?`)) {
+      selectedIds.forEach(id => deleteObstacle(id));
+      setSelectedIds([]);
+    }
+  };
+
+  const handleToggleSelect = (obstacleId) => {
+    setSelectedIds(prev =>
+      prev.includes(obstacleId)
+        ? prev.filter(id => id !== obstacleId)
+        : [...prev, obstacleId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    const obstacles = bopData?.obstacles || [];
+    if (selectedIds.length === obstacles.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(obstacles.map(o => o.obstacle_id));
     }
   };
 
@@ -174,12 +200,12 @@ function ObstacleTable() {
         <button
           style={{
             ...styles.actionButtonDanger,
-            ...(selectedObstacleId ? {} : styles.actionButtonDisabled)
+            ...(selectedIds.length === 0 ? styles.actionButtonDisabled : {})
           }}
-          disabled={!selectedObstacleId}
-          onClick={handleDeleteObstacle}
+          disabled={selectedIds.length === 0}
+          onClick={handleDeleteSelected}
         >
-          선택 삭제
+          선택 항목 삭제 ({selectedIds.length})
         </button>
       </div>
 
@@ -195,6 +221,14 @@ function ObstacleTable() {
         <table style={styles.table}>
           <thead>
             <tr>
+              <th style={{ ...styles.th, width: '40px' }}>
+                <input
+                  type="checkbox"
+                  checked={obstacles.length > 0 && selectedIds.length === obstacles.length}
+                  onChange={handleToggleSelectAll}
+                  style={styles.checkbox}
+                />
+              </th>
               <th style={{ ...styles.th, width: '80px' }}>ID</th>
               <th style={{ ...styles.th, minWidth: '120px' }}>이름</th>
               <th style={{ ...styles.th, width: '70px' }}>유형</th>
@@ -220,6 +254,14 @@ function ObstacleTable() {
                   }}
                   onClick={() => setSelectedObstacle(obstacle.obstacle_id)}
                 >
+                  <td style={styles.td} onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(obstacle.obstacle_id)}
+                      onChange={() => handleToggleSelect(obstacle.obstacle_id)}
+                      style={styles.checkbox}
+                    />
+                  </td>
                   <td style={styles.td}>
                     <strong>{obstacle.obstacle_id}</strong>
                   </td>
@@ -526,6 +568,11 @@ const styles = {
     fontSize: '11px',
     borderRadius: '12px',
     fontWeight: 'bold',
+  },
+  checkbox: {
+    cursor: 'pointer',
+    width: '16px',
+    height: '16px',
   },
 };
 

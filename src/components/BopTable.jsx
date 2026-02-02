@@ -19,47 +19,13 @@ function BopTable() {
     addResourceToProcess,
     removeResourceFromProcess,
     linkProcesses,
-    unlinkProcesses
+    unlinkProcesses,
+    updateProjectSettings
   } = useBopStore();
 
-  const [exportLoading, setExportLoading] = useState(false);
-  const [exportError, setExportError] = useState('');
-
-  const handleExportExcel = async () => {
-    if (!bopData || !bopData.processes || bopData.processes.length === 0) {
-      setExportError('먼저 BOP를 생성해주세요');
-      return;
-    }
-
-    setExportLoading(true);
-    setExportError('');
-
-    try {
-      await api.exportExcel(bopData);
-    } catch (err) {
-      setExportError(err.message);
-    } finally {
-      setExportLoading(false);
-    }
-  };
-
-  const handleExport3D = async () => {
-    if (!bopData || !bopData.processes || bopData.processes.length === 0) {
-      setExportError('먼저 BOP를 생성해주세요');
-      return;
-    }
-
-    setExportLoading(true);
-    setExportError('');
-
-    try {
-      await api.export3D(bopData);
-    } catch (err) {
-      setExportError(err.message);
-    } finally {
-      setExportLoading(false);
-    }
-  };
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [editProjectTitle, setEditProjectTitle] = useState('');
+  const [editTargetUph, setEditTargetUph] = useState('');
 
   if (!bopData) {
     return (
@@ -72,12 +38,40 @@ function BopTable() {
     );
   }
 
+  // Handle settings edit
+  const handleEditSettings = () => {
+    setEditProjectTitle(bopData.project_title || '');
+    setEditTargetUph(String(bopData.target_uph || 60));
+    setEditingSettings(true);
+  };
+
+  const handleSaveSettings = () => {
+    updateProjectSettings({
+      project_title: editProjectTitle,
+      target_uph: editTargetUph
+    });
+    setEditingSettings(false);
+  };
+
+  const handleCancelSettings = () => {
+    setEditingSettings(false);
+  };
+
   if (!bopData.processes || bopData.processes.length === 0) {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <h2 style={styles.title}>{bopData.project_title}</h2>
-          <div style={styles.uph}>Target: {bopData.target_uph} UPH</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+            <h2 style={styles.title}>{bopData.project_title}</h2>
+            <div style={styles.uph}>Target: {bopData.target_uph} UPH</div>
+            <button
+              style={styles.settingsButton}
+              onClick={handleEditSettings}
+              title="프로젝트 설정 편집"
+            >
+              ⚙️
+            </button>
+          </div>
         </div>
         <div style={styles.emptyState}>
           <p>공정이 없습니다.</p>
@@ -88,6 +82,44 @@ function BopTable() {
             + 공정 추가
           </button>
         </div>
+
+        {/* Settings Edit Modal */}
+        {editingSettings && (
+          <div style={styles.modalOverlay} onClick={handleCancelSettings}>
+            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <h3 style={styles.modalTitle}>프로젝트 설정</h3>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>프로젝트명</label>
+                <input
+                  type="text"
+                  value={editProjectTitle}
+                  onChange={(e) => setEditProjectTitle(e.target.value)}
+                  style={styles.input}
+                  placeholder="예: 전기 자전거 조립 라인"
+                />
+              </div>
+              <div style={styles.formGroup}>
+                <label style={styles.label}>목표 UPH (시간당 생산량)</label>
+                <input
+                  type="number"
+                  value={editTargetUph}
+                  onChange={(e) => setEditTargetUph(e.target.value)}
+                  style={styles.input}
+                  min="1"
+                  placeholder="예: 120"
+                />
+              </div>
+              <div style={styles.modalActions}>
+                <button style={styles.modalButtonCancel} onClick={handleCancelSettings}>
+                  취소
+                </button>
+                <button style={styles.modalButtonSave} onClick={handleSaveSettings}>
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -255,26 +287,90 @@ function BopTable() {
     );
   };
 
-  // Calculate bottleneck - only consider child processes (actual production lines)
+  // Calculate bottleneck based on effective cycle time (CT / parallel_count)
   const getBottleneck = () => {
-    let maxTime = 0;
+    let maxEffectiveTime = 0;
     let bottleneckProcess = null;
 
-    bopData.processes.forEach(process => {
-      // Skip parent processes
-      if (process.is_parent) return;
+    // Group processes by base ID (parent or independent)
+    const baseProcesses = new Map();
 
-      const cycleTime = process.cycle_time_sec;
-      if (cycleTime > maxTime) {
-        maxTime = cycleTime;
-        bottleneckProcess = process;
+    bopData.processes.forEach(process => {
+      if (process.is_parent) {
+        // Parent process - find all children and calculate effective CT
+        const baseId = process.process_id;
+        const children = bopData.processes.filter(p => p.parent_id === baseId);
+        const parallelCount = children.length || 1;
+
+        // Effective CT using harmonic mean (throughput sum)
+        // Effective CT = 1 / Σ(1/CT_i)
+        // This correctly reflects that parallel lines add throughput
+        const childCTs = children.map(c => c.cycle_time_sec || 0);
+        const maxChildCT = children.length > 0
+          ? Math.max(...childCTs)
+          : process.cycle_time_sec;
+
+        // Calculate effective CT using harmonic mean
+        // Example: Line1=240s, Line2=140s
+        // → Rate1=1/240, Rate2=1/140
+        // → Total Rate = 1/240 + 1/140
+        // → Effective CT = 1 / (1/240 + 1/140) = 88.5s
+        const effectiveCT = children.length > 0
+          ? 1 / childCTs.reduce((sum, ct) => sum + (ct > 0 ? 1 / ct : 0), 0)
+          : process.cycle_time_sec;
+
+        // Debug log
+        if (baseId === 'P003') {
+          console.log(`[Bottleneck Debug] ${process.name}:`, {
+            baseId,
+            childCTs,
+            parallelCount,
+            effectiveCT,
+            throughputSum: childCTs.reduce((sum, ct) => sum + (ct > 0 ? 1 / ct : 0), 0),
+            formula: `1 / (${childCTs.map(ct => `1/${ct}`).join(' + ')})`
+          });
+        }
+
+        baseProcesses.set(baseId, {
+          process,
+          effectiveCT,
+          parallelCount,
+          baseCT: maxChildCT
+        });
+      } else if (!process.parent_id) {
+        // Independent process (no parent)
+        const baseId = process.process_id;
+        const parallelCount = 1; // Independent processes have parallel_count = 1
+        const effectiveCT = process.cycle_time_sec;
+
+        baseProcesses.set(baseId, {
+          process,
+          effectiveCT,
+          parallelCount,
+          baseCT: process.cycle_time_sec
+        });
+      }
+      // Skip child processes - they're already represented by their parent
+    });
+
+    // Find bottleneck (max effective CT)
+    baseProcesses.forEach(({ process, effectiveCT, parallelCount, baseCT }) => {
+      if (effectiveCT > maxEffectiveTime) {
+        maxEffectiveTime = effectiveCT;
+        bottleneckProcess = { process, effectiveCT, parallelCount, baseCT };
       }
     });
 
-    return { process: bottleneckProcess, time: maxTime };
+    return {
+      process: bottleneckProcess?.process || null,
+      effectiveTime: maxEffectiveTime,
+      parallelCount: bottleneckProcess?.parallelCount || 1,
+      baseCT: bottleneckProcess?.baseCT || 0
+    };
   };
 
   const bottleneck = getBottleneck();
+  const expectedUPH = bottleneck.effectiveTime > 0 ? 3600 / bottleneck.effectiveTime : 0;
 
   // Group processes by parent (for hierarchical display)
   const processGroups = [];
@@ -306,9 +402,56 @@ function BopTable() {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <h2 style={styles.title}>{bopData.project_title}</h2>
-        <div style={styles.uph}>Target: {bopData.target_uph} UPH</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+          <h2 style={styles.title}>{bopData.project_title}</h2>
+          <div style={styles.uph}>Target: {bopData.target_uph} UPH</div>
+          <button
+            style={styles.settingsButton}
+            onClick={handleEditSettings}
+            title="프로젝트 설정 편집"
+          >
+            ⚙️
+          </button>
+        </div>
       </div>
+
+      {/* Settings Edit Modal */}
+      {editingSettings && (
+        <div style={styles.modalOverlay} onClick={handleCancelSettings}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h3 style={styles.modalTitle}>프로젝트 설정</h3>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>프로젝트명</label>
+              <input
+                type="text"
+                value={editProjectTitle}
+                onChange={(e) => setEditProjectTitle(e.target.value)}
+                style={styles.input}
+                placeholder="예: 전기 자전거 조립 라인"
+              />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>목표 UPH (시간당 생산량)</label>
+              <input
+                type="number"
+                value={editTargetUph}
+                onChange={(e) => setEditTargetUph(e.target.value)}
+                style={styles.input}
+                min="1"
+                placeholder="예: 120"
+              />
+            </div>
+            <div style={styles.modalActions}>
+              <button style={styles.modalButtonCancel} onClick={handleCancelSettings}>
+                취소
+              </button>
+              <button style={styles.modalButtonSave} onClick={handleSaveSettings}>
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Action Bar */}
       <div style={styles.actionBar}>
@@ -394,7 +537,9 @@ function BopTable() {
               group.children.forEach((process, childIdx) => {
                 const isFirstChild = childIdx === 0;
                 const isThisRowSelected = selectedProcessKey === process.process_id;
-                const isBottleneck = bottleneck.process?.process_id === process.process_id;
+                // Check if this process group is the bottleneck (compare parent or independent process)
+                const baseProcessId = group.parent?.process_id || process.process_id;
+                const isBottleneck = bottleneck.process?.process_id === baseProcessId;
 
                 const { equipments, workers, materials } = getResourcesByType(process);
 
@@ -447,8 +592,11 @@ function BopTable() {
                                   {group.children.length}x
                                 </span>
                                 {isBottleneck && (
-                                  <span style={styles.bottleneckBadge}>
-                                    Bottleneck
+                                  <span
+                                    style={styles.bottleneckBadge}
+                                    title={`Effective CT: ${bottleneck.effectiveTime.toFixed(1)}s${bottleneck.parallelCount > 1 ? ` (${bottleneck.parallelCount}라인 중 최대)` : ''}`}
+                                  >
+                                    Bottleneck ({bottleneck.effectiveTime.toFixed(1)}s)
                                   </span>
                                 )}
                               </div>
@@ -473,6 +621,36 @@ function BopTable() {
                           ) : (
                             <div style={styles.cycleTimeInfo}>
                               <div><strong>{process.cycle_time_sec?.toFixed(1) || 0}s</strong></div>
+                              {isParallelGroup && group.children.length > 1 && (() => {
+                                const childCTs = group.children.map(c => c.cycle_time_sec || 0);
+                                // Use harmonic mean: 1 / Σ(1/CT_i)
+                                const effectiveCT = 1 / childCTs.reduce((sum, ct) => sum + (ct > 0 ? 1 / ct : 0), 0);
+
+                                // Debug log for P003
+                                if (group.parent?.process_id === 'P003') {
+                                  console.log(`[Table Display] ${group.parent.name}:`, {
+                                    childCTs,
+                                    parallelCount: group.children.length,
+                                    effectiveCT,
+                                    formula: `1 / (${childCTs.map(ct => `1/${ct}`).join(' + ')})`
+                                  });
+                                }
+
+                                // Check if all CTs are the same
+                                const allSame = childCTs.every(ct => ct === childCTs[0]);
+                                const detailText = allSame
+                                  ? `(${childCTs[0].toFixed(0)}s ÷ ${group.children.length}라인 = ${(childCTs[0] / group.children.length).toFixed(1)}s)`
+                                  : `(처리율: ${childCTs.map(ct => ct.toFixed(0)).join('s, ')}s)`;
+
+                                return (
+                                  <div style={styles.effectiveTime}>
+                                    → Effective CT: {effectiveCT.toFixed(1)}s
+                                    <span style={{ fontSize: '9px', color: '#999', marginLeft: '4px' }}>
+                                      {detailText}
+                                    </span>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
                         </td>
@@ -531,9 +709,17 @@ function BopTable() {
                               />
                             </>
                           ) : (
-                            <span style={styles.parallelLineText}>
-                              └ #{process.parallel_index}
-                            </span>
+                            <>
+                              <div style={styles.processName}>
+                                <span style={styles.parallelLineText}>└ #{process.parallel_index}</span>
+                                {process.name !== group.parent?.name && (
+                                  <span style={{ fontSize: '12px', color: '#666' }}> - {process.name}</span>
+                                )}
+                              </div>
+                              {process.description && (
+                                <div style={styles.processDescription}>{process.description}</div>
+                              )}
+                            </>
                           )}
                         </td>
                         <td style={styles.td}>
@@ -553,6 +739,11 @@ function BopTable() {
                           ) : (
                             <div style={styles.cycleTimeInfo}>
                               <div>{process.cycle_time_sec?.toFixed(1) || 0}s</div>
+                              {process.cycle_time_sec !== group.parent?.cycle_time_sec && (
+                                <div style={{ fontSize: '10px', color: '#ff9800', marginTop: '2px' }}>
+                                  (수정됨)
+                                </div>
+                              )}
                             </div>
                           )}
                         </td>
@@ -615,8 +806,11 @@ function BopTable() {
                               <div style={styles.processName}>
                                 <strong>{process.name}</strong>
                                 {isBottleneck && (
-                                  <span style={styles.bottleneckBadge}>
-                                    Bottleneck
+                                  <span
+                                    style={styles.bottleneckBadge}
+                                    title={`Effective CT: ${bottleneck.effectiveTime.toFixed(1)}s${bottleneck.parallelCount > 1 ? ` (${bottleneck.parallelCount}라인 중 최대)` : ''}`}
+                                  >
+                                    Bottleneck ({bottleneck.effectiveTime.toFixed(1)}s)
                                   </span>
                                 )}
                               </div>
@@ -705,30 +899,32 @@ function BopTable() {
           <span style={styles.summaryValue}>{bopData.materials?.length || 0}</span>
         </div>
         <div style={styles.summaryItem}>
-          <span style={styles.summaryLabel}>Bottleneck Time:</span>
-          <span style={styles.summaryValue}>{bottleneck.time.toFixed(1)}s</span>
+          <span style={styles.summaryLabel}>Bottleneck (Effective CT):</span>
+          <span style={styles.summaryValue}>
+            {bottleneck.process ? (
+              <>
+                {bottleneck.effectiveTime.toFixed(1)}s
+                {bottleneck.parallelCount > 1 && (
+                  <span style={styles.summaryDetail}>
+                    {' '}({bottleneck.parallelCount} 라인 중 최대)
+                  </span>
+                )}
+              </>
+            ) : '-'}
+          </span>
         </div>
-      </div>
-
-      {/* Export Section */}
-      <div style={styles.exportSection}>
-        <h3 style={styles.exportTitle}>내보내기</h3>
-        {exportError && <div style={styles.exportError}>{exportError}</div>}
-        <div style={styles.exportButtons}>
-          <button
-            style={styles.exportButton}
-            onClick={handleExportExcel}
-            disabled={exportLoading}
-          >
-            📊 Excel
-          </button>
-          <button
-            style={{ ...styles.exportButton, ...styles.exportButtonSecondary }}
-            onClick={handleExport3D}
-            disabled={exportLoading}
-          >
-            🎨 3D JSON
-          </button>
+        <div style={styles.summaryItem}>
+          <span style={styles.summaryLabel}>예상 UPH:</span>
+          <span style={styles.summaryValue}>
+            {expectedUPH > 0 ? (
+              <>
+                {Math.round(expectedUPH)}
+                <span style={styles.summaryDetail}>
+                  {' '}(Target: {bopData.target_uph})
+                </span>
+              </>
+            ) : '-'}
+          </span>
         </div>
       </div>
     </div>
@@ -980,39 +1176,92 @@ const styles = {
     fontWeight: 'bold',
     color: '#333',
   },
-  exportSection: {
-    padding: '15px 20px',
-    borderTop: '2px solid #ddd',
-    backgroundColor: '#f5f5f5',
+  summaryDetail: {
+    fontSize: '12px',
+    fontWeight: 'normal',
+    color: '#888',
   },
-  exportTitle: {
-    margin: '0 0 10px 0',
-    fontSize: '14px',
+  settingsButton: {
+    backgroundColor: 'transparent',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    padding: '4px 8px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '24px',
+    minWidth: '400px',
+    maxWidth: '500px',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2)',
+  },
+  modalTitle: {
+    margin: '0 0 20px 0',
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  formGroup: {
+    marginBottom: '16px',
+  },
+  label: {
+    display: 'block',
+    marginBottom: '6px',
+    fontSize: '13px',
     fontWeight: 'bold',
     color: '#555',
   },
-  exportButtons: {
+  input: {
+    width: '100%',
+    padding: '8px 12px',
+    fontSize: '14px',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    boxSizing: 'border-box',
+  },
+  modalActions: {
     display: 'flex',
     gap: '10px',
+    justifyContent: 'flex-end',
+    marginTop: '24px',
   },
-  exportButton: {
-    flex: 1,
-    padding: '10px',
+  modalButtonCancel: {
+    padding: '8px 16px',
+    backgroundColor: '#999',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  modalButtonSave: {
+    padding: '8px 16px',
     backgroundColor: '#4a90e2',
     color: 'white',
     border: 'none',
     borderRadius: '4px',
-    fontSize: '13px',
+    fontSize: '14px',
     cursor: 'pointer',
     fontWeight: 'bold',
-  },
-  exportButtonSecondary: {
-    backgroundColor: '#888',
-  },
-  exportError: {
-    color: '#ff6b6b',
-    fontSize: '12px',
-    marginBottom: '10px',
   },
 };
 

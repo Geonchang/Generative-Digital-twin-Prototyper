@@ -947,22 +947,24 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
       {(isSelected || hovered) && (
         <>
           <Text
-            position={[0, geometry.yOffset * 2 + 0.3, 0]}
+            position={[0, geometry.yOffset * 2 + 0.5, 0]}
             fontSize={0.15}
             color="#333"
             anchorX="center"
             anchorY="middle"
             maxWidth={2}
+            scale={[1/scale.x, 1/scale.y, 1/scale.z]}
           >
             {getName()}
           </Text>
           {resource.role && (
             <Text
-              position={[0, geometry.yOffset * 2, 0]}
+              position={[0, geometry.yOffset * 2 + 0.25, 0]}
               fontSize={0.12}
               color="#666"
               anchorX="center"
               anchorY="middle"
+              scale={[1/scale.x, 1/scale.y, 1/scale.z]}
             >
               ({resource.role})
             </Text>
@@ -973,7 +975,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
       {/* Transform mode indicator - 선택된 경우에만 표시 */}
       {isSelected && (
         <Text
-          position={[0, geometry.yOffset * 2 + 0.6, 0]}
+          position={[0, geometry.yOffset * 2 + 1.0, 0]}
           fontSize={0.18}
           color={
             (activeAxis || hoveredAxis) === 'X' ? '#ff0000' :
@@ -988,6 +990,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
           anchorY="middle"
           outlineWidth={0.02}
           outlineColor="#ffffff"
+          scale={[1/scale.x, 1/scale.y, 1/scale.z]}
         >
           {transformMode === 'translate' ? '이동 (T)' :
            transformMode === 'rotate' ? '회전 (R)' :

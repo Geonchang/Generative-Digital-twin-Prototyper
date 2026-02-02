@@ -250,19 +250,27 @@ function expandParallelProcesses(bopData) {
         }
       }
 
+      // Use parallel_lines info if available, otherwise use default values
+      const parallelLineInfo = process.parallel_lines?.[i];
+      const childLocation = parallelLineInfo?.location || {
+        x: process.location.x,
+        y: process.location.y || 0,
+        z: process.location.z + i * 5  // Z-offset: 5m per parallel process (default)
+      };
+      const childRotation = parallelLineInfo?.rotation_y ?? (process.rotation_y || 0);
+      const childName = parallelLineInfo?.name || process.name;
+      const childDescription = parallelLineInfo?.description || process.description;
+      const childCycleTime = parallelLineInfo?.cycle_time_sec || process.cycle_time_sec;
+
       const childProcess = {
         process_id: `${process.process_id}-${String(i + 1).padStart(2, '0')}`,
-        name: process.name,
-        description: process.description,
-        cycle_time_sec: process.cycle_time_sec,
+        name: childName,
+        description: childDescription,
+        cycle_time_sec: childCycleTime,
         parent_id: process.process_id,
         parallel_index: i + 1,  // 1-based
-        location: {
-          x: process.location.x,
-          y: process.location.y || 0,
-          z: process.location.z + i * 5  // Z-offset: 5m per parallel process
-        },
-        rotation_y: process.rotation_y || 0,
+        location: childLocation,
+        rotation_y: childRotation,
         predecessor_ids: process.predecessor_ids || [],
         successor_ids: process.successor_ids || [],
         resources: res
@@ -313,6 +321,16 @@ function collapseParallelProcesses(bopData) {
           rotation_y: siblings[0].rotation_y || 0,
           predecessor_ids: siblings[0].predecessor_ids || [],
           successor_ids: siblings[0].successor_ids || [],
+          // Store each parallel line's individual properties
+          parallel_lines: siblings.map(sibling => ({
+            process_id: sibling.process_id,
+            parallel_index: sibling.parallel_index,
+            name: sibling.name,
+            description: sibling.description,
+            cycle_time_sec: sibling.cycle_time_sec,
+            location: sibling.location,
+            rotation_y: sibling.rotation_y || 0
+          })),
           resources: siblings.flatMap((sibling, index) =>
             (sibling.resources || []).map(r => ({
               ...r,
@@ -350,10 +368,10 @@ function generateNextProcessId(processes) {
 function generateNextEquipmentId(equipments) {
   let maxNum = 0;
   (equipments || []).forEach(e => {
-    const match = e.equipment_id.match(/(\d+)$/);
+    const match = e.equipment_id.match(/^EQ(\d+)$/);
     if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
   });
-  return `EQ-NEW-${String(maxNum + 1).padStart(2, '0')}`;
+  return `EQ${String(maxNum + 1).padStart(3, '0')}`;
 }
 
 function generateNextWorkerId(workers) {
@@ -368,10 +386,10 @@ function generateNextWorkerId(workers) {
 function generateNextMaterialId(materials) {
   let maxNum = 0;
   (materials || []).forEach(m => {
-    const match = m.material_id.match(/(\d+)$/);
+    const match = m.material_id.match(/^M(\d+)$/);
     if (match) maxNum = Math.max(maxNum, parseInt(match[1], 10));
   });
-  return `M-NEW-${String(maxNum + 1).padStart(3, '0')}`;
+  return `M${String(maxNum + 1).padStart(3, '0')}`;
 }
 
 function generateNextObstacleId(obstacles) {
@@ -478,6 +496,28 @@ const useBopStore = create((set) => ({
     set({ bopData: expandedData });
     console.log('[STORE] bopData updated');
   },
+
+  // Update project settings (project_title, target_uph)
+  updateProjectSettings: (fields) => set((state) => {
+    if (!state.bopData) return state;
+
+    const updates = {};
+    if (fields.project_title !== undefined) {
+      updates.project_title = fields.project_title;
+    }
+    if (fields.target_uph !== undefined) {
+      const uph = parseInt(fields.target_uph, 10);
+      if (isNaN(uph) || uph <= 0) {
+        console.error('[STORE] Invalid target_uph:', fields.target_uph);
+        return state;
+      }
+      updates.target_uph = uph;
+    }
+
+    return {
+      bopData: { ...state.bopData, ...updates }
+    };
+  }),
 
   // Export BOP data (collapse parallel processes back to parallel_count format)
   exportBopData: () => {
@@ -723,6 +763,38 @@ const useBopStore = create((set) => ({
     };
   }),
 
+  // Update resource quantity (for materials)
+  updateResourceQuantity: (processId, resourceType, resourceId, quantity) => set((state) => {
+    if (!state.bopData) return state;
+
+    const updatedProcesses = state.bopData.processes.map(process => {
+      if (process.process_id === processId) {
+        const updatedResources = process.resources.map(resource => {
+          if (resource.resource_type === resourceType && resource.resource_id === resourceId) {
+            return {
+              ...resource,
+              quantity: quantity
+            };
+          }
+          return resource;
+        });
+
+        return {
+          ...process,
+          resources: updatedResources
+        };
+      }
+      return process;
+    });
+
+    return {
+      bopData: {
+        ...state.bopData,
+        processes: updatedProcesses
+      }
+    };
+  }),
+
   // Normalize all processes (useful for initial data load)
   normalizeAllProcesses: () => set((state) => {
     if (!state.bopData) return state;
@@ -861,30 +933,69 @@ const useBopStore = create((set) => ({
   updateProcess: (processId, fields) => set((state) => {
     if (!state.bopData) return state;
 
-    const allowedFields = ['name', 'description', 'cycle_time_sec'];
-    const updates = {};
-    for (const key of allowedFields) {
-      if (fields[key] !== undefined) updates[key] = fields[key];
+    // Fields that can be updated individually per child process
+    const individualFields = ['name', 'description', 'cycle_time_sec'];
+    // Fields that update the entire parallel group
+    const groupFields = ['location', 'rotation_y'];
+
+    const individualUpdates = {};
+    const groupUpdates = {};
+
+    for (const key of individualFields) {
+      if (fields[key] !== undefined) individualUpdates[key] = fields[key];
     }
-    if (Object.keys(updates).length === 0) return state;
+    for (const key of groupFields) {
+      if (fields[key] !== undefined) groupUpdates[key] = fields[key];
+    }
+
+    if (Object.keys(individualUpdates).length === 0 && Object.keys(groupUpdates).length === 0) {
+      return state;
+    }
 
     const target = state.bopData.processes.find(p => p.process_id === processId);
     if (!target) return state;
 
-    // For parallel groups, collect all member IDs
-    const groupIds = new Set([processId]);
-    if (target.parent_id) {
-      groupIds.add(target.parent_id);
-      state.bopData.processes
-        .filter(p => p.parent_id === target.parent_id)
-        .forEach(p => groupIds.add(p.process_id));
-    } else if (target.is_parent && target.children) {
-      target.children.forEach(cid => groupIds.add(cid));
+    // Determine which processes to update for group fields
+    const groupIds = new Set();
+    if (Object.keys(groupUpdates).length > 0) {
+      groupIds.add(processId);
+      if (target.parent_id) {
+        groupIds.add(target.parent_id);
+        state.bopData.processes
+          .filter(p => p.parent_id === target.parent_id)
+          .forEach(p => groupIds.add(p.process_id));
+      } else if (target.is_parent && target.children) {
+        target.children.forEach(cid => groupIds.add(cid));
+      }
     }
 
-    const updatedProcesses = state.bopData.processes.map(process =>
-      groupIds.has(process.process_id) ? { ...process, ...updates } : process
-    );
+    let updatedProcesses = state.bopData.processes.map(process => {
+      let updated = process;
+
+      // Apply individual updates only to the specific process
+      if (process.process_id === processId && Object.keys(individualUpdates).length > 0) {
+        updated = { ...updated, ...individualUpdates };
+      }
+
+      // Apply group updates to all processes in the group
+      if (groupIds.has(process.process_id)) {
+        updated = { ...updated, ...groupUpdates };
+      }
+
+      return updated;
+    });
+
+    // If we updated cycle_time_sec on a child, update parent to max of all children
+    if (individualUpdates.cycle_time_sec !== undefined && target.parent_id) {
+      const parentId = target.parent_id;
+      const allChildren = updatedProcesses.filter(p => p.parent_id === parentId);
+      if (allChildren.length > 0) {
+        const maxChildCT = Math.max(...allChildren.map(c => c.cycle_time_sec || 0));
+        updatedProcesses = updatedProcesses.map(p =>
+          p.process_id === parentId ? { ...p, cycle_time_sec: maxChildCT } : p
+        );
+      }
+    }
 
     return {
       bopData: { ...state.bopData, processes: updatedProcesses }

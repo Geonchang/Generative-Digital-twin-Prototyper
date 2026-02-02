@@ -18,7 +18,7 @@ export const mockBopData = {
       "resources": [
         {
           "resource_type": "equipment",
-          "resource_id": "EQ-ROBOT-01",
+          "resource_id": "EQ001",
           "quantity": 1,
           "parallel_line_index": 0,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
@@ -38,7 +38,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "equipment",
-          "resource_id": "EQ-ROBOT-02",
+          "resource_id": "EQ002",
           "quantity": 1,
           "parallel_line_index": 1,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
@@ -58,7 +58,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "material",
-          "resource_id": "M-STEEL-001",
+          "resource_id": "M001",
           "quantity": 5.2,
           "relative_location": { "x": -1.2, "y": 0, "z": 0 },
           "rotation_y": 0,
@@ -80,7 +80,7 @@ export const mockBopData = {
       "resources": [
         {
           "resource_type": "equipment",
-          "resource_id": "EQ-MACHINE-01",
+          "resource_id": "EQ003",
           "quantity": 1,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
           "rotation_y": 0,
@@ -98,7 +98,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "material",
-          "resource_id": "M-PAINT-001",
+          "resource_id": "M002",
           "quantity": 0.8,
           "relative_location": { "x": -1.2, "y": 0, "z": 0 },
           "rotation_y": 0,
@@ -120,7 +120,7 @@ export const mockBopData = {
       "resources": [
         {
           "resource_type": "equipment",
-          "resource_id": "EQ-MANUAL-01",
+          "resource_id": "EQ004",
           "quantity": 1,
           "parallel_line_index": 0,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
@@ -140,7 +140,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "equipment",
-          "resource_id": "EQ-MANUAL-03",
+          "resource_id": "EQ006",
           "quantity": 1,
           "parallel_line_index": 1,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
@@ -160,7 +160,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "material",
-          "resource_id": "M-BATTERY-001",
+          "resource_id": "M003",
           "quantity": 1,
           "relative_location": { "x": -1.0, "y": 0, "z": 0.4 },
           "rotation_y": 0,
@@ -169,7 +169,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "material",
-          "resource_id": "M-MOTOR-001",
+          "resource_id": "M004",
           "quantity": 1,
           "relative_location": { "x": -1.0, "y": 0, "z": -0.4 },
           "rotation_y": 0,
@@ -191,7 +191,7 @@ export const mockBopData = {
       "resources": [
         {
           "resource_type": "equipment",
-          "resource_id": "EQ-MANUAL-02",
+          "resource_id": "EQ005",
           "quantity": 1,
           "parallel_line_index": 0,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
@@ -211,7 +211,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "equipment",
-          "resource_id": "EQ-MANUAL-04",
+          "resource_id": "EQ007",
           "quantity": 1,
           "parallel_line_index": 1,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
@@ -231,7 +231,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "material",
-          "resource_id": "M-WHEEL-001",
+          "resource_id": "M005",
           "quantity": 2,
           "relative_location": { "x": -1.0, "y": 0, "z": 0.4 },
           "rotation_y": 0,
@@ -240,7 +240,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "material",
-          "resource_id": "M-BRAKE-001",
+          "resource_id": "M006",
           "quantity": 2,
           "relative_location": { "x": -1.0, "y": 0, "z": -0.4 },
           "rotation_y": 0,
@@ -262,7 +262,7 @@ export const mockBopData = {
       "resources": [
         {
           "resource_type": "equipment",
-          "resource_id": "EQ-MACHINE-02",
+          "resource_id": "EQ008",
           "quantity": 1,
           "relative_location": { "x": 0, "y": 0, "z": 0 },
           "rotation_y": 0,
@@ -289,7 +289,7 @@ export const mockBopData = {
         },
         {
           "resource_type": "material",
-          "resource_id": "M-BOX-001",
+          "resource_id": "M007",
           "quantity": 1,
           "relative_location": { "x": 1.2, "y": 0, "z": -0.5 },
           "rotation_y": 0,
@@ -301,42 +301,42 @@ export const mockBopData = {
   ],
   "equipments": [
     {
-      "equipment_id": "EQ-ROBOT-01",
+      "equipment_id": "EQ001",
       "name": "6축 용접 로봇 #1",
       "type": "robot"
     },
     {
-      "equipment_id": "EQ-ROBOT-02",
+      "equipment_id": "EQ002",
       "name": "6축 용접 로봇 #2",
       "type": "robot"
     },
     {
-      "equipment_id": "EQ-MACHINE-01",
+      "equipment_id": "EQ003",
       "name": "분체 도장 부스",
       "type": "machine"
     },
     {
-      "equipment_id": "EQ-MANUAL-01",
+      "equipment_id": "EQ004",
       "name": "전장 조립 워크스테이션 #1",
       "type": "manual_station"
     },
     {
-      "equipment_id": "EQ-MANUAL-02",
+      "equipment_id": "EQ005",
       "name": "기계 조립 워크스테이션 #1",
       "type": "manual_station"
     },
     {
-      "equipment_id": "EQ-MANUAL-03",
+      "equipment_id": "EQ006",
       "name": "전장 조립 워크스테이션 #2",
       "type": "manual_station"
     },
     {
-      "equipment_id": "EQ-MANUAL-04",
+      "equipment_id": "EQ007",
       "name": "기계 조립 워크스테이션 #2",
       "type": "manual_station"
     },
     {
-      "equipment_id": "EQ-MACHINE-02",
+      "equipment_id": "EQ008",
       "name": "기능 테스트 장비",
       "type": "machine"
     }
@@ -353,13 +353,13 @@ export const mockBopData = {
     { "worker_id": "W009", "name": "한지민", "skill_level": "Senior" }
   ],
   "materials": [
-    { "material_id": "M-STEEL-001", "name": "알루미늄 합금 프레임", "unit": "kg" },
-    { "material_id": "M-PAINT-001", "name": "분체 도료", "unit": "kg" },
-    { "material_id": "M-BATTERY-001", "name": "리튬이온 배터리 팩 (48V 13Ah)", "unit": "ea" },
-    { "material_id": "M-MOTOR-001", "name": "허브 모터 (500W)", "unit": "ea" },
-    { "material_id": "M-WHEEL-001", "name": "26인치 휠 세트", "unit": "ea" },
-    { "material_id": "M-BRAKE-001", "name": "디스크 브레이크 세트", "unit": "ea" },
-    { "material_id": "M-BOX-001", "name": "포장 박스", "unit": "ea" }
+    { "material_id": "M001", "name": "알루미늄 합금 프레임", "unit": "kg" },
+    { "material_id": "M002", "name": "분체 도료", "unit": "kg" },
+    { "material_id": "M003", "name": "리튬이온 배터리 팩 (48V 13Ah)", "unit": "ea" },
+    { "material_id": "M004", "name": "허브 모터 (500W)", "unit": "ea" },
+    { "material_id": "M005", "name": "26인치 휠 세트", "unit": "ea" },
+    { "material_id": "M006", "name": "디스크 브레이크 세트", "unit": "ea" },
+    { "material_id": "M007", "name": "포장 박스", "unit": "ea" }
   ],
   "obstacles": []
 };

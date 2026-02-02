@@ -9,6 +9,7 @@ function WorkersTable() {
   const selectedRowRef = useRef(null);
   const [editingCell, setEditingCell] = useState(null);
   const [selectedMasterId, setSelectedMasterId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -33,6 +34,32 @@ function WorkersTable() {
     if (window.confirm('선택한 작업자를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.')) {
       deleteWorker(selectedMasterId);
       setSelectedMasterId(null);
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    if (window.confirm(`선택한 ${selectedIds.length}명의 작업자를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.`)) {
+      selectedIds.forEach(id => deleteWorker(id));
+      setSelectedIds([]);
+      setSelectedMasterId(null);
+    }
+  };
+
+  const handleToggleSelect = (workerId) => {
+    setSelectedIds(prev =>
+      prev.includes(workerId)
+        ? prev.filter(id => id !== workerId)
+        : [...prev, workerId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    const workers = bopData?.workers || [];
+    if (selectedIds.length === workers.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(workers.map(w => w.worker_id));
     }
   };
 
@@ -104,12 +131,12 @@ function WorkersTable() {
         <button
           style={{
             ...styles.actionButtonDanger,
-            ...(selectedMasterId ? {} : styles.actionButtonDisabled)
+            ...(selectedIds.length === 0 ? styles.actionButtonDisabled : {})
           }}
-          disabled={!selectedMasterId}
-          onClick={handleDeleteWorker}
+          disabled={selectedIds.length === 0}
+          onClick={handleDeleteSelected}
         >
-          선택 작업자 삭제
+          선택 항목 삭제 ({selectedIds.length})
         </button>
       </div>
 
@@ -118,6 +145,14 @@ function WorkersTable() {
         <table style={styles.table}>
           <thead>
             <tr>
+              <th style={{ ...styles.th, width: '40px' }}>
+                <input
+                  type="checkbox"
+                  checked={bopData.workers.length > 0 && selectedIds.length === bopData.workers.length}
+                  onChange={handleToggleSelectAll}
+                  style={styles.checkbox}
+                />
+              </th>
               <th style={{ ...styles.th, width: '100px' }}>작업자 ID</th>
               <th style={{ ...styles.th, minWidth: '120px' }}>이름</th>
               <th style={{ ...styles.th, width: '80px' }}>숙련도</th>
@@ -142,6 +177,14 @@ function WorkersTable() {
                     }}
                     onClick={() => setSelectedMasterId(worker.worker_id)}
                   >
+                    <td style={styles.td} onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(worker.worker_id)}
+                        onChange={() => handleToggleSelect(worker.worker_id)}
+                        style={styles.checkbox}
+                      />
+                    </td>
                     <td style={styles.td}><strong>{worker.worker_id}</strong></td>
                     <td style={styles.td}>
                       {isMasterSelected ? (
@@ -212,6 +255,14 @@ function WorkersTable() {
                   >
                     {idx === 0 && (
                       <>
+                        <td style={styles.td} rowSpan={usedProcesses.length} onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(worker.worker_id)}
+                            onChange={() => handleToggleSelect(worker.worker_id)}
+                            style={styles.checkbox}
+                          />
+                        </td>
                         <td style={styles.td} rowSpan={usedProcesses.length}>
                           <strong>{worker.worker_id}</strong>
                         </td>
@@ -442,6 +493,11 @@ const styles = {
   notSpecified: {
     color: '#999',
     fontSize: '12px',
+  },
+  checkbox: {
+    cursor: 'pointer',
+    width: '16px',
+    height: '16px',
   },
 };
 
