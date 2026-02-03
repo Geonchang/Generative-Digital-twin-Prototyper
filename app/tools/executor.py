@@ -227,6 +227,13 @@ def _execute_subprocess(
         "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),  # Windows needs this
     }
 
+    # === params를 환경변수로 전달 ===
+    if params:
+        for key, val in params.items():
+            if val is not None:
+                env[key] = str(val)
+        log.info("[subprocess] 환경변수로 전달된 params: %s", {k: v for k, v in env.items() if k not in ["PATH", "PYTHONPATH", "SYSTEMROOT"]})
+
     try:
         result = subprocess.run(
             cmd,
@@ -274,9 +281,11 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
     work_dir = WORKDIR_BASE / exec_id
     work_dir.mkdir(parents=True, exist_ok=True)
 
+    log.info("=" * 60)
     log.info("[execute] === 도구 실행 시작 ===")
     log.info("[execute] tool_id=%s, tool_name=%s", tool_id, metadata.tool_name)
     log.info("[execute] params=%s", json.dumps(params, ensure_ascii=False) if params else "None")
+    log.info("[execute] args_format=%s", metadata.input_schema.args_format if metadata.input_schema else "None")
 
     # 로그 수집용 변수
     exec_log = {
@@ -491,10 +500,16 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
             exec_log["message"] += f" (자동 복구 {exec_log['auto_repair_attempts']}회 수행)"
         exec_log["execution_time_sec"] = time.time() - start_time
 
+        log.info("[execute] === 실행 완료 ===")
+        log.info("[execute] tool_input (처음 500자):\n%s", tool_input[:500] if tool_input else "None")
+        log.info("[execute] tool_output (처음 500자):\n%s", tool_output[:500] if tool_output else "None")
+        log.info("=" * 60)
+
         return {
             "success": True,
             "message": exec_log["message"],
             "updated_bop": updated_bop,
+            "tool_input": tool_input[:5000] if tool_input else None,
             "tool_output": tool_output[:5000] if tool_output else None,
             "stdout": stdout[:2000] if stdout else None,
             "stderr": stderr[:500] if stderr else None,

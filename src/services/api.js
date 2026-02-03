@@ -230,4 +230,42 @@ export const api = {
     }
     return res.json();
   },
+
+  async improveTool(toolId, { userFeedback, executionContext, modifyAdapter, modifyParams, modifyScript }) {
+    const res = await fetch(`/api/tools/${toolId}/improve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_feedback: userFeedback,
+        execution_context: executionContext,
+        modify_adapter: modifyAdapter,
+        modify_params: modifyParams,
+        modify_script: modifyScript,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `개선 실패 (${res.status})`);
+    }
+    return res.json();
+  },
+
+  async applyImprovement(toolId, { preProcessCode, postProcessCode, paramsSchema, scriptCode, createNewVersion }) {
+    const res = await fetch(`/api/tools/${toolId}/apply-improvement`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pre_process_code: preProcessCode,
+        post_process_code: postProcessCode,
+        params_schema: paramsSchema,
+        script_code: scriptCode,
+        create_new_version: createNewVersion,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `적용 실패 (${res.status})`);
+    }
+    return res.json();
+  },
 };

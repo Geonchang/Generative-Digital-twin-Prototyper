@@ -139,6 +139,18 @@ def update_tool_adapter(tool_id: str, adapter: AdapterCode) -> bool:
         return False
 
 
+def get_script_content(tool_id: str, file_name: str) -> Optional[str]:
+    """스크립트 파일의 내용을 읽어 반환합니다."""
+    path = UPLOADS_DIR / tool_id / file_name
+    if not path.exists():
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return None
+
+
 def update_tool_metadata(tool_id: str, metadata: ToolMetadata) -> bool:
     """
     도구의 메타데이터만 업데이트합니다 (자동 복구용).

@@ -39,6 +39,14 @@ function ToolsPanel() {
   const [originalBop, setOriginalBop] = useState(null);
   const [bopChanges, setBopChanges] = useState(null);
 
+  // AI Improvement
+  const [showImprove, setShowImprove] = useState(false);
+  const [improveFeedback, setImproveFeedback] = useState('');
+  const [improveScope, setImproveScope] = useState({ adapter: true, params: true, script: false });
+  const [improving, setImproving] = useState(false);
+  const [improveResult, setImproveResult] = useState(null);
+  const [applying, setApplying] = useState(false);
+
   // Error
   const [error, setError] = useState('');
 
@@ -384,6 +392,81 @@ function ToolsPanel() {
       setError(err.message);
     } finally {
       setRegistering(false);
+    }
+  };
+
+  // === AI Improvement Handlers ===
+
+  const handleImprove = async () => {
+    if (!selectedTool || !improveFeedback.trim()) return;
+    setImproving(true);
+    setError('');
+    setImproveResult(null);
+
+    console.log('[ToolsPanel] AI 개선 요청:', selectedTool.tool_id);
+    console.log('[ToolsPanel] 피드백:', improveFeedback);
+    console.log('[ToolsPanel] 수정 범위:', improveScope);
+
+    try {
+      const result = await api.improveTool(selectedTool.tool_id, {
+        userFeedback: improveFeedback,
+        executionContext: execResult ? {
+          success: execResult.success,
+          stdout: execResult.stdout,
+          stderr: execResult.stderr,
+          tool_output: execResult.tool_output,
+        } : null,
+        modifyAdapter: improveScope.adapter,
+        modifyParams: improveScope.params,
+        modifyScript: improveScope.script,
+      });
+
+      console.log('[ToolsPanel] 개선 결과:', result);
+
+      if (result.success) {
+        setImproveResult(result);
+      } else {
+        setError(result.message || '개선 생성에 실패했습니다.');
+      }
+    } catch (err) {
+      console.error('[ToolsPanel] 개선 실패:', err);
+      setError(err.message);
+    } finally {
+      setImproving(false);
+    }
+  };
+
+  const handleApplyImprovement = async (createNewVersion) => {
+    if (!selectedTool || !improveResult?.preview) return;
+    setApplying(true);
+    setError('');
+
+    console.log('[ToolsPanel] 개선 적용:', createNewVersion ? '새 버전' : '덮어쓰기');
+
+    try {
+      const result = await api.applyImprovement(selectedTool.tool_id, {
+        preProcessCode: improveResult.preview.pre_process_code,
+        postProcessCode: improveResult.preview.post_process_code,
+        paramsSchema: improveResult.preview.params_schema,
+        scriptCode: improveResult.preview.script_code,
+        createNewVersion,
+      });
+
+      console.log('[ToolsPanel] 적용 결과:', result);
+
+      if (result.success) {
+        addMessage('assistant', `"${selectedTool.tool_name}" 도구가 ${createNewVersion ? '새 버전(' + result.tool_name + ')으로' : ''} 개선되었습니다.`);
+        // Reset and go back
+        setImproveResult(null);
+        setImproveFeedback('');
+        setShowImprove(false);
+        setView('main');
+      }
+    } catch (err) {
+      console.error('[ToolsPanel] 적용 실패:', err);
+      setError(err.message);
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -735,11 +818,21 @@ function ToolsPanel() {
               </div>
             )}
 
+            {/* Tool Input Preview */}
+            {execResult.tool_input && (
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
+                  📥 도구 입력 데이터
+                </summary>
+                {renderToolOutput(execResult.tool_input)}
+              </details>
+            )}
+
             {/* Tool Output Preview */}
-            {execResult.success && execResult.tool_output && (
+            {execResult.tool_output && (
               <div style={{ marginTop: 8, borderTop: '1px solid #e0e0e0', paddingTop: 8 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
-                  결과 미리보기
+                  📤 도구 출력 결과
                 </div>
                 {renderToolOutput(execResult.tool_output)}
               </div>
@@ -804,10 +897,141 @@ function ToolsPanel() {
         </div>
       )}
 
+      {/* AI Improvement Section */}
+      {execResult && (
+        <div style={{ ...styles.section, borderTop: '1px solid #e0e0e0', paddingTop: 16, marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <label style={{ ...styles.label, marginBottom: 0 }}>AI 개선</label>
+            <button
+              style={showImprove ? styles.secondaryBtn : styles.aiBtn}
+              onClick={() => { setShowImprove(!showImprove); setImproveResult(null); setImproveFeedback(''); }}
+            >
+              {showImprove ? '접기' : '✨ AI로 개선하기'}
+            </button>
+          </div>
+
+          {showImprove && (
+            <>
+              {/* 수정 범위 선택 */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>수정 범위 선택:</div>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <label style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={improveScope.adapter}
+                      onChange={e => setImproveScope(prev => ({ ...prev, adapter: e.target.checked }))}
+                    />
+                    어댑터 코드
+                  </label>
+                  <label style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={improveScope.params}
+                      onChange={e => setImproveScope(prev => ({ ...prev, params: e.target.checked }))}
+                    />
+                    파라미터 스키마
+                  </label>
+                  <label style={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={improveScope.script}
+                      onChange={e => setImproveScope(prev => ({ ...prev, script: e.target.checked }))}
+                    />
+                    스크립트 코드
+                  </label>
+                </div>
+              </div>
+
+              {/* 피드백 입력 */}
+              <textarea
+                style={{ ...styles.textarea, marginBottom: 8 }}
+                placeholder="예: 장애물 정보는 BOP에서 가져오고, 벽 간격은 파라미터로 받을 수 있게 해줘."
+                value={improveFeedback}
+                onChange={e => setImproveFeedback(e.target.value)}
+                rows={3}
+              />
+              <button
+                style={styles.primaryBtn}
+                onClick={handleImprove}
+                disabled={improving || !improveFeedback.trim() || (!improveScope.adapter && !improveScope.params && !improveScope.script)}
+              >
+                {improving ? '개선 중...' : '개선 요청'}
+              </button>
+
+              {/* 개선 결과 미리보기 */}
+              {improveResult && improveResult.success && (
+                <div style={{ marginTop: 16 }}>
+                  <div style={{ ...styles.resultCard, borderLeft: '4px solid #667eea' }}>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: '#667eea' }}>개선 미리보기</div>
+                    <div style={{ fontSize: 13, marginBottom: 8 }}>{improveResult.explanation}</div>
+
+                    {improveResult.changes_summary?.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 4 }}>변경 사항:</div>
+                        {improveResult.changes_summary.map((change, idx) => (
+                          <div key={idx} style={{ fontSize: 12, color: '#666', marginLeft: 8 }}>• {change}</div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* 코드 미리보기 토글 */}
+                    {improveResult.preview?.pre_process_code && (
+                      <details style={{ marginTop: 8 }}>
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>Pre-process 코드</summary>
+                        <pre style={{ ...styles.codePreview, maxHeight: 150 }}>{improveResult.preview.pre_process_code}</pre>
+                      </details>
+                    )}
+                    {improveResult.preview?.post_process_code && (
+                      <details style={{ marginTop: 4 }}>
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>Post-process 코드</summary>
+                        <pre style={{ ...styles.codePreview, maxHeight: 150 }}>{improveResult.preview.post_process_code}</pre>
+                      </details>
+                    )}
+                    {improveResult.preview?.params_schema && (
+                      <details style={{ marginTop: 4 }}>
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>파라미터 스키마</summary>
+                        <pre style={{ ...styles.codePreview, maxHeight: 150 }}>{JSON.stringify(improveResult.preview.params_schema, null, 2)}</pre>
+                      </details>
+                    )}
+                    {improveResult.preview?.script_code && (
+                      <details style={{ marginTop: 4 }}>
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>스크립트 코드</summary>
+                        <pre style={{ ...styles.codePreview, maxHeight: 200 }}>{improveResult.preview.script_code}</pre>
+                      </details>
+                    )}
+                  </div>
+
+                  {/* 적용 버튼 */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                    <button
+                      style={styles.applyBtn}
+                      onClick={() => handleApplyImprovement(true)}
+                      disabled={applying}
+                    >
+                      {applying ? '적용 중...' : '새 버전으로 저장 (v2)'}
+                    </button>
+                    <button
+                      style={styles.dangerBtn}
+                      onClick={() => handleApplyImprovement(false)}
+                      disabled={applying}
+                    >
+                      현재 도구에 덮어쓰기
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Delete */}
       <div style={{ ...styles.section, borderTop: '1px solid #eee', paddingTop: 16, marginTop: 16 }}>
         <button style={styles.dangerBtn} onClick={handleDelete}>삭제하기</button>
       </div>
+
+      {error && <div style={styles.error}>{error}</div>}
     </div>
   );
 
@@ -1035,6 +1259,14 @@ const styles = {
     resize: 'vertical',
     boxSizing: 'border-box',
     lineHeight: 1.5,
+  },
+  checkboxLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    fontSize: 12,
+    color: '#555',
+    cursor: 'pointer',
   },
 };
 

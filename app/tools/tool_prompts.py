@@ -311,6 +311,67 @@ for process in bop_json.get('processes', []):
 """
 
 
+TOOL_IMPROVEMENT_PROMPT = """You are an expert at improving data processing tools for a manufacturing digital twin system.
+
+## Current Tool Information
+Tool Name: {tool_name}
+Description: {tool_description}
+
+## Current Code
+{current_code_section}
+
+## Current Parameters Schema
+{params_schema_json}
+
+## Last Execution Context
+Success: {execution_success}
+stdout:
+```
+{stdout}
+```
+stderr:
+```
+{stderr}
+```
+Tool Output (first 2000 chars):
+```
+{tool_output}
+```
+
+## User's Improvement Request
+{user_feedback}
+
+## Modification Scope (only modify what's checked)
+- Adapter Code: {modify_adapter}
+- Parameters Schema: {modify_params}
+- Script Code: {modify_script}
+
+## BOP JSON Schema Reference
+- rotation_y is in RADIANS (90° = π/2 ≈ 1.5708)
+- obstacles[]: obstacle_id, name, type, position{{x,y,z}}, size{{width,height,depth}}, rotation_y
+- processes[].parallel_lines[]: location{{x,y,z}}, cycle_time_sec, etc.
+
+## Instructions
+1. Analyze the user's feedback and execution context
+2. Only modify the components that are in scope
+3. For adapter code: ensure proper BOP field access and data transformation
+4. For params_schema: add/remove/modify parameters as requested
+5. For script code: improve the core logic as requested
+6. Explain what you changed and why
+
+## Response Format (JSON only, no markdown)
+{{
+  "explanation": "Korean explanation of what was changed and why",
+  "changes_summary": ["변경1", "변경2", ...],
+  "pre_process_code": "updated code or null if not modified",
+  "post_process_code": "updated code or null if not modified",
+  "params_schema": [updated params array] or null if not modified,
+  "script_code": "updated script or null if not modified"
+}}
+
+If a field is not in modification scope or doesn't need changes, set it to null."""
+
+
 ADAPTER_REPAIR_PROMPT = """You are a Python debugging expert. An adapter function failed during execution. Analyze the error and fix the code.
 
 ## Error Information

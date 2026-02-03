@@ -109,6 +109,7 @@ class ExecuteResponse(BaseModel):
     success: bool
     message: str
     updated_bop: Optional[Dict[str, Any]] = None
+    tool_input: Optional[str] = None  # 도구에 전달된 입력 데이터
     tool_output: Optional[str] = None
     stdout: Optional[str] = None
     stderr: Optional[str] = None
@@ -138,3 +139,34 @@ class GenerateScriptResponse(BaseModel):
     script_code: Optional[str] = None
     suggested_params: Optional[List[ParamDef]] = None
     message: Optional[str] = None
+
+
+class ExecutionContext(BaseModel):
+    success: bool = False
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+    tool_output: Optional[str] = None
+
+
+class ImproveRequest(BaseModel):
+    user_feedback: str = Field(..., description="사용자의 개선 요청 내용")
+    execution_context: Optional[ExecutionContext] = None
+    modify_adapter: bool = Field(default=True, description="어댑터 코드 수정 여부")
+    modify_params: bool = Field(default=True, description="파라미터 스키마 수정 여부")
+    modify_script: bool = Field(default=False, description="스크립트 코드 수정 여부")
+
+
+class ImproveResponse(BaseModel):
+    success: bool
+    message: str
+    explanation: Optional[str] = None
+    changes_summary: Optional[List[str]] = None
+    preview: Optional[Dict[str, Any]] = None  # pre_process_code, post_process_code, params_schema, script_code
+
+
+class ApplyImprovementRequest(BaseModel):
+    pre_process_code: Optional[str] = None
+    post_process_code: Optional[str] = None
+    params_schema: Optional[List[ParamDef]] = None
+    script_code: Optional[str] = None
+    create_new_version: bool = Field(default=True, description="새 버전으로 등록할지 여부")
