@@ -113,6 +113,9 @@ class ExecuteResponse(BaseModel):
     stdout: Optional[str] = None
     stderr: Optional[str] = None
     execution_time_sec: Optional[float] = None
+    auto_repair_attempted: Optional[bool] = None
+    auto_repaired: Optional[bool] = None
+    error_diagnosis: Optional[Dict[str, Any]] = None
 
 
 class ToolListItem(BaseModel):
@@ -122,3 +125,16 @@ class ToolListItem(BaseModel):
     execution_type: ExecutionType
     created_at: str
     params_schema: Optional[List[ParamDef]] = None
+
+
+class GenerateScriptRequest(BaseModel):
+    description: str = Field(..., description="원하는 도구 기능 설명")
+
+
+class GenerateScriptResponse(BaseModel):
+    success: bool
+    tool_name: Optional[str] = None
+    description: Optional[str] = None
+    script_code: Optional[str] = None
+    suggested_params: Optional[List[ParamDef]] = None
+    message: Optional[str] = None

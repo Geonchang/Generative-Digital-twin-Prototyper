@@ -11,7 +11,7 @@ function ToolsPanel() {
   } = useBopStore();
 
   // Navigation
-  const [view, setView] = useState('main'); // 'main' | 'upload' | 'detail'
+  const [view, setView] = useState('main'); // 'main' | 'upload' | 'detail' | 'generate'
 
   // Tool list
   const [tools, setTools] = useState([]);
@@ -23,6 +23,12 @@ function ToolsPanel() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [registering, setRegistering] = useState(false);
+
+  // AI Script Generation
+  const [genDescription, setGenDescription] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [generatedResult, setGeneratedResult] = useState(null);
+  const [editedCode, setEditedCode] = useState('');
 
   // Detail
   const [selectedTool, setSelectedTool] = useState(null);
@@ -172,8 +178,13 @@ function ToolsPanel() {
     if (!analysisResult || !uploadedCode) return;
     setRegistering(true);
     setError('');
+
+    console.log('[ToolsPanel] 도구 등록 시작:', analysisResult.tool_name);
+    console.log('[ToolsPanel] input_schema:', analysisResult.input_schema);
+    console.log('[ToolsPanel] params_schema:', analysisResult.params_schema);
+
     try {
-      await api.registerTool({
+      const registerData = {
         tool_name: analysisResult.tool_name,
         description: analysisResult.description,
         execution_type: analysisResult.execution_type,
@@ -182,13 +193,19 @@ function ToolsPanel() {
         input_schema: analysisResult.input_schema,
         output_schema: analysisResult.output_schema,
         params_schema: analysisResult.params_schema || null,
-      });
+      };
+      console.log('[ToolsPanel] 등록 요청 데이터:', registerData);
+
+      const result = await api.registerTool(registerData);
+      console.log('[ToolsPanel] 등록 완료:', result);
+
       // Reset and go back to tools
       setUploadedCode('');
       setFileName('');
       setAnalysisResult(null);
       setView('main');
     } catch (err) {
+      console.error('[ToolsPanel] 등록 실패:', err);
       setError(err.message);
     } finally {
       setRegistering(false);
@@ -225,6 +242,9 @@ function ToolsPanel() {
     setOriginalBop(null);
     setBopChanges(null);
     setError('');
+
+    console.log('[ToolsPanel] 도구 실행 시작:', selectedTool.tool_id);
+
     try {
       const collapsedBop = exportBopData();
       if (!collapsedBop) {
@@ -241,11 +261,19 @@ function ToolsPanel() {
           cleanParams[p.key] = p.type === 'number' ? Number(val) : val;
         }
       });
+
+      console.log('[ToolsPanel] 전송할 params:', cleanParams);
+      console.log('[ToolsPanel] BOP 요약: processes=%d, obstacles=%d',
+        collapsedBop.processes?.length || 0,
+        collapsedBop.obstacles?.length || 0);
+
       const result = await api.executeTool(
         selectedTool.tool_id,
         collapsedBop,
         Object.keys(cleanParams).length > 0 ? cleanParams : null
       );
+
+      console.log('[ToolsPanel] 실행 결과:', result);
       setExecResult(result);
       if (result.success && result.updated_bop) {
         const changes = computeBopChanges(collapsedBop, result.updated_bop);
@@ -305,15 +333,74 @@ function ToolsPanel() {
     }
   };
 
+  // === AI Script Generation Handlers ===
+
+  const handleGenerate = async () => {
+    if (!genDescription.trim()) return;
+    setGenerating(true);
+    setError('');
+    setGeneratedResult(null);
+    try {
+      const result = await api.generateScript(genDescription);
+      if (result.success) {
+        setGeneratedResult(result);
+        setEditedCode(result.script_code || '');
+      } else {
+        setError(result.message || '스크립트 생성에 실패했습니다.');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleRegisterGenerated = async () => {
+    if (!generatedResult || !editedCode) return;
+    setRegistering(true);
+    setError('');
+    try {
+      // 먼저 편집된 코드로 분석 실행
+      const analysisRes = await api.analyzeScript(editedCode, `${generatedResult.tool_name}.py`);
+
+      // 분석 결과로 등록
+      await api.registerTool({
+        tool_name: analysisRes.tool_name || generatedResult.tool_name,
+        description: analysisRes.description || generatedResult.description,
+        execution_type: analysisRes.execution_type || 'python',
+        file_name: `${generatedResult.tool_name}.py`,
+        source_code: editedCode,
+        input_schema: analysisRes.input_schema,
+        output_schema: analysisRes.output_schema,
+        params_schema: analysisRes.params_schema || generatedResult.suggested_params || null,
+      });
+
+      // Reset and go back
+      setGenDescription('');
+      setGeneratedResult(null);
+      setEditedCode('');
+      setView('main');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setRegistering(false);
+    }
+  };
+
   // === Render ===
 
   const renderTools = () => (
     <div style={styles.content}>
       <div style={styles.header}>
         <h3 style={styles.title}>도구 관리</h3>
-        <button style={styles.primaryBtn} onClick={() => { setView('upload'); setError(''); }}>
-          + 도구 업로드
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={styles.aiBtn} onClick={() => { setView('generate'); setError(''); setGeneratedResult(null); setGenDescription(''); }}>
+            ✨ AI 생성
+          </button>
+          <button style={styles.secondaryBtn} onClick={() => { setView('upload'); setError(''); }}>
+            + 업로드
+          </button>
+        </div>
       </div>
 
       {listLoading && <div style={styles.info}>불러오는 중...</div>}
@@ -485,6 +572,89 @@ function ToolsPanel() {
     }
   };
 
+  const renderGenerate = () => (
+    <div style={styles.content}>
+      <div style={styles.header}>
+        <button style={styles.backBtn} onClick={() => setView('main')}>← 목록</button>
+        <h3 style={styles.title}>AI로 도구 생성</h3>
+      </div>
+
+      {/* Step 1: Description Input */}
+      <div style={styles.section}>
+        <label style={styles.label}>1. 원하는 도구 기능 설명</label>
+        <textarea
+          style={styles.textarea}
+          placeholder="예: 공정 간 거리를 계산해서 최소 거리보다 가까운 공정들을 찾아주는 도구가 필요해. 최소 거리는 파라미터로 받고 싶어."
+          value={genDescription}
+          onChange={e => setGenDescription(e.target.value)}
+          rows={4}
+        />
+        <button
+          style={{ ...styles.primaryBtn, marginTop: 8 }}
+          onClick={handleGenerate}
+          disabled={generating || !genDescription.trim()}
+        >
+          {generating ? '생성 중...' : '스크립트 생성'}
+        </button>
+      </div>
+
+      {/* Step 2: Generated Result */}
+      {generatedResult && (
+        <>
+          <div style={styles.section}>
+            <label style={styles.label}>2. 생성된 도구 정보</label>
+            <div style={styles.resultCard}>
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>도구명:</span>
+                <span style={styles.resultValue}>{generatedResult.tool_name}</span>
+              </div>
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>설명:</span>
+                <span style={styles.resultValue}>{generatedResult.description}</span>
+              </div>
+              {generatedResult.suggested_params?.length > 0 && (
+                <div style={{ marginTop: 8, borderTop: '1px solid #e0e0e0', paddingTop: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
+                    예상 파라미터 ({generatedResult.suggested_params.length}개)
+                  </div>
+                  {generatedResult.suggested_params.map((p, idx) => (
+                    <div key={idx} style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                      <span style={{ fontWeight: 500 }}>{p.label}</span>
+                      <span style={{ color: '#999' }}> ({p.key}, {p.type})</span>
+                      {p.required && <span style={{ color: '#c0392b', marginLeft: 4 }}>*필수</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={styles.section}>
+            <label style={styles.label}>3. 코드 확인 및 수정</label>
+            <textarea
+              style={{ ...styles.textarea, fontFamily: 'monospace', fontSize: 11, minHeight: 300 }}
+              value={editedCode}
+              onChange={e => setEditedCode(e.target.value)}
+            />
+          </div>
+
+          <div style={styles.section}>
+            <label style={styles.label}>4. 도구 등록</label>
+            <button
+              style={styles.primaryBtn}
+              onClick={handleRegisterGenerated}
+              disabled={registering || !editedCode.trim()}
+            >
+              {registering ? '등록 중 (분석 + 어댑터 생성)...' : '이 코드로 등록하기'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {error && <div style={styles.error}>{error}</div>}
+    </div>
+  );
+
   const renderDetail = () => (
     <div style={styles.content}>
       <div style={styles.header}>
@@ -648,6 +818,9 @@ function ToolsPanel() {
 
       {/* Upload view */}
       {view === 'upload' && renderUpload()}
+
+      {/* AI Generate view */}
+      {view === 'generate' && renderGenerate()}
 
       {/* Detail view */}
       {view === 'detail' && renderDetail()}
@@ -842,6 +1015,26 @@ const styles = {
     fontSize: '11px',
     fontFamily: 'monospace',
     color: '#333',
+  },
+  aiBtn: {
+    padding: '8px 16px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '13px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  textarea: {
+    width: '100%',
+    padding: '10px',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '13px',
+    resize: 'vertical',
+    boxSizing: 'border-box',
+    lineHeight: 1.5,
   },
 };
 

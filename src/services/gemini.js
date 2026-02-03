@@ -10,17 +10,23 @@ const SYSTEM_PROMPT = `당신은 제조 공정(BOP: Bill of Process) 설계 전�
 \`\`\`json
 {
   "project_title": "프로젝트 제목",
+  "target_uph": 60,
   "processes": [
     {
       "process_id": "P001",
-      "name": "공정 이름",
-      "description": "공정 설명",
-      "cycle_time_sec": 60.0,
       "parallel_count": 1,
-      "location": { "x": 0, "y": 0, "z": 0 },
-      "rotation_y": 0,
       "predecessor_ids": [],
-      "successor_ids": [],
+      "successor_ids": ["P002"],
+      "parallel_lines": [
+        {
+          "parallel_index": 1,
+          "name": "공정 이름",
+          "description": "공정 설명",
+          "cycle_time_sec": 60.0,
+          "location": { "x": 0, "y": 0, "z": 0 },
+          "rotation_y": 0
+        }
+      ],
       "resources": [
         {
           "resource_type": "equipment | worker | material",
@@ -29,7 +35,8 @@ const SYSTEM_PROMPT = `당신은 제조 공정(BOP: Bill of Process) 설계 전�
           "role": "역할 설명",
           "relative_location": { "x": 0, "y": 0, "z": 0 },
           "rotation_y": 0,
-          "scale": { "x": 1, "y": 1, "z": 1 }
+          "scale": { "x": 1, "y": 1, "z": 1 },
+          "parallel_line_index": 0
         }
       ]
     }
@@ -42,6 +49,16 @@ const SYSTEM_PROMPT = `당신은 제조 공정(BOP: Bill of Process) 설계 전�
   ],
   "materials": [
     { "material_id": "M-STEEL-001", "name": "철강 소재", "unit": "ea | kg | m | l" }
+  ],
+  "obstacles": [
+    {
+      "obstacle_id": "OBS001",
+      "name": "안전 펜스",
+      "type": "fence | zone | pillar | wall",
+      "position": { "x": 0, "y": 0, "z": 0 },
+      "size": { "width": 3, "height": 1.5, "depth": 0.1 },
+      "rotation_y": 0
+    }
   ]
 }
 \`\`\`
@@ -51,16 +68,18 @@ const SYSTEM_PROMPT = `당신은 제조 공정(BOP: Bill of Process) 설계 전�
 - equipment_id: EQ- + 타입약어 + 번호 (EQ-ROBOT-01, EQ-PRESS-01, EQ-MANUAL-01)
 - worker_id: W + 3자리 숫자 (W001, W002, ...)
 - material_id: M- + 소재약어 + 번호 (M-STEEL-001, M-BOLT-001)
+- obstacle_id: OBS + 3자리 숫자 (OBS001, OBS002, ...)
 
 ## 레이아웃 규칙
-- 공정 간 X축 간격: 약 5m (location.x)
-- 병렬 라인이 있는 경우(parallel_count > 1): Z축으로 5m 간격 배치
+- 공정 상세(name, description, cycle_time_sec, location, rotation_y)는 parallel_lines[] 안에 정의
+- 공정 간 X축 간격: 약 5m (parallel_lines[].location.x)
+- 병렬 라인(parallel_count > 1): 각 라인을 parallel_lines[]에 추가, Z축 5m 간격
 - 리소스는 공정 내 상대 위치(relative_location)로 배치 (-1 ~ 1m 범위)
 - 첫 공정 location.x = 0, 이후 순서대로 증가
+- 장애물(obstacles): 절대 위치(position)로 배치, size는 width/height/depth 사용
 
 ## 공정 연결 규칙
-- predecessor_ids: 선행 공정 ID 배열
-- successor_ids: 후행 공정 ID 배열
+- predecessor_ids, successor_ids: process 레벨에 정의 (parallel_lines 안이 아님)
 - 첫 공정은 predecessor_ids = [], 마지막 공정은 successor_ids = []
 - 반드시 쌍방향 일관성을 유지 (A의 successor에 B가 있으면, B의 predecessor에 A가 있어야 함)
 
@@ -79,7 +98,9 @@ const SYSTEM_PROMPT = `당신은 제조 공정(BOP: Bill of Process) 설계 전�
 3. 질문(QA)에 답변할 때: message에 답변, bop_data는 null
 4. BOP 수정 시 기존 데이터를 기반으로 변경하고, 변경되지 않는 부분은 그대로 유지
 5. 리소스(equipment, worker, material)를 processes.resources에 배치할 때, 반드시 해당 리소스가 equipments/workers/materials 마스터 배열에도 존재해야 함
-6. message는 간결하되 무엇을 했는지 명확히 설명`;
+6. message는 간결하되 무엇을 했는지 명확히 설명
+7. 공정 생성 시 반드시 parallel_lines[] 배열 포함 (parallel_count=1이어도 1개 항목 필요)
+8. 공정 레벨에는 연결 정보(process_id, parallel_count, predecessor_ids, successor_ids)만, 상세 정보(name, location 등)는 parallel_lines[] 안에`;
 
 function buildContents(messages, currentBop) {
   const contents = [];

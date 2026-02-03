@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import useBopStore from '../store/bopStore';
+import { api } from '../services/api';
 import * as XLSX from 'xlsx';
 
 function ScenariosPanel() {
@@ -288,64 +289,7 @@ function ScenariosPanel() {
     }
 
     try {
-      const wb = XLSX.utils.book_new();
-
-      // Process Structure Sheet (metadata only)
-      const processStructureData = [
-        ['공정 ID', '병렬수', '선행공정', '후속공정']
-      ];
-      data.processes.forEach(p => {
-        processStructureData.push([
-          p.process_id,
-          p.parallel_count || 1,
-          (p.predecessor_ids || []).join(', '),
-          (p.successor_ids || []).join(', ')
-        ]);
-      });
-      const wsStructure = XLSX.utils.aoa_to_sheet(processStructureData);
-      XLSX.utils.book_append_sheet(wb, wsStructure, '공정 구조');
-
-      // Process Details Sheet
-      const processDetailsData = [
-        ['공정 ID', '병렬라인 ID', '병렬인덱스', '공정명', '설명', '사이클타임(초)',
-          '위치 X', '위치 Y', '위치 Z', '회전 Y']
-      ];
-      data.processes.forEach(p => {
-        if (p.parallel_lines && p.parallel_lines.length > 0) {
-          p.parallel_lines.forEach(line => {
-            processDetailsData.push([
-              p.process_id,
-              line.process_id || '',
-              line.parallel_index || 0,
-              line.name || p.name,
-              line.description || p.description,
-              line.cycle_time_sec || p.cycle_time_sec,
-              line.location?.x || p.location?.x || 0,
-              line.location?.y || p.location?.y || 0,
-              line.location?.z || p.location?.z || 0,
-              line.rotation_y || p.rotation_y || 0
-            ]);
-          });
-        } else {
-          processDetailsData.push([
-            p.process_id,
-            '',
-            0,
-            p.name,
-            p.description,
-            p.cycle_time_sec,
-            p.location?.x || 0,
-            p.location?.y || 0,
-            p.location?.z || 0,
-            p.rotation_y || 0
-          ]);
-        }
-      });
-      const wsDetails = XLSX.utils.aoa_to_sheet(processDetailsData);
-      XLSX.utils.book_append_sheet(wb, wsDetails, '공정 상세');
-
-      XLSX.writeFile(wb, `${data.project_title || 'bop'}_${new Date().toISOString().split('T')[0]}.xlsx`);
-
+      api.exportExcel(data);
       addMessage('assistant', 'BOP 데이터를 Excel 파일로 다운로드했습니다.');
       setError('');
     } catch (err) {
@@ -384,41 +328,181 @@ function ScenariosPanel() {
         const binaryStr = event.target.result;
         const workbook = XLSX.read(binaryStr, { type: 'binary' });
 
-        const structureSheet = workbook.Sheets['공정 구조'];
-        if (!structureSheet) {
-          throw new Error('"공정 구조" 시트를 찾을 수 없습니다.');
-        }
-
-        const structureData = XLSX.utils.sheet_to_json(structureSheet);
-        const processes = structureData.map(row => ({
-          process_id: row['공정 ID'],
-          name: row['공정명'] || row['공정 ID'],
-          description: row['설명'] || '',
-          cycle_time_sec: parseFloat(row['사이클타임(초)']) || 60,
-          parallel_count: parseInt(row['병렬수']) || 1,
-          location: { x: 0, y: 0, z: 0 },
-          rotation_y: 0,
-          predecessor_ids: row['선행공정'] ? String(row['선행공정']).split(',').map(s => s.trim()).filter(Boolean) : [],
-          successor_ids: row['후속공정'] ? String(row['후속공정']).split(',').map(s => s.trim()).filter(Boolean) : [],
-          resources: []
-        }));
-
-        const data = {
-          project_title: bopData?.project_title || '새 프로젝트',
-          target_uph: bopData?.target_uph || 60,
-          processes,
-          equipments: bopData?.equipments || [],
-          workers: bopData?.workers || [],
-          materials: bopData?.materials || [],
-          obstacles: bopData?.obstacles || []
+        // Helper: 시트 데이터 읽기 (없으면 빈 배열)
+        const readSheet = (name) => {
+          const sheet = workbook.Sheets[name];
+          if (!sheet) return [];
+          const data = XLSX.utils.sheet_to_json(sheet);
+          // 빈 행 제거 (모든 값이 비어있는 경우)
+          return data.filter(row => Object.values(row).some(v => v !== '' && v !== null && v !== undefined));
         };
 
-        if (processes.length > 0) {
-          setBopData(data);
-          setTimeout(() => normalizeAllProcesses(), 0);
-          addMessage('assistant', `"${file.name}" 파일에서 BOP 데이터를 불러왔습니다.`);
-          setError('');
+        // 1. 프로젝트 정보
+        const projectData = readSheet('프로젝트 정보');
+        let project_title = '새 프로젝트';
+        let target_uph = 60;
+        projectData.forEach(row => {
+          if (row['항목'] === '프로젝트명') project_title = row['값'] || project_title;
+          if (row['항목'] === '목표 UPH') target_uph = parseInt(row['값']) || target_uph;
+        });
+
+        // 2. 공정 시트 (연결 정보만)
+        const processData = readSheet('공정');
+        if (processData.length === 0) {
+          throw new Error('"공정" 시트에 데이터가 없습니다.');
         }
+
+        // 3. 병렬라인 상세 시트 (모든 공정의 모든 라인)
+        const parallelData = readSheet('병렬라인 상세');
+        const parallelLinesMap = {};
+        parallelData.forEach(row => {
+          const processId = row['공정 ID'];
+          if (!processId) return;
+          if (!parallelLinesMap[processId]) parallelLinesMap[processId] = [];
+          parallelLinesMap[processId].push({
+            parallel_index: parseInt(row['병렬 인덱스']) || 1,
+            name: row['공정명'] || '',
+            description: row['설명'] || '',
+            cycle_time_sec: parseFloat(row['사이클타임(초)']) || 60,
+            location: {
+              x: parseFloat(row['위치 X']) || 0,
+              y: parseFloat(row['위치 Y']) || 0,
+              z: parseFloat(row['위치 Z']) || 0,
+            },
+            rotation_y: parseFloat(row['회전 Y']) || 0,
+          });
+        });
+
+        // 4. 리소스 배치 시트
+        const resourceData = readSheet('리소스 배치');
+        const resourcesMap = {};
+        resourceData.forEach(row => {
+          const processId = row['공정 ID'];
+          if (!processId || !row['리소스 ID']) return;
+          if (!resourcesMap[processId]) resourcesMap[processId] = [];
+
+          const pliRaw = row['병렬라인 인덱스'];
+          const parallel_line_index = (pliRaw !== '' && pliRaw !== null && pliRaw !== undefined)
+            ? parseInt(pliRaw)
+            : undefined;
+
+          resourcesMap[processId].push({
+            resource_type: row['리소스 유형'],
+            resource_id: row['리소스 ID'],
+            quantity: parseFloat(row['수량']) || 1,
+            role: row['역할'] || '',
+            relative_location: {
+              x: parseFloat(row['상대위치 X']) || 0,
+              y: parseFloat(row['상대위치 Y']) || 0,
+              z: parseFloat(row['상대위치 Z']) || 0,
+            },
+            rotation_y: parseFloat(row['회전 Y']) || 0,
+            scale: {
+              x: parseFloat(row['스케일 X']) || 1,
+              y: parseFloat(row['스케일 Y']) || 1,
+              z: parseFloat(row['스케일 Z']) || 1,
+            },
+            ...(parallel_line_index !== undefined && { parallel_line_index }),
+          });
+        });
+
+        // 5. 공정 조립 (공정 시트 + 병렬라인 상세 합체)
+        // 새 JSON 구조: 연결 정보 + parallel_lines만 (대표값 없음)
+        const processes = processData.map(row => {
+          const process_id = row['공정 ID'];
+          const parallel_count = parseInt(row['병렬 수']) || 1;
+          const lines = parallelLinesMap[process_id] || [];
+
+          // 병렬라인 상세가 없으면 기본값으로 1개 라인 생성
+          const parallel_lines = lines.length > 0 ? lines : [{
+            parallel_index: 1,
+            name: process_id,
+            description: '',
+            cycle_time_sec: 60,
+            location: { x: 0, y: 0, z: 0 },
+            rotation_y: 0,
+          }];
+
+          return {
+            process_id,
+            parallel_count,
+            predecessor_ids: row['선행 공정']
+              ? String(row['선행 공정']).split(',').map(s => s.trim()).filter(Boolean)
+              : [],
+            successor_ids: row['후행 공정']
+              ? String(row['후행 공정']).split(',').map(s => s.trim()).filter(Boolean)
+              : [],
+            parallel_lines,
+            resources: resourcesMap[process_id] || [],
+          };
+        });
+
+        // 6. 장비 시트
+        const equipmentData = readSheet('장비');
+        const equipments = equipmentData.map(row => ({
+          equipment_id: row['장비 ID'],
+          name: row['장비명'] || row['장비 ID'],
+          type: row['유형'] || 'machine',
+        })).filter(e => e.equipment_id);
+
+        // 7. 작업자 시트
+        const workerData = readSheet('작업자');
+        const workers = workerData.map(row => ({
+          worker_id: row['작업자 ID'],
+          name: row['이름'] || row['작업자 ID'],
+          skill_level: row['숙련도'] || 'Mid',
+        })).filter(w => w.worker_id);
+
+        // 8. 자재 시트
+        const materialData = readSheet('자재');
+        const materials = materialData.map(row => ({
+          material_id: row['자재 ID'],
+          name: row['자재명'] || row['자재 ID'],
+          unit: row['단위'] || 'ea',
+        })).filter(m => m.material_id);
+
+        // 9. 장애물 시트
+        const obstacleData = readSheet('장애물');
+        const obstacles = obstacleData.map(row => ({
+          obstacle_id: row['장애물 ID'],
+          name: row['이름'] || '',
+          type: row['유형'] || 'fence',
+          position: {
+            x: parseFloat(row['위치 X']) || 0,
+            y: parseFloat(row['위치 Y']) || 0,
+            z: parseFloat(row['위치 Z']) || 0,
+          },
+          size: {
+            width: parseFloat(row['크기 X']) || 1,
+            height: parseFloat(row['크기 Y']) || 1,
+            depth: parseFloat(row['크기 Z']) || 1,
+          },
+          rotation_y: parseFloat(row['회전 Y']) || 0,
+        })).filter(o => o.obstacle_id);
+
+        // 최종 BOP 데이터 조립
+        const data = {
+          project_title,
+          target_uph,
+          processes,
+          equipments,
+          workers,
+          materials,
+          obstacles,
+        };
+
+        setBopData(data);
+        setTimeout(() => normalizeAllProcesses(), 0);
+
+        const summary = [
+          `공정 ${processes.length}개`,
+          `장비 ${equipments.length}개`,
+          `작업자 ${workers.length}명`,
+          `자재 ${materials.length}개`,
+          `장애물 ${obstacles.length}개`,
+        ].join(', ');
+        addMessage('assistant', `"${file.name}" 파일에서 BOP 데이터를 불러왔습니다. (${summary})`);
+        setError('');
       } catch (err) {
         setError('Excel 파일 파싱 오류: ' + err.message);
       }

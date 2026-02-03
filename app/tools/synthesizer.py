@@ -3,9 +3,11 @@ import os
 import time
 import logging
 import requests
+import traceback
 from dotenv import load_dotenv
-from app.tools.tool_prompts import ADAPTER_SYNTHESIS_PROMPT
+from app.tools.tool_prompts import ADAPTER_SYNTHESIS_PROMPT, ADAPTER_REPAIR_PROMPT, SCRIPT_GENERATION_PROMPT
 from app.tools.tool_models import ToolMetadata, AdapterCode
+from typing import Optional, Dict, Any
 
 log = logging.getLogger("tool_synthesizer")
 
@@ -137,3 +139,198 @@ async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None) ->
             continue
 
     raise Exception(f"어댑터 코드 생성 실패: {last_error}")
+
+
+async def repair_adapter(
+    failed_function: str,  # "pre_process" or "post_process"
+    failed_code: str,
+    error_info: Dict[str, Any],
+    input_data: str,
+) -> Optional[str]:
+    """
+    실패한 어댑터 코드를 분석하고 수정합니다.
+
+    Args:
+        failed_function: 실패한 함수 ("pre_process" or "post_process")
+        failed_code: 실패한 코드
+        error_info: 에러 정보 (type, message, traceback)
+        input_data: 입력 데이터 (JSON 문자열)
+
+    Returns:
+        수정된 코드 문자열, 실패 시 None
+    """
+    if not GEMINI_API_KEY:
+        log.error("[repair] GEMINI_API_KEY가 설정되지 않았습니다.")
+        return None
+
+    function_name = "convert_bop_to_input" if failed_function == "pre_process" else "apply_result_to_bop"
+
+    prompt = ADAPTER_REPAIR_PROMPT.format(
+        error_type=error_info.get("type", "Unknown"),
+        error_message=error_info.get("message", "Unknown error"),
+        traceback=error_info.get("traceback", "No traceback available"),
+        failed_function=failed_function,
+        failed_code=failed_code,
+        input_data=input_data[:5000],  # 입력 데이터 크기 제한
+        function_name=function_name,
+    )
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "temperature": 0.2,  # 낮은 temperature로 일관된 수정
+                },
+            }
+
+            response = requests.post(
+                url,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=60,
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+            text = _strip_markdown_block(text)
+
+            data = json.loads(text)
+
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
+
+            error_analysis = data.get("error_analysis", "")
+            fixed_code = data.get("fixed_code", "")
+
+            if not fixed_code:
+                log.warning("[repair] 수정된 코드가 비어 있습니다.")
+                return None
+
+            log.info("[repair] 에러 분석: %s", error_analysis)
+            log.info("[repair] 코드 수정 완료 (길이: %d)", len(fixed_code))
+
+            return fixed_code
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                wait_time = (2 ** attempt) * 2
+                log.warning("[repair] Rate Limit - %d초 대기", wait_time)
+                time.sleep(wait_time)
+                continue
+            log.error("[repair] API 호출 실패: %s", str(e))
+            return None
+
+        except (json.JSONDecodeError, KeyError) as e:
+            log.error("[repair] 응답 파싱 실패: %s", str(e))
+            if attempt < max_retries - 1:
+                time.sleep(1)
+                continue
+            return None
+
+        except Exception as e:
+            log.error("[repair] 예외 발생: %s", str(e))
+            return None
+
+    return None
+
+
+async def generate_tool_script(user_description: str) -> Optional[Dict[str, Any]]:
+    """
+    사용자 설명을 기반으로 Python 도구 스크립트를 생성합니다.
+
+    Args:
+        user_description: 사용자가 원하는 도구 기능 설명
+
+    Returns:
+        생성된 스크립트 정보 dict:
+        {
+            "tool_name": str,
+            "description": str,
+            "script_code": str,
+            "suggested_params": list
+        }
+        실패 시 None
+    """
+    if not GEMINI_API_KEY:
+        log.error("[generate_script] GEMINI_API_KEY가 설정되지 않았습니다.")
+        return None
+
+    prompt = SCRIPT_GENERATION_PROMPT.format(user_description=user_description)
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "temperature": 0.4,
+                },
+            }
+
+            response = requests.post(
+                url,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=90,  # 스크립트 생성은 시간이 더 걸릴 수 있음
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+            log.info("[generate_script] Gemini 응답 수신 (길이: %d)", len(text))
+            text = _strip_markdown_block(text)
+
+            data = json.loads(text)
+
+            # 배열로 감싸진 경우 처리
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
+
+            # 필수 필드 검증
+            if "script_code" not in data:
+                raise ValueError("응답에 script_code가 없습니다.")
+
+            # 기본값 설정
+            if "tool_name" not in data:
+                data["tool_name"] = "generated_tool"
+            if "description" not in data:
+                data["description"] = "AI 생성 도구"
+            if "suggested_params" not in data:
+                data["suggested_params"] = []
+
+            log.info("[generate_script] 스크립트 생성 완료: %s", data["tool_name"])
+            return data
+
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                wait_time = (2 ** attempt) * 2
+                log.warning("[generate_script] Rate Limit - %d초 대기", wait_time)
+                time.sleep(wait_time)
+                continue
+            log.error("[generate_script] API 호출 실패: %s", str(e))
+            if attempt < max_retries - 1:
+                time.sleep(1)
+                continue
+            return None
+
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            log.error("[generate_script] 응답 파싱 실패: %s", str(e))
+            if attempt < max_retries - 1:
+                time.sleep(1)
+                continue
+            return None
+
+        except Exception as e:
+            log.error("[generate_script] 예외 발생: %s", str(e))
+            return None
+
+    return None

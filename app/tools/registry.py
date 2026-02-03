@@ -112,3 +112,53 @@ def delete_tool(tool_id: str) -> bool:
 def get_script_path(tool_id: str, file_name: str) -> Optional[Path]:
     path = UPLOADS_DIR / tool_id / file_name
     return path if path.exists() else None
+
+
+def update_tool_adapter(tool_id: str, adapter: AdapterCode) -> bool:
+    """
+    도구의 어댑터 코드만 업데이트합니다 (자동 복구용).
+
+    Args:
+        tool_id: 도구 ID
+        adapter: 업데이트할 어댑터 코드
+
+    Returns:
+        성공 여부
+    """
+    tool_dir = REGISTRY_DIR / tool_id
+    adapter_file = tool_dir / "adapter.json"
+
+    if not tool_dir.exists():
+        return False
+
+    try:
+        with open(adapter_file, "w", encoding="utf-8") as f:
+            json.dump(adapter.model_dump(), f, indent=2, ensure_ascii=False)
+        return True
+    except Exception:
+        return False
+
+
+def update_tool_metadata(tool_id: str, metadata: ToolMetadata) -> bool:
+    """
+    도구의 메타데이터만 업데이트합니다 (자동 복구용).
+
+    Args:
+        tool_id: 도구 ID
+        metadata: 업데이트할 메타데이터
+
+    Returns:
+        성공 여부
+    """
+    tool_dir = REGISTRY_DIR / tool_id
+    meta_file = tool_dir / "metadata.json"
+
+    if not tool_dir.exists():
+        return False
+
+    try:
+        with open(meta_file, "w", encoding="utf-8") as f:
+            json.dump(metadata.model_dump(), f, indent=2, ensure_ascii=False)
+        return True
+    except Exception:
+        return False

@@ -4,23 +4,36 @@ import useBopStore from '../store/bopStore';
 import { useState, useMemo, useCallback, useRef, useEffect, Suspense } from 'react';
 import { RobotModel, ConveyorModel, BoxModel, ScannerModel, WorkerModel } from './Models3D';
 
+// Helper function: Normalize angle to [-π, π] range
+function normalizeAngle(angle) {
+  while (angle > Math.PI) angle -= 2 * Math.PI;
+  while (angle < -Math.PI) angle += 2 * Math.PI;
+  return angle;
+}
+
+// Helper: 5도 스냅 (라디안)
+const ROTATION_SNAP_ANGLE = Math.PI / 36; // 5 degrees
+function snapRotation(angle) {
+  return Math.round(angle / ROTATION_SNAP_ANGLE) * ROTATION_SNAP_ANGLE;
+}
+
 // Helper function: Get resource size based on type (exported for tables)
 export function getResourceSize(resourceType, equipmentType) {
   if (resourceType === 'equipment') {
     switch (equipmentType) {
       case 'robot':
-        return { width: 0.6, height: 1.8, depth: 0.6 };  // cylinder radius 0.3 → diameter 0.6, height 1.8
+        return { width: 1.4, height: 1.7, depth: 0.6 };
       case 'machine':
-        return { width: 0.8, height: 1.2, depth: 0.8 };  // box [0.8, 1.2, 0.8]
+        return { width: 2.1, height: 1.9, depth: 1.0 };
       case 'manual_station':
-        return { width: 0.6, height: 1.0, depth: 0.6 };  // box [0.6, 1.0, 0.6]
+        return { width: 1.6, height: 1.0, depth: 0.8 };
       default:
         return { width: 0.4, height: 0.4, depth: 0.4 };
     }
   } else if (resourceType === 'worker') {
-    return { width: 0.5, height: 1.6, depth: 0.5 };  // cylinder radius 0.25 → diameter 0.5, height 1.6
+    return { width: 0.5, height: 1.7, depth: 0.3 };
   } else if (resourceType === 'material') {
-    return { width: 0.4, height: 0.25, depth: 0.4 };  // box [0.4, 0.25, 0.4]
+    return { width: 0.4, height: 0.25, depth: 0.4 };
   }
   return { width: 0.4, height: 0.4, depth: 0.4 };  // default
 }
@@ -31,10 +44,18 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
   const [transformMode, setTransformMode] = useState('translate'); // 'translate', 'rotate'
   const [activeAxis, setActiveAxis] = useState(null); // 현재 드래그 중인 축 ('X', 'Y', 'Z', 'XY', etc.)
   const [hoveredAxis, setHoveredAxis] = useState(null); // 마우스 hover 중인 축
+  const [rotationRingHovered, setRotationRingHovered] = useState(false); // 회전 링 hover 상태
+  const [isRotating, setIsRotating] = useState(false); // 회전 중 상태 (UI용)
   const { bopData, updateProcessLocation, updateProcessRotation, obstacleCreationMode } = useBopStore();
 
   const groupRef = useRef();
   const transformControlsRef = useRef();
+
+  // 커스텀 회전을 위한 refs
+  const isRotatingRef = useRef(false);
+  const rotationStartValueRef = useRef(0);  // 드래그 시작 시 저장된 회전값
+  const mouseStartXRef = useRef(0);  // 드래그 시작 시 마우스 X 위치
+  const currentRotationRef = useRef(0);  // 현재 회전값 (드래그 중 업데이트)
 
   // Three.js 좌표계:
   // X축: 좌우 (right = +) - 공정 흐름 방향 (왼쪽에서 오른쪽)
@@ -154,6 +175,13 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
   // Get rotation from process data (with default)
   const rotationY = process.rotation_y || 0;
 
+  // Transform 시작 시 초기값 저장
+  const handleTransformStart = () => {
+    if (transformMode === 'rotate') {
+      // 회전은 커스텀 핸들러에서 처리하므로 여기서는 아무것도 하지 않음
+    }
+  };
+
   // Transform change handler - 드래그 중에는 제약만 적용
   const handleObjectChange = () => {
     if (!groupRef.current) return;
@@ -161,18 +189,23 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
     // 현재 드래그 중인 축 감지
     if (transformControlsRef.current) {
       const axis = transformControlsRef.current.axis;
-      setActiveAxis(axis);
+      if (axis !== activeAxis) {
+        setActiveAxis(axis);
+      }
     }
 
     if (transformMode === 'translate') {
       // Y축 고정
       groupRef.current.position.y = 0;
     } else if (transformMode === 'rotate') {
-      // X, Z축 회전 고정, Y축만 허용
+      // 회전은 커스텀 핸들러에서 처리
+      // TransformControls의 회전값을 무시하고 커스텀 값 적용
       groupRef.current.rotation.x = 0;
       groupRef.current.rotation.z = 0;
+      if (isRotatingRef.current) {
+        groupRef.current.rotation.y = currentRotationRef.current;
+      }
     }
-    // Store 업데이트는 하지 않음 (드래그 종료 시 처리)
   };
 
   // Transform 종료 시 최종 값을 store에 저장
@@ -186,17 +219,66 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
         y: 0,
         z: groupRef.current.position.z
       };
-
-      // Store 업데이트
       updateProcessLocation(process.process_id, newLocation);
-    } else if (transformMode === 'rotate') {
-      // Y축 회전 업데이트
-      updateProcessRotation(process.process_id, groupRef.current.rotation.y);
+    } else if (transformMode === 'rotate' && isRotatingRef.current) {
+      // 커스텀 회전값 저장
+      const finalRotation = normalizeAngle(currentRotationRef.current);
+      updateProcessRotation(process.process_id, finalRotation);
+      isRotatingRef.current = false;
     }
 
     // 축 선택 초기화
     setActiveAxis(null);
   };
+
+  // 커스텀 회전 핸들러 - 마우스 드래그로 직접 회전 계산 (5도 스냅 적용)
+  const handleRotationMouseDown = useCallback((e) => {
+    if (transformMode !== 'rotate') return;
+    e.stopPropagation();
+
+    isRotatingRef.current = true;
+    setIsRotating(true);
+    rotationStartValueRef.current = rotationY;
+    currentRotationRef.current = rotationY;
+    mouseStartXRef.current = e.clientX;
+
+    const handleMouseMove = (moveEvent) => {
+      if (!isRotatingRef.current) return;
+
+      const deltaX = moveEvent.clientX - mouseStartXRef.current;
+      // 마우스 200px 이동 = 180도 회전
+      const rotationDelta = (deltaX / 200) * Math.PI;
+      // 5도 스냅 적용
+      currentRotationRef.current = snapRotation(rotationStartValueRef.current + rotationDelta);
+
+      if (groupRef.current) {
+        groupRef.current.rotation.y = currentRotationRef.current;
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isRotatingRef.current) {
+        const finalRotation = normalizeAngle(currentRotationRef.current);
+        updateProcessRotation(process.process_id, finalRotation);
+        isRotatingRef.current = false;
+        setIsRotating(false);
+      }
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      onTransformMouseUp?.();
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    onTransformMouseDown?.();
+  }, [transformMode, rotationY, process.process_id, updateProcessRotation, onTransformMouseDown, onTransformMouseUp]);
+
+  // 커스텀 회전 중 회전값 유지
+  useFrame(() => {
+    if (isRotatingRef.current && groupRef.current) {
+      groupRef.current.rotation.y = currentRotationRef.current;
+    }
+  });
 
   // Keyboard shortcuts for switching transform mode (T, R)
   useEffect(() => {
@@ -410,26 +492,58 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
           outlineWidth={0.02}
           outlineColor="#ffffff"
         >
-          {transformMode === 'translate' ? '이동 (T)' : '회전 (R)'}
-          {(activeAxis || hoveredAxis) && ` - ${activeAxis || hoveredAxis}${(activeAxis || hoveredAxis).length > 1 ? ' 평면' : '축'}${activeAxis ? ' [드래그 중]' : ' [hover]'}`}
+          {transformMode === 'translate' ? '이동 (T)' :
+           isRotating ? `회전 중: ${Math.round(currentRotationRef.current * 180 / Math.PI)}°` :
+           '회전 (R) - 링 드래그'}
+          {transformMode === 'translate' && (activeAxis || hoveredAxis) && ` - ${activeAxis || hoveredAxis}${(activeAxis || hoveredAxis).length > 1 ? ' 평면' : '축'}${activeAxis ? ' [드래그 중]' : ' [hover]'}`}
         </Text>
       )}
+
+      {/* 커스텀 회전 핸들 - 회전 모드에서만 표시 */}
+      {/* 회전 중심(0,0,0)에 링 배치 - 실제 회전 피벗 포인트, 바닥에 배치 */}
+      {isSelected && transformMode === 'rotate' && (() => {
+        const ringRadius = Math.max(boundingBox.width, boundingBox.depth) * 0.6 + 0.3;
+        const ringColor = isRotating ? '#ffaa00' : (rotationRingHovered ? '#00cc00' : '#44ff44');
+        const ringOpacity = isRotating ? 1.0 : (rotationRingHovered ? 0.95 : 0.85);
+        return (
+          <>
+            {/* 회전 링 - 바닥(y=0.02)에 배치, 두꺼운 링 */}
+            <mesh
+              position={[0, 0.02, 0]}
+              rotation={[-Math.PI / 2, 0, 0]}
+              onPointerDown={handleRotationMouseDown}
+              onPointerOver={() => setRotationRingHovered(true)}
+              onPointerOut={() => setRotationRingHovered(false)}
+            >
+              <ringGeometry args={[ringRadius, ringRadius + 0.35, 64]} />
+              <meshBasicMaterial color={ringColor} transparent opacity={ringOpacity} side={2} />
+            </mesh>
+            {/* 회전 중심 표시 마커 */}
+            <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[0.2, 32]} />
+              <meshBasicMaterial color={ringColor} transparent opacity={ringOpacity} side={2} />
+            </mesh>
+          </>
+        );
+      })()}
       </group>
 
-      {/* TransformControls - 선택된 경우에만 표시 */}
-      {isSelected && (
+      {/* TransformControls - 이동 모드에서만 표시 */}
+      {isSelected && transformMode === 'translate' && (
         <TransformControls
           ref={transformControlsRef}
           object={groupRef}
-          mode={transformMode}
+          mode="translate"
           space="world"
           size={1.5}
-          showX={transformMode === 'translate'}
-          showY={transformMode === 'rotate'}
-          showZ={transformMode === 'translate'}
-          rotationSnap={transformMode === 'rotate' ? Math.PI / 180 * 5 : null}
+          showX={true}
+          showY={false}
+          showZ={true}
           onObjectChange={handleObjectChange}
-          onMouseDown={onTransformMouseDown}
+          onMouseDown={(e) => {
+            handleTransformStart();
+            onTransformMouseDown(e);
+          }}
           onMouseUp={(e) => {
             handleTransformEnd();
             onTransformMouseUp(e);
@@ -446,10 +560,18 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   const [transformMode, setTransformMode] = useState('translate'); // 'translate', 'rotate', 'scale'
   const [activeAxis, setActiveAxis] = useState(null); // 현재 드래그 중인 축 ('X', 'Y', 'Z', 'XY', etc.)
   const [hoveredAxis, setHoveredAxis] = useState(null); // 마우스 hover 중인 축
+  const [rotationRingHovered, setRotationRingHovered] = useState(false); // 회전 링 hover 상태
+  const [isRotating, setIsRotating] = useState(false); // 회전 중 상태 (UI용)
   const { selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceRotation, updateResourceScale, obstacleCreationMode, use3DModels } = useBopStore();
 
   const groupRef = useRef();
   const transformControlsRef = useRef();
+
+  // 커스텀 회전을 위한 refs
+  const isRotatingRef = useRef(false);
+  const rotationStartValueRef = useRef(0);
+  const mouseStartXRef = useRef(0);
+  const currentRotationRef = useRef(0);
 
   // 리소스 위치 계산: relative_location이 명시적으로 설정되었으면 사용, 아니면 auto-layout
   const getPosition = () => {
@@ -510,23 +632,23 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   };
 
   const getGeometry = () => {
-    // 3D 모델 사용 시
+    // 3D 모델 사용 시 - actualHeight 추가 (라벨 위치 계산용)
     if (use3DModels) {
       if (resource.resource_type === 'equipment' && equipmentData) {
         switch (equipmentData.type) {
           case 'robot':
-            return { type: 'glb', model: 'robot', args: [0.3, 0.3, 1.8, 8], yOffset: 0 };
+            return { type: 'glb', model: 'robot', args: [1.4, 1.7, 0.6], yOffset: 0, actualHeight: 1.7 };
           case 'machine':
-            return { type: 'glb', model: 'conveyor', args: [0.8, 1.2, 0.8], yOffset: 0 };
+            return { type: 'glb', model: 'scanner', args: [2.1, 1.9, 1.0], yOffset: 0, actualHeight: 1.9 };
           case 'manual_station':
-            return { type: 'glb', model: 'scanner', args: [0.6, 1.0, 0.6], yOffset: 0 };
+            return { type: 'glb', model: 'conveyor', args: [1.6, 1.0, 0.8], yOffset: 0, actualHeight: 1.0 };
           default:
-            return { type: 'box', args: [0.4, 0.4, 0.4], yOffset: 0.2 };
+            return { type: 'box', args: [0.4, 0.4, 0.4], yOffset: 0.2, actualHeight: 0.4 };
         }
       } else if (resource.resource_type === 'worker') {
-        return { type: 'glb', model: 'worker', args: [0.25, 0.25, 1.6, 8], yOffset: 0 };
+        return { type: 'glb', model: 'worker', args: [0.5, 1.7, 0.3], yOffset: 0, actualHeight: 1.7 };
       } else if (resource.resource_type === 'material') {
-        return { type: 'glb', model: 'box', args: [0.4, 0.25, 0.4], yOffset: 0 };
+        return { type: 'glb', model: 'box', args: [0.4, 0.25, 0.4], yOffset: 0, actualHeight: 0.25 };
       }
     }
 
@@ -534,20 +656,20 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
     if (resource.resource_type === 'equipment' && equipmentData) {
       switch (equipmentData.type) {
         case 'robot':
-          return { type: 'cylinder', args: [0.3, 0.3, 1.8, 8], yOffset: 0.9 };
+          return { type: 'box', args: [1.4, 1.7, 0.6], yOffset: 0.85, actualHeight: 1.7 };
         case 'machine':
-          return { type: 'box', args: [0.8, 1.2, 0.8], yOffset: 0.6 };
+          return { type: 'box', args: [2.1, 1.9, 1.0], yOffset: 0.95, actualHeight: 1.9 };
         case 'manual_station':
-          return { type: 'box', args: [0.6, 1.0, 0.6], yOffset: 0.5 };
+          return { type: 'box', args: [1.6, 1.0, 0.8], yOffset: 0.5, actualHeight: 1.0 };
         default:
-          return { type: 'box', args: [0.4, 0.4, 0.4], yOffset: 0.2 };
+          return { type: 'box', args: [0.4, 0.4, 0.4], yOffset: 0.2, actualHeight: 0.4 };
       }
     } else if (resource.resource_type === 'worker') {
-      return { type: 'cylinder', args: [0.25, 0.25, 1.6, 8], yOffset: 0.8 };
+      return { type: 'box', args: [0.5, 1.7, 0.3], yOffset: 0.85, actualHeight: 1.7 };
     } else if (resource.resource_type === 'material') {
-      return { type: 'box', args: [0.4, 0.25, 0.4], yOffset: 0.125 };
+      return { type: 'box', args: [0.4, 0.25, 0.4], yOffset: 0.125, actualHeight: 0.25 };
     }
-    return { type: 'box', args: [0.4, 0.4, 0.4], yOffset: 0.2 };
+    return { type: 'box', args: [0.4, 0.4, 0.4], yOffset: 0.2, actualHeight: 0.4 };
   };
 
   const getName = () => {
@@ -593,6 +715,11 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   const rotationY = processRotation + resourceRotationY;
   const scale = resource.scale || { x: 1, y: 1, z: 1 };
 
+  // Transform 시작 시 초기값 저장
+  const handleTransformStart = () => {
+    // 회전은 커스텀 핸들러에서 처리
+  };
+
   // Transform change handler - 드래그 중에는 제약만 적용
   const handleObjectChange = () => {
     if (!groupRef.current) return;
@@ -600,18 +727,22 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
     // 현재 드래그 중인 축 감지
     if (transformControlsRef.current) {
       const axis = transformControlsRef.current.axis;
-      setActiveAxis(axis);
+      if (axis !== activeAxis) {
+        setActiveAxis(axis);
+      }
     }
 
     if (transformMode === 'translate') {
       // Y축 고정
       groupRef.current.position.y = 0;
     } else if (transformMode === 'rotate') {
-      // X, Z축 회전 고정, Y축만 허용
+      // 커스텀 회전 핸들러에서 처리
       groupRef.current.rotation.x = 0;
       groupRef.current.rotation.z = 0;
+      if (isRotatingRef.current) {
+        groupRef.current.rotation.y = currentRotationRef.current;
+      }
     }
-    // Store 업데이트는 하지 않음 (드래그 종료 시 처리)
   };
 
   // Transform 종료 시 최종 값을 store에 저장
@@ -619,44 +750,30 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
     if (!groupRef.current) return;
 
     if (transformMode === 'translate') {
-      console.log(`\n[ResourceMarker Transform] ${resource.resource_id} (${resource.resource_type})`);
-      console.log(`  processId: ${processId}`);
-
       // 1. 월드 좌표 → process.location 기준 좌표
       const worldOffsetX = groupRef.current.position.x - processLocation.x;
       const worldOffsetZ = groupRef.current.position.z - processLocation.z;
 
-      console.log(`  월드 좌표: (${groupRef.current.position.x.toFixed(2)}, ${groupRef.current.position.z.toFixed(2)})`);
-      console.log(`  공정 위치: (${processLocation.x.toFixed(2)}, ${processLocation.z.toFixed(2)})`);
-      console.log(`  월드 오프셋: (${worldOffsetX.toFixed(2)}, ${worldOffsetZ.toFixed(2)})`);
-      console.log(`  공정 회전: ${(processRotation * 180 / Math.PI).toFixed(1)}°`);
-
-      // 2. 역회전 변환 - 정회전의 역행렬
-      // 정회전: rotatedX = x*cos + z*sin, rotatedZ = -x*sin + z*cos
-      // 역회전: x = rotatedX*cos - rotatedZ*sin, z = rotatedX*sin + rotatedZ*cos
+      // 2. 역회전 변환
       const relX = worldOffsetX * Math.cos(processRotation) - worldOffsetZ * Math.sin(processRotation);
       const relZ = worldOffsetX * Math.sin(processRotation) + worldOffsetZ * Math.cos(processRotation);
 
-      console.log(`  역회전 결과 (relative): (${relX.toFixed(2)}, ${relZ.toFixed(2)})`);
-
-      // 3. process.location 기준 상대 좌표
       const newRelativeLocation = {
         x: relX,
         y: 0,
         z: relZ
       };
 
-      // Store 업데이트
-      console.log(`  ⚡ updateResourceLocation 호출`);
       updateResourceLocation(
         processId,
         resource.resource_type,
         resource.resource_id,
         newRelativeLocation
       );
-    } else if (transformMode === 'rotate') {
-      // 객체 자체 회전만 저장 (전체 회전에서 공정 회전을 뺌)
-      const resourceOwnRotation = groupRef.current.rotation.y - processRotation;
+    } else if (transformMode === 'rotate' && isRotatingRef.current) {
+      // 커스텀 회전값에서 공정 회전을 빼서 리소스 자체 회전만 저장
+      const resourceOwnRotation = normalizeAngle(currentRotationRef.current - processRotation);
+      isRotatingRef.current = false;
 
       updateResourceRotation(
         processId,
@@ -681,6 +798,61 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
     // 축 선택 초기화
     setActiveAxis(null);
   };
+
+  // 커스텀 회전 핸들러 - 마우스 드래그로 직접 회전 계산 (5도 스냅 적용)
+  const handleRotationMouseDown = useCallback((e) => {
+    if (transformMode !== 'rotate') return;
+    e.stopPropagation();
+
+    isRotatingRef.current = true;
+    setIsRotating(true);
+    rotationStartValueRef.current = rotationY;
+    currentRotationRef.current = rotationY;
+    mouseStartXRef.current = e.clientX;
+
+    const handleMouseMove = (moveEvent) => {
+      if (!isRotatingRef.current) return;
+
+      const deltaX = moveEvent.clientX - mouseStartXRef.current;
+      // 마우스 200px 이동 = 180도 회전
+      const rotationDelta = (deltaX / 200) * Math.PI;
+      // 5도 스냅 적용
+      currentRotationRef.current = snapRotation(rotationStartValueRef.current + rotationDelta);
+
+      if (groupRef.current) {
+        groupRef.current.rotation.y = currentRotationRef.current;
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isRotatingRef.current) {
+        // 리소스 자체 회전만 저장 (공정 회전 빼기)
+        const resourceOwnRotation = normalizeAngle(currentRotationRef.current - processRotation);
+        updateResourceRotation(
+          processId,
+          resource.resource_type,
+          resource.resource_id,
+          resourceOwnRotation
+        );
+        isRotatingRef.current = false;
+        setIsRotating(false);
+      }
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      onTransformMouseUp?.();
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    onTransformMouseDown?.();
+  }, [transformMode, rotationY, processRotation, processId, resource.resource_type, resource.resource_id, updateResourceRotation, onTransformMouseDown, onTransformMouseUp]);
+
+  // 커스텀 회전 중 회전값 유지
+  useFrame(() => {
+    if (isRotatingRef.current && groupRef.current) {
+      groupRef.current.rotation.y = currentRotationRef.current;
+    }
+  });
 
   // Change TransformControls colors based on active/hovered axis
   useEffect(() => {
@@ -900,16 +1072,16 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
             </mesh>
           }>
             {geometry.model === 'robot' && (
-              <RobotModel color={isSelected || hovered ? '#ffeb3b' : color} />
+              <RobotModel highlighted={isSelected || hovered} />
             )}
             {geometry.model === 'conveyor' && (
-              <ConveyorModel color={isSelected || hovered ? '#ffeb3b' : color} />
+              <ConveyorModel highlighted={isSelected || hovered} />
             )}
             {geometry.model === 'scanner' && (
-              <ScannerModel color={isSelected || hovered ? '#ffeb3b' : color} />
+              <ScannerModel highlighted={isSelected || hovered} />
             )}
             {geometry.model === 'box' && (
-              <BoxModel color={isSelected || hovered ? '#ffeb3b' : color} />
+              <BoxModel highlighted={isSelected || hovered} />
             )}
             {geometry.model === 'worker' && (
               <WorkerModel highlighted={isSelected || hovered} />
@@ -943,11 +1115,11 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
         </mesh>
       )}
 
-      {/* Resource label */}
+      {/* Resource label - actualHeight 사용하여 라벨 위치 계산 */}
       {(isSelected || hovered) && (
         <>
           <Text
-            position={[0, geometry.yOffset * 2 + 0.5, 0]}
+            position={[0, geometry.actualHeight + 0.5, 0]}
             fontSize={0.15}
             color="#333"
             anchorX="center"
@@ -959,7 +1131,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
           </Text>
           {resource.role && (
             <Text
-              position={[0, geometry.yOffset * 2 + 0.25, 0]}
+              position={[0, geometry.actualHeight + 0.25, 0]}
               fontSize={0.12}
               color="#666"
               anchorX="center"
@@ -975,7 +1147,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
       {/* Transform mode indicator - 선택된 경우에만 표시 */}
       {isSelected && (
         <Text
-          position={[0, geometry.yOffset * 2 + 1.0, 0]}
+          position={[0, geometry.actualHeight + 1.0, 0]}
           fontSize={0.18}
           color={
             (activeAxis || hoveredAxis) === 'X' ? '#ff0000' :
@@ -993,27 +1165,60 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
           scale={[1/scale.x, 1/scale.y, 1/scale.z]}
         >
           {transformMode === 'translate' ? '이동 (T)' :
-           transformMode === 'rotate' ? '회전 (R)' :
+           transformMode === 'rotate' ?
+             (isRotating ? `회전 중: ${Math.round(currentRotationRef.current * 180 / Math.PI)}°` : '회전 (R) - 링 드래그') :
            '크기 (S)'}
-          {(activeAxis || hoveredAxis) && ` - ${activeAxis || hoveredAxis}${(activeAxis || hoveredAxis).length > 1 ? ' 평면' : '축'}${activeAxis ? ' [드래그 중]' : ' [hover]'}`}
+          {transformMode !== 'rotate' && (activeAxis || hoveredAxis) && ` - ${activeAxis || hoveredAxis}${(activeAxis || hoveredAxis).length > 1 ? ' 평면' : '축'}${activeAxis ? ' [드래그 중]' : ' [hover]'}`}
         </Text>
       )}
+
+      {/* 커스텀 회전 핸들 - 회전 모드에서만 표시, 바닥에 배치 */}
+      {isSelected && transformMode === 'rotate' && (() => {
+        // 리소스 크기 기반 링 반경 계산
+        const resourceWidth = geometry.args[0] * scale.x;
+        const resourceDepth = geometry.args[2] * scale.z;
+        const ringRadius = Math.max(resourceWidth, resourceDepth) * 0.6 + 0.2;
+        const ringColor = isRotating ? '#ffaa00' : (rotationRingHovered ? '#00cc00' : '#44ff44');
+        const ringOpacity = isRotating ? 1.0 : (rotationRingHovered ? 0.95 : 0.85);
+        return (
+          <>
+            {/* 회전 링 - 바닥에 배치, 두꺼운 링 */}
+            <mesh
+              position={[0, 0.02, 0]}
+              rotation={[-Math.PI / 2, 0, 0]}
+              onPointerDown={handleRotationMouseDown}
+              onPointerOver={() => setRotationRingHovered(true)}
+              onPointerOut={() => setRotationRingHovered(false)}
+            >
+              <ringGeometry args={[ringRadius, ringRadius + 0.25, 64]} />
+              <meshBasicMaterial color={ringColor} transparent opacity={ringOpacity} side={2} />
+            </mesh>
+            {/* 회전 중심 표시 마커 */}
+            <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[0.12, 32]} />
+              <meshBasicMaterial color={ringColor} transparent opacity={ringOpacity} side={2} />
+            </mesh>
+          </>
+        );
+      })()}
       </group>
 
-      {/* TransformControls - 선택된 경우에만 표시 */}
-      {isSelected && (
+      {/* TransformControls - 이동/크기 모드에서만 표시 (회전은 커스텀 핸들 사용) */}
+      {isSelected && transformMode !== 'rotate' && (
         <TransformControls
           ref={transformControlsRef}
           object={groupRef}
           mode={transformMode}
           space="world"
           size={1.2}
-          showX={transformMode === 'translate' || transformMode === 'scale'}
-          showY={transformMode === 'rotate' || transformMode === 'scale'}
-          showZ={transformMode === 'translate' || transformMode === 'scale'}
-          rotationSnap={transformMode === 'rotate' ? Math.PI / 180 * 5 : null}
+          showX={true}
+          showY={transformMode === 'scale'}
+          showZ={true}
           onObjectChange={handleObjectChange}
-          onMouseDown={onTransformMouseDown}
+          onMouseDown={(e) => {
+            handleTransformStart();
+            onTransformMouseDown(e);
+          }}
           onMouseUp={(e) => {
             handleTransformEnd();
             onTransformMouseUp(e);
@@ -1136,10 +1341,18 @@ function ProcessFlowArrow({ fromProcess, toProcess, parallelIndex }) {
 function ObstacleBox({ obstacle, isSelected, onSelect, onTransformMouseDown, onTransformMouseUp, isDraggingTransformRef }) {
   const [hovered, setHovered] = useState(false);
   const [transformMode, setTransformMode] = useState('translate'); // 'translate', 'rotate'
+  const [rotationRingHovered, setRotationRingHovered] = useState(false); // 회전 링 hover 상태
+  const [isRotating, setIsRotating] = useState(false); // 회전 중 상태 (UI용)
   const { updateObstacle, obstacleCreationMode } = useBopStore();
 
   const groupRef = useRef();
   const transformControlsRef = useRef();
+
+  // 커스텀 회전을 위한 refs
+  const isRotatingRef = useRef(false);
+  const rotationStartValueRef = useRef(0);
+  const mouseStartXRef = useRef(0);
+  const currentRotationRef = useRef(0);
 
   const pos = obstacle.position || { x: 0, y: 0, z: 0 };
   const size = obstacle.size || { width: 1, height: 1, depth: 1 };
@@ -1164,19 +1377,16 @@ function ObstacleBox({ obstacle, isSelected, onSelect, onTransformMouseDown, onT
     return 0.8;
   };
 
-  // Transform change handler
+  // Transform change handler (이동 모드에서만 사용)
   const handleObjectChange = () => {
     if (!groupRef.current) return;
 
     if (transformMode === 'translate') {
       groupRef.current.position.y = 0; // Keep on floor
-    } else if (transformMode === 'rotate') {
-      groupRef.current.rotation.x = 0;
-      groupRef.current.rotation.z = 0;
     }
   };
 
-  // Transform end handler
+  // Transform end handler (이동 모드에서만 사용)
   const handleTransformEnd = () => {
     if (!groupRef.current) return;
 
@@ -1187,10 +1397,57 @@ function ObstacleBox({ obstacle, isSelected, onSelect, onTransformMouseDown, onT
         z: groupRef.current.position.z
       };
       updateObstacle(obstacle.obstacle_id, { position: newPosition });
-    } else if (transformMode === 'rotate') {
-      updateObstacle(obstacle.obstacle_id, { rotation_y: groupRef.current.rotation.y });
     }
   };
+
+  // 커스텀 회전 핸들러 - 마우스 드래그로 직접 회전 계산 (5도 스냅 적용)
+  const handleRotationMouseDown = useCallback((e) => {
+    if (transformMode !== 'rotate') return;
+    e.stopPropagation();
+
+    isRotatingRef.current = true;
+    setIsRotating(true);
+    rotationStartValueRef.current = rotationY;
+    currentRotationRef.current = rotationY;
+    mouseStartXRef.current = e.clientX;
+
+    const handleMouseMove = (moveEvent) => {
+      if (!isRotatingRef.current) return;
+
+      const deltaX = moveEvent.clientX - mouseStartXRef.current;
+      // 마우스 200px 이동 = 180도 회전
+      const rotationDelta = (deltaX / 200) * Math.PI;
+      // 5도 스냅 적용
+      currentRotationRef.current = snapRotation(rotationStartValueRef.current + rotationDelta);
+
+      if (groupRef.current) {
+        groupRef.current.rotation.y = currentRotationRef.current;
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isRotatingRef.current) {
+        const finalRotation = normalizeAngle(currentRotationRef.current);
+        updateObstacle(obstacle.obstacle_id, { rotation_y: finalRotation });
+        isRotatingRef.current = false;
+        setIsRotating(false);
+      }
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      onTransformMouseUp?.();
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    onTransformMouseDown?.();
+  }, [transformMode, rotationY, obstacle.obstacle_id, updateObstacle, onTransformMouseDown, onTransformMouseUp]);
+
+  // 커스텀 회전 중 회전값 유지
+  useFrame(() => {
+    if (isRotatingRef.current && groupRef.current) {
+      groupRef.current.rotation.y = currentRotationRef.current;
+    }
+  });
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1260,31 +1517,61 @@ function ObstacleBox({ obstacle, isSelected, onSelect, onTransformMouseDown, onT
           <Text
             position={[0, size.height + 0.6, 0]}
             fontSize={0.18}
-            color={transformMode === 'translate' ? '#4a90e2' : '#ff6b6b'}
+            color={transformMode === 'translate' ? '#4a90e2' : (isRotating ? '#ffaa00' : '#ff6b6b')}
             anchorX="center"
             anchorY="middle"
             outlineWidth={0.02}
             outlineColor="#ffffff"
           >
-            {transformMode === 'translate' ? '이동 (T)' : '회전 (R)'}
+            {transformMode === 'translate' ? '이동 (T)' :
+             isRotating ? `회전 중: ${Math.round(currentRotationRef.current * 180 / Math.PI)}°` :
+             '회전 (R) - 링 드래그'}
           </Text>
         )}
+
+        {/* 커스텀 회전 핸들 - 회전 모드에서만 표시, 바닥에 배치 */}
+        {isSelected && transformMode === 'rotate' && (() => {
+          const ringRadius = Math.max(size.width, size.depth) * 0.6 + 0.2;
+          const ringColor = isRotating ? '#ffaa00' : (rotationRingHovered ? '#00cc00' : '#44ff44');
+          const ringOpacity = isRotating ? 1.0 : (rotationRingHovered ? 0.95 : 0.85);
+          return (
+            <>
+              {/* 회전 링 - 바닥에 배치, 두꺼운 링 */}
+              <mesh
+                position={[0, 0.02, 0]}
+                rotation={[-Math.PI / 2, 0, 0]}
+                onPointerDown={handleRotationMouseDown}
+                onPointerOver={() => setRotationRingHovered(true)}
+                onPointerOut={() => setRotationRingHovered(false)}
+              >
+                <ringGeometry args={[ringRadius, ringRadius + 0.25, 64]} />
+                <meshBasicMaterial color={ringColor} transparent opacity={ringOpacity} side={2} />
+              </mesh>
+              {/* 회전 중심 표시 마커 */}
+              <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                <circleGeometry args={[0.12, 32]} />
+                <meshBasicMaterial color={ringColor} transparent opacity={ringOpacity} side={2} />
+              </mesh>
+            </>
+          );
+        })()}
       </group>
 
-      {/* TransformControls */}
-      {isSelected && (
+      {/* TransformControls - 이동 모드에서만 표시 */}
+      {isSelected && transformMode === 'translate' && (
         <TransformControls
           ref={transformControlsRef}
           object={groupRef}
-          mode={transformMode}
+          mode="translate"
           space="world"
           size={1.2}
-          showX={transformMode === 'translate'}
-          showY={transformMode === 'rotate'}
-          showZ={transformMode === 'translate'}
-          rotationSnap={transformMode === 'rotate' ? Math.PI / 180 * 5 : null}
+          showX={true}
+          showY={false}
+          showZ={true}
           onObjectChange={handleObjectChange}
-          onMouseDown={onTransformMouseDown}
+          onMouseDown={(e) => {
+            onTransformMouseDown(e);
+          }}
           onMouseUp={(e) => {
             handleTransformEnd();
             onTransformMouseUp(e);

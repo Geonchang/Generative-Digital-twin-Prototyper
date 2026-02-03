@@ -8,13 +8,58 @@ import builtins
 import re
 import copy
 import inspect
+import traceback
+import logging
 from pathlib import Path
 from typing import Tuple, Optional, Dict, Any
 
 from datetime import datetime
-from app.tools.registry import get_tool, get_script_path, WORKDIR_BASE, LOGS_DIR
+from app.tools.registry import get_tool, get_script_path, WORKDIR_BASE, LOGS_DIR, update_tool_adapter, update_tool_metadata
+from app.tools.synthesizer import repair_adapter
+
+log = logging.getLogger("tool_executor")
 
 SUBPROCESS_TIMEOUT_SEC = 60
+MAX_AUTO_REPAIR_ATTEMPTS = 2  # 자동 복구 최대 시도 횟수
+MAX_SCRIPT_REPAIR_ATTEMPTS = 1  # 스크립트 실행 오류 자동 복구 시도 횟수
+
+
+def _detect_args_format_error(stderr: str) -> Optional[Dict[str, Any]]:
+    """
+    argparse 오류 패턴을 감지하고 분석합니다.
+    Returns: {"type": "invalid_placeholder", "placeholder": "wall_thickness"} 또는 None
+    """
+    if not stderr:
+        return None
+
+    # Pattern: invalid float value: '{placeholder}'
+    import re
+    match = re.search(r"invalid (\w+) value: '\{(\w+)\}'", stderr)
+    if match:
+        return {
+            "type": "unsubstituted_placeholder",
+            "value_type": match.group(1),
+            "placeholder": match.group(2),
+        }
+
+    # Pattern: argument --xxx: expected one argument
+    match = re.search(r"argument (--\w+): expected", stderr)
+    if match:
+        return {
+            "type": "missing_argument",
+            "argument": match.group(1),
+        }
+
+    return None
+
+
+def _capture_error_info(e: Exception) -> Dict[str, Any]:
+    """예외에서 상세 에러 정보를 추출합니다."""
+    return {
+        "type": type(e).__name__,
+        "message": str(e),
+        "traceback": traceback.format_exc(),
+    }
 
 
 def _save_execution_log(tool_id: str, log_data: dict):
@@ -114,6 +159,7 @@ def _build_command(
     execution_type: str,
     args_format: Optional[str],
     bop_data: dict,
+    params: Optional[Dict[str, Any]] = None,
 ) -> list:
     """Build the subprocess command, substituting args_format placeholders."""
     if execution_type == "python":
@@ -132,10 +178,24 @@ def _build_command(
             if isinstance(val, (int, float, str, bool)):
                 substitutions[key] = str(val)
 
+        # === 핵심 수정: params도 치환 대상에 추가 ===
+        if params:
+            for key, val in params.items():
+                if val is not None:
+                    substitutions[key] = str(val)
+
         # Replace {placeholder} in args_format
         args_str = args_format
         for key, val in substitutions.items():
             args_str = args_str.replace(f"{{{key}}}", val)
+
+        log.debug("[build_command] args_format: %s -> %s", args_format, args_str)
+
+        # 치환되지 않은 placeholder 검출 (자가 진단)
+        import re
+        remaining_placeholders = re.findall(r'\{(\w+)\}', args_str)
+        if remaining_placeholders:
+            log.warning("[build_command] 치환되지 않은 placeholder 발견: %s", remaining_placeholders)
 
         # Split into individual arguments
         # Use shlex-like splitting but handle -- flags properly
@@ -145,6 +205,7 @@ def _build_command(
         # Fallback: just pass input file as positional arg
         cmd.append(str(input_file))
 
+    log.info("[build_command] 최종 명령어: %s", ' '.join(cmd[:5]) + ('...' if len(cmd) > 5 else ''))
     return cmd
 
 
@@ -156,8 +217,9 @@ def _execute_subprocess(
     execution_type: str,
     args_format: Optional[str],
     bop_data: dict,
+    params: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, str, int]:
-    cmd = _build_command(script_path, input_file, output_file, execution_type, args_format, bop_data)
+    cmd = _build_command(script_path, input_file, output_file, execution_type, args_format, bop_data, params)
 
     env = {
         "PATH": os.environ.get("PATH", ""),
@@ -181,11 +243,13 @@ def _execute_subprocess(
 
 async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, Any]] = None) -> dict:
     """
-    도구 실행 파이프라인:
+    도구 실행 파이프라인 (자동 복구 기능 포함):
     1. 레지스트리에서 도구 로드
     2. Pre-processor 실행 (BOP → 도구 입력)
     3. 외부 스크립트 실행 (subprocess)
     4. Post-processor 실행 (도구 출력 → BOP 업데이트)
+
+    어댑터 오류 발생 시 Gemini를 통해 자동 복구 시도
     """
     start_time = time.time()
 
@@ -210,11 +274,16 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
     work_dir = WORKDIR_BASE / exec_id
     work_dir.mkdir(parents=True, exist_ok=True)
 
+    log.info("[execute] === 도구 실행 시작 ===")
+    log.info("[execute] tool_id=%s, tool_name=%s", tool_id, metadata.tool_name)
+    log.info("[execute] params=%s", json.dumps(params, ensure_ascii=False) if params else "None")
+
     # 로그 수집용 변수
-    log = {
+    exec_log = {
         "tool_id": tool_id,
         "tool_name": metadata.tool_name,
         "executed_at": datetime.now().isoformat(),
+        "params": params,
         "input": None,
         "output": None,
         "stdout": None,
@@ -223,19 +292,58 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
         "success": False,
         "message": None,
         "execution_time_sec": None,
+        "auto_repair_attempts": 0,
+        "auto_repair_success": False,
+        "script_repair_info": None,
     }
 
-    try:
-        # 4. Pre-processor 실행
-        try:
-            tool_input = _run_preprocessor(adapter.pre_process_code, bop_data, params)
-        except Exception as e:
-            log["message"] = f"Pre-processor 실행 오류: {str(e)}"
-            log["execution_time_sec"] = time.time() - start_time
-            result = {"success": False, "message": log["message"], "execution_time_sec": log["execution_time_sec"]}
-            return result
+    # 현재 사용할 어댑터 코드 (복구 시 업데이트됨)
+    current_pre_code = adapter.pre_process_code
+    current_post_code = adapter.post_process_code
 
-        log["input"] = tool_input
+    try:
+        # === Pre-processor 실행 (자동 복구 포함) ===
+        tool_input = None
+        pre_error = None
+
+        for attempt in range(MAX_AUTO_REPAIR_ATTEMPTS + 1):
+            try:
+                tool_input = _run_preprocessor(current_pre_code, bop_data, params)
+                break  # 성공
+            except Exception as e:
+                pre_error = e
+                if attempt < MAX_AUTO_REPAIR_ATTEMPTS:
+                    log.info("[execute] Pre-processor 오류 - 자동 복구 시도 %d/%d", attempt + 1, MAX_AUTO_REPAIR_ATTEMPTS)
+                    exec_log["auto_repair_attempts"] += 1
+
+                    error_info = _capture_error_info(e)
+                    bop_json_str = json.dumps(bop_data, ensure_ascii=False, indent=2)
+
+                    fixed_code = await repair_adapter(
+                        failed_function="pre_process",
+                        failed_code=current_pre_code,
+                        error_info=error_info,
+                        input_data=bop_json_str,
+                    )
+
+                    if fixed_code:
+                        log.info("[execute] Pre-processor 코드 수정 완료 - 재시도")
+                        current_pre_code = fixed_code
+                    else:
+                        log.warning("[execute] Pre-processor 자동 복구 실패")
+                        break
+
+        if tool_input is None:
+            exec_log["message"] = f"Pre-processor 실행 오류: {str(pre_error)}"
+            exec_log["execution_time_sec"] = time.time() - start_time
+            return {
+                "success": False,
+                "message": exec_log["message"],
+                "execution_time_sec": exec_log["execution_time_sec"],
+                "auto_repair_attempted": exec_log["auto_repair_attempts"] > 0,
+            }
+
+        exec_log["input"] = tool_input
 
         # 5. 입력/출력 파일 경로 결정
         input_suffix_map = {"csv": ".csv", "json": ".json", "args": ".csv", "stdin": ".txt"}
@@ -256,30 +364,64 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
             args_format = metadata.input_schema.args_format
 
         # 6. 외부 스크립트 실행
+        log.info("[execute] 스크립트 실행 시작: %s (args_format=%s)", metadata.file_name, args_format)
         try:
             stdout, stderr, return_code = _execute_subprocess(
                 script_path, work_dir, input_file, output_file,
-                metadata.execution_type, args_format, bop_data,
+                metadata.execution_type, args_format, bop_data, params,
             )
+            log.info("[execute] 스크립트 실행 완료: return_code=%d", return_code)
         except TimeoutError as e:
-            log["message"] = str(e)
-            log["execution_time_sec"] = time.time() - start_time
-            result = {"success": False, "message": log["message"], "execution_time_sec": log["execution_time_sec"]}
-            return result
+            exec_log["message"] = str(e)
+            exec_log["execution_time_sec"] = time.time() - start_time
+            return {"success": False, "message": exec_log["message"], "execution_time_sec": exec_log["execution_time_sec"]}
 
-        log["stdout"] = stdout
-        log["stderr"] = stderr
-        log["return_code"] = return_code
+        exec_log["stdout"] = stdout
+        exec_log["stderr"] = stderr
+        exec_log["return_code"] = return_code
 
         if return_code != 0:
-            log["message"] = f"스크립트가 오류 코드 {return_code}로 종료되었습니다."
-            log["execution_time_sec"] = time.time() - start_time
+            log.warning("[execute] 스크립트 오류 발생: return_code=%d", return_code)
+            log.warning("[execute] stderr: %s", stderr[:500] if stderr else "None")
+
+            # === 스크립트 오류 자가 진단 ===
+            args_error = _detect_args_format_error(stderr)
+            if args_error:
+                log.info("[execute] argparse 오류 감지: %s", args_error)
+                exec_log["script_repair_info"] = args_error
+
+                if args_error["type"] == "unsubstituted_placeholder":
+                    placeholder = args_error["placeholder"]
+                    # params에 해당 값이 있는지 확인
+                    if params and placeholder in params:
+                        log.error(
+                            "[execute] 치환 실패: params에 '%s'=%s 가 있지만 args_format에서 치환되지 않음",
+                            placeholder, params[placeholder]
+                        )
+                        exec_log["message"] = (
+                            f"스크립트 인자 오류: '{placeholder}' 파라미터가 전달되지 않았습니다. "
+                            f"(값: {params[placeholder]}). 시스템 버그일 수 있습니다."
+                        )
+                    else:
+                        log.error(
+                            "[execute] params에 '%s' 키가 없음. params_schema 또는 args_format 확인 필요",
+                            placeholder
+                        )
+                        exec_log["message"] = (
+                            f"스크립트 인자 오류: '{placeholder}' 파라미터가 정의되지 않았습니다. "
+                            f"도구를 다시 등록하거나 params_schema를 확인해 주세요."
+                        )
+            else:
+                exec_log["message"] = f"스크립트가 오류 코드 {return_code}로 종료되었습니다."
+
+            exec_log["execution_time_sec"] = time.time() - start_time
             return {
                 "success": False,
-                "message": log["message"],
+                "message": exec_log["message"],
                 "stdout": stdout[:2000] if stdout else None,
                 "stderr": stderr[:2000] if stderr else None,
-                "execution_time_sec": log["execution_time_sec"],
+                "execution_time_sec": exec_log["execution_time_sec"],
+                "error_diagnosis": args_error,
             }
 
         # 7. 도구 출력 수집 (output file 우선, 없으면 stdout)
@@ -288,46 +430,89 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
             with open(output_file, "r", encoding="utf-8") as f:
                 tool_output = f.read()
 
-        log["output"] = tool_output
+        exec_log["output"] = tool_output
 
-        # 8. Post-processor 실행
-        try:
-            updated_bop = _run_postprocessor(adapter.post_process_code, bop_data, tool_output)
-        except Exception as e:
-            log["message"] = f"Post-processor 실행 오류: {str(e)}"
-            log["execution_time_sec"] = time.time() - start_time
+        # === Post-processor 실행 (자동 복구 포함) ===
+        updated_bop = None
+        post_error = None
+
+        for attempt in range(MAX_AUTO_REPAIR_ATTEMPTS + 1):
+            try:
+                updated_bop = _run_postprocessor(current_post_code, bop_data, tool_output)
+                break  # 성공
+            except Exception as e:
+                post_error = e
+                if attempt < MAX_AUTO_REPAIR_ATTEMPTS:
+                    log.info("[execute] Post-processor 오류 - 자동 복구 시도 %d/%d", attempt + 1, MAX_AUTO_REPAIR_ATTEMPTS)
+                    exec_log["auto_repair_attempts"] += 1
+
+                    error_info = _capture_error_info(e)
+
+                    fixed_code = await repair_adapter(
+                        failed_function="post_process",
+                        failed_code=current_post_code,
+                        error_info=error_info,
+                        input_data=tool_output[:5000] if tool_output else "",
+                    )
+
+                    if fixed_code:
+                        log.info("[execute] Post-processor 코드 수정 완료 - 재시도")
+                        current_post_code = fixed_code
+                    else:
+                        log.warning("[execute] Post-processor 자동 복구 실패")
+                        break
+
+        if updated_bop is None:
+            exec_log["message"] = f"Post-processor 실행 오류: {str(post_error)}"
+            exec_log["execution_time_sec"] = time.time() - start_time
             return {
                 "success": False,
-                "message": log["message"],
+                "message": exec_log["message"],
                 "stdout": stdout[:2000] if stdout else None,
-                "execution_time_sec": log["execution_time_sec"],
+                "execution_time_sec": exec_log["execution_time_sec"],
+                "auto_repair_attempted": exec_log["auto_repair_attempts"] > 0,
             }
 
-        log["success"] = True
-        log["message"] = "도구 실행이 완료되었습니다."
-        log["execution_time_sec"] = time.time() - start_time
+        # === 자동 복구된 코드가 있으면 레지스트리 업데이트 ===
+        if current_pre_code != adapter.pre_process_code or current_post_code != adapter.post_process_code:
+            from app.tools.tool_models import AdapterCode as AC
+            updated_adapter = AC(
+                tool_id=tool_id,
+                pre_process_code=current_pre_code,
+                post_process_code=current_post_code,
+            )
+            if update_tool_adapter(tool_id, updated_adapter):
+                log.info("[execute] 자동 복구된 어댑터 코드가 레지스트리에 저장되었습니다.")
+                exec_log["auto_repair_success"] = True
+
+        exec_log["success"] = True
+        exec_log["message"] = "도구 실행이 완료되었습니다."
+        if exec_log["auto_repair_attempts"] > 0:
+            exec_log["message"] += f" (자동 복구 {exec_log['auto_repair_attempts']}회 수행)"
+        exec_log["execution_time_sec"] = time.time() - start_time
 
         return {
             "success": True,
-            "message": log["message"],
+            "message": exec_log["message"],
             "updated_bop": updated_bop,
             "tool_output": tool_output[:5000] if tool_output else None,
             "stdout": stdout[:2000] if stdout else None,
             "stderr": stderr[:500] if stderr else None,
-            "execution_time_sec": log["execution_time_sec"],
+            "execution_time_sec": exec_log["execution_time_sec"],
+            "auto_repaired": exec_log["auto_repair_success"],
         }
 
     except Exception as e:
-        log["message"] = f"실행 오류: {str(e)}"
-        log["execution_time_sec"] = time.time() - start_time
+        exec_log["message"] = f"실행 오류: {str(e)}"
+        exec_log["execution_time_sec"] = time.time() - start_time
         return {
             "success": False,
-            "message": log["message"],
-            "execution_time_sec": log["execution_time_sec"],
+            "message": exec_log["message"],
+            "execution_time_sec": exec_log["execution_time_sec"],
         }
     finally:
         # 실행 로그 저장
-        _save_execution_log(tool_id, log)
+        _save_execution_log(tool_id, exec_log)
 
         try:
             shutil.rmtree(work_dir)

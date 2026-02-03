@@ -31,40 +31,80 @@ export const api = {
   exportExcel(bopData) {
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: 공정
+    // Sheet 1: 프로젝트 정보
+    const projectRows = [
+      { '항목': '프로젝트명', '값': bopData.project_title || '' },
+      { '항목': '목표 UPH', '값': bopData.target_uph || '' },
+      { '항목': '공정 수', '값': (bopData.processes || []).length },
+      { '항목': '장비 수', '값': (bopData.equipments || []).length },
+      { '항목': '작업자 수', '값': (bopData.workers || []).length },
+      { '항목': '자재 수', '값': (bopData.materials || []).length },
+      { '항목': '장애물 수', '값': (bopData.obstacles || []).length },
+    ];
+    const wsProject = XLSX.utils.json_to_sheet(projectRows);
+    wsProject['!cols'] = [{ wch: 15 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, wsProject, '프로젝트 정보');
+
+    // Sheet 2: 공정 (연결 정보만)
     const processRows = (bopData.processes || []).map(p => ({
       '공정 ID': p.process_id,
-      '공정명': p.name,
-      '설명': p.description || '',
-      '사이클타임(초)': p.cycle_time_sec,
       '병렬 수': p.parallel_count || 1,
       '선행 공정': (p.predecessor_ids || []).join(', '),
       '후행 공정': (p.successor_ids || []).join(', '),
-      '위치 X': p.location?.x ?? '',
-      '위치 Y': p.location?.y ?? '',
-      '위치 Z': p.location?.z ?? '',
     }));
-    const wsProcesses = XLSX.utils.json_to_sheet(processRows);
+    const wsProcesses = XLSX.utils.json_to_sheet(processRows.length ? processRows : [{}]);
     XLSX.utils.book_append_sheet(wb, wsProcesses, '공정');
 
-    // Sheet 2: 리소스 배치
+    // Sheet 3: 공정별 병렬라인 상세 (모든 공정의 모든 라인 포함)
+    const parallelRows = [];
+    (bopData.processes || []).forEach(p => {
+      const parallelCount = p.parallel_count || 1;
+      const lines = p.parallel_lines && p.parallel_lines.length > 0
+        ? p.parallel_lines
+        : [{ parallel_index: 1, name: p.name, description: p.description, cycle_time_sec: p.cycle_time_sec, location: p.location, rotation_y: p.rotation_y }];
+
+      lines.forEach((line, idx) => {
+        parallelRows.push({
+          '공정 ID': p.process_id,
+          '병렬 인덱스': line.parallel_index ?? (idx + 1),
+          '공정명': line.name || p.name,
+          '설명': line.description ?? p.description ?? '',
+          '사이클타임(초)': line.cycle_time_sec ?? p.cycle_time_sec,
+          '위치 X': line.location?.x ?? 0,
+          '위치 Y': line.location?.y ?? 0,
+          '위치 Z': line.location?.z ?? 0,
+          '회전 Y': line.rotation_y ?? 0,
+        });
+      });
+    });
+    const wsParallel = XLSX.utils.json_to_sheet(parallelRows.length ? parallelRows : [{}]);
+    XLSX.utils.book_append_sheet(wb, wsParallel, '병렬라인 상세');
+
+    // Sheet 4: 리소스 배치
     const resourceRows = [];
     (bopData.processes || []).forEach(p => {
       (p.resources || []).forEach(r => {
         resourceRows.push({
           '공정 ID': p.process_id,
-          '공정명': p.name,
+          '병렬라인 인덱스': r.parallel_line_index ?? '',
           '리소스 유형': r.resource_type,
           '리소스 ID': r.resource_id,
           '수량': r.quantity ?? 1,
           '역할': r.role || '',
+          '상대위치 X': r.relative_location?.x ?? 0,
+          '상대위치 Y': r.relative_location?.y ?? 0,
+          '상대위치 Z': r.relative_location?.z ?? 0,
+          '회전 Y': r.rotation_y ?? 0,
+          '스케일 X': r.scale?.x ?? 1,
+          '스케일 Y': r.scale?.y ?? 1,
+          '스케일 Z': r.scale?.z ?? 1,
         });
       });
     });
-    const wsResources = XLSX.utils.json_to_sheet(resourceRows);
+    const wsResources = XLSX.utils.json_to_sheet(resourceRows.length ? resourceRows : [{}]);
     XLSX.utils.book_append_sheet(wb, wsResources, '리소스 배치');
 
-    // Sheet 3: 장비
+    // Sheet 5: 장비
     const eqRows = (bopData.equipments || []).map(e => ({
       '장비 ID': e.equipment_id,
       '장비명': e.name,
@@ -73,16 +113,16 @@ export const api = {
     const wsEquip = XLSX.utils.json_to_sheet(eqRows.length ? eqRows : [{}]);
     XLSX.utils.book_append_sheet(wb, wsEquip, '장비');
 
-    // Sheet 4: 작업자
+    // Sheet 6: 작업자
     const wkRows = (bopData.workers || []).map(w => ({
       '작업자 ID': w.worker_id,
       '이름': w.name,
-      '숙련도': w.skill_level,
+      '숙련도': w.skill_level || '',
     }));
     const wsWorkers = XLSX.utils.json_to_sheet(wkRows.length ? wkRows : [{}]);
     XLSX.utils.book_append_sheet(wb, wsWorkers, '작업자');
 
-    // Sheet 5: 자재
+    // Sheet 7: 자재
     const mtRows = (bopData.materials || []).map(m => ({
       '자재 ID': m.material_id,
       '자재명': m.name,
@@ -91,9 +131,26 @@ export const api = {
     const wsMaterials = XLSX.utils.json_to_sheet(mtRows.length ? mtRows : [{}]);
     XLSX.utils.book_append_sheet(wb, wsMaterials, '자재');
 
+    // Sheet 8: 장애물
+    const obsRows = (bopData.obstacles || []).map(o => ({
+      '장애물 ID': o.obstacle_id,
+      '이름': o.name || '',
+      '유형': o.type || '',
+      '위치 X': o.position?.x ?? 0,
+      '위치 Y': o.position?.y ?? 0,
+      '위치 Z': o.position?.z ?? 0,
+      '크기 X': o.size?.width ?? 0,
+      '크기 Y': o.size?.height ?? 0,
+      '크기 Z': o.size?.depth ?? 0,
+      '회전 Y': o.rotation_y ?? 0,
+    }));
+    const wsObstacles = XLSX.utils.json_to_sheet(obsRows.length ? obsRows : [{}]);
+    XLSX.utils.book_append_sheet(wb, wsObstacles, '장애물');
+
     const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    downloadBlob(blob, `${bopData.project_title || 'BOP'}.xlsx`);
+    const dateStr = new Date().toISOString().split('T')[0];
+    downloadBlob(blob, `${bopData.project_title || 'BOP'}_${dateStr}.xlsx`);
   },
 
   /**
@@ -157,6 +214,19 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `실행 실패 (${res.status})`);
+    }
+    return res.json();
+  },
+
+  async generateScript(description) {
+    const res = await fetch('/api/tools/generate-script', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `스크립트 생성 실패 (${res.status})`);
     }
     return res.json();
   },

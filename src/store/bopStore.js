@@ -171,6 +171,7 @@ function normalizeProcessCenter(process, equipments) {
 }
 
 // Expand parallel processes: convert parallel_count format to separate processes
+// New JSON structure: all details in parallel_lines, no representative values at process level
 function expandParallelProcesses(bopData) {
   if (!bopData || !bopData.processes) return bopData;
 
@@ -185,13 +186,20 @@ function expandParallelProcesses(bopData) {
 
   bopData.processes.forEach(process => {
     const parallelCount = process.parallel_count || 1;
+    const parallelLines = process.parallel_lines || [];
+
+    // Get first line info for parent process display (fallback to old structure for compatibility)
+    const firstLine = parallelLines[0] || {};
+    const parentName = firstLine.name || process.name || process.process_id;
+    const parentDescription = firstLine.description ?? process.description ?? '';
+    const parentCycleTime = firstLine.cycle_time_sec ?? process.cycle_time_sec ?? 60;
 
     // ALL processes become parent + child(ren) structure
     const parentProcess = {
       process_id: process.process_id,
-      name: process.name,
-      description: process.description,
-      cycle_time_sec: process.cycle_time_sec,
+      name: parentName,
+      description: parentDescription,
+      cycle_time_sec: parentCycleTime,
       is_parent: true,
       children: Array.from({ length: parallelCount }, (_, i) =>
         `${process.process_id}-${String(i + 1).padStart(2, '0')}`
@@ -250,17 +258,20 @@ function expandParallelProcesses(bopData) {
         }
       }
 
-      // Use parallel_lines info if available, otherwise use default values
-      const parallelLineInfo = process.parallel_lines?.[i];
-      const childLocation = parallelLineInfo?.location || {
-        x: process.location.x,
-        y: process.location.y || 0,
-        z: process.location.z + i * 5  // Z-offset: 5m per parallel process (default)
+      // Get line info from parallel_lines (new structure) or fallback to process level (old structure)
+      const lineInfo = parallelLines[i] || {};
+
+      // For new lines without location, use first line as base and offset by Z axis
+      const baseLocation = firstLine.location || process.location || { x: 0, y: 0, z: 0 };
+      const childLocation = lineInfo.location || {
+        x: baseLocation.x,
+        y: baseLocation.y || 0,
+        z: baseLocation.z + i * 5  // Z축으로 5m 간격
       };
-      const childRotation = parallelLineInfo?.rotation_y ?? (process.rotation_y || 0);
-      const childName = parallelLineInfo?.name || process.name;
-      const childDescription = parallelLineInfo?.description || process.description;
-      const childCycleTime = parallelLineInfo?.cycle_time_sec || process.cycle_time_sec;
+      const childRotation = lineInfo.rotation_y ?? firstLine.rotation_y ?? process.rotation_y ?? 0;
+      const childName = lineInfo.name || firstLine.name || process.name || process.process_id;
+      const childDescription = lineInfo.description ?? firstLine.description ?? process.description ?? '';
+      const childCycleTime = lineInfo.cycle_time_sec ?? firstLine.cycle_time_sec ?? process.cycle_time_sec ?? 60;
 
       const childProcess = {
         process_id: `${process.process_id}-${String(i + 1).padStart(2, '0')}`,
@@ -288,6 +299,7 @@ function expandParallelProcesses(bopData) {
 }
 
 // Collapse parallel processes: convert separate processes back to parallel_count format
+// JSON structure matches Excel: connection info + parallel_lines (no duplicate representative values)
 function collapseParallelProcesses(bopData) {
   if (!bopData || !bopData.processes) return bopData;
 
@@ -307,26 +319,17 @@ function collapseParallelProcesses(bopData) {
           .sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0));
 
         // Merge into single process with parallel_count
+        // Only connection info at process level, all details in parallel_lines
         const collapsedProcess = {
           process_id: process.parent_id,
-          name: siblings[0].name, // Name is already correct (no suffix)
-          description: siblings[0].description,
-          cycle_time_sec: siblings[0].cycle_time_sec,
           parallel_count: siblings.length,
-          location: {
-            x: siblings[0].location.x,
-            y: siblings[0].location.y || 0,
-            z: siblings[0].location.z // First line's Z position
-          },
-          rotation_y: siblings[0].rotation_y || 0,
           predecessor_ids: siblings[0].predecessor_ids || [],
           successor_ids: siblings[0].successor_ids || [],
-          // Store each parallel line's individual properties
+          // All line details in parallel_lines (no duplicate representative values)
           parallel_lines: siblings.map(sibling => ({
-            process_id: sibling.process_id,
             parallel_index: sibling.parallel_index,
             name: sibling.name,
-            description: sibling.description,
+            description: sibling.description || '',
             cycle_time_sec: sibling.cycle_time_sec,
             location: sibling.location,
             rotation_y: sibling.rotation_y || 0
@@ -343,8 +346,21 @@ function collapseParallelProcesses(bopData) {
         collapsedGroups.add(process.parent_id);
       }
     } else {
-      // Independent process (no parent)
-      collapsedProcesses.push(process);
+      // Independent process (no parent) - should not happen in current structure
+      // but handle for safety: wrap in parallel_lines format
+      const { name, description, cycle_time_sec, location, rotation_y, ...rest } = process;
+      collapsedProcesses.push({
+        ...rest,
+        parallel_count: 1,
+        parallel_lines: [{
+          parallel_index: 1,
+          name,
+          description: description || '',
+          cycle_time_sec,
+          location,
+          rotation_y: rotation_y || 0
+        }]
+      });
     }
   });
 
@@ -1805,12 +1821,15 @@ const useBopStore = create((set) => ({
   // Scenario Management (localStorage)
   // ===================================================================
 
-  // Save current BOP as a scenario
+  // Save current BOP as a scenario (collapsed format for consistency with exports)
   saveScenario: (name) => {
     const state = useBopStore.getState();
     if (!state.bopData) {
       throw new Error('저장할 BOP 데이터가 없습니다.');
     }
+
+    // Save in collapsed format for consistency with JSON/Excel exports
+    const collapsedData = collapseParallelProcesses(state.bopData);
 
     const scenarios = JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
     const now = new Date().toISOString();
@@ -1823,7 +1842,7 @@ const useBopStore = create((set) => ({
       scenarios[existingIndex] = {
         ...scenarios[existingIndex],
         updatedAt: now,
-        data: state.bopData
+        data: collapsedData
       };
     } else {
       // Create new
@@ -1832,7 +1851,7 @@ const useBopStore = create((set) => ({
         name,
         createdAt: now,
         updatedAt: now,
-        data: state.bopData
+        data: collapsedData
       };
       scenarios.push(newScenario);
     }
@@ -1841,7 +1860,7 @@ const useBopStore = create((set) => ({
     return scenarios;
   },
 
-  // Load a scenario
+  // Load a scenario (expand parallel processes for UI)
   loadScenario: (id) => set((state) => {
     const scenarios = JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
     const scenario = scenarios.find(s => s.id === id);
@@ -1850,8 +1869,11 @@ const useBopStore = create((set) => ({
       throw new Error('시나리오를 찾을 수 없습니다.');
     }
 
+    // Expand parallel processes for UI rendering
+    const expandedData = expandParallelProcesses(scenario.data);
+
     return {
-      bopData: scenario.data,
+      bopData: expandedData,
       selectedProcessKey: null,
       selectedResourceKey: null,
       selectedObstacleId: null
