@@ -415,8 +415,9 @@ async def improve_tool(
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
                 "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.3,
+                    # responseMimeType 제거: JSON 출력이 불안정할 때 일반 텍스트로 받기
+                    # "responseMimeType": "application/json",
+                    "temperature": 0.2,  # 낮은 temperature로 일관성 향상
                 },
             }
 
@@ -460,9 +461,44 @@ async def improve_tool(
 
             log.info("[improve] Gemini 응답 수신 (길이: %d)", len(text))
             log.info("[improve] 응답 앞 500자:\n%s", text[:500])
-            text = _strip_markdown_block(text)
+            log.info("[improve] 응답 뒤 500자:\n%s", text[-500:])
 
-            data = json.loads(text)
+            text = _strip_markdown_block(text)
+            log.info("[improve] Markdown 제거 후 길이: %d", len(text))
+            log.info("[improve] 제거 후 앞 300자:\n%s", text[:300])
+
+            # JSON 파싱 시도
+            try:
+                data = json.loads(text)
+            except json.JSONDecodeError as json_err:
+                # script_code 필드 때문에 파싱 실패 가능성 높음
+                # strict=False로 재시도
+                log.warning("[improve] 표준 JSON 파싱 실패, strict=False로 재시도")
+                try:
+                    data = json.loads(text, strict=False)
+                except:
+                    # 최후의 수단: script_code 추출 후 따로 처리
+                    log.warning("[improve] strict=False도 실패, script_code 수동 추출 시도")
+                    import re
+                    # script_code를 임시로 제거하고 파싱
+                    script_match = re.search(r'"script_code":\s*"([^"]*(?:\\"[^"]*)*)"', text, re.DOTALL)
+                    if script_match:
+                        script_code_value = script_match.group(1)
+                        # script_code를 임시 값으로 치환
+                        text_without_script = re.sub(
+                            r'"script_code":\s*"[^"]*(?:\\"[^"]*)*"',
+                            '"script_code": "PLACEHOLDER"',
+                            text
+                        )
+                        try:
+                            data = json.loads(text_without_script)
+                            # script_code 복원 (이스케이프 해제)
+                            data["script_code"] = script_code_value.encode().decode('unicode_escape')
+                            log.info("[improve] script_code 수동 추출 성공")
+                        except:
+                            raise json_err  # 원래 에러 발생
+                    else:
+                        raise json_err
             log.info("[improve] JSON 파싱 성공, 키: %s", list(data.keys()) if isinstance(data, dict) else "list")
 
             if isinstance(data, list) and len(data) > 0:
@@ -494,7 +530,9 @@ async def improve_tool(
 
         except json.JSONDecodeError as e:
             log.error("[improve] JSON 파싱 실패: %s", str(e))
-            log.error("[improve] 원본 텍스트: %s", text[:1000] if 'text' in dir() else "N/A")
+            log.error("[improve] 파싱 위치: line %d, column %d", e.lineno if hasattr(e, 'lineno') else 0, e.colno if hasattr(e, 'colno') else 0)
+            log.error("[improve] 원본 텍스트 전체 (처음 2000자):\n%s", text[:2000] if 'text' in dir() else "N/A")
+            log.error("[improve] 원본 텍스트 전체 (마지막 500자):\n%s", text[-500:] if 'text' in dir() else "N/A")
             if attempt < max_retries - 1:
                 time.sleep(1)
                 continue

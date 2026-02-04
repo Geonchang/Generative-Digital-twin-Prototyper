@@ -369,7 +369,18 @@ Tool Output (first 2000 chars):
   "script_code": "updated script or null if not modified"
 }}
 
-If a field is not in modification scope or doesn't need changes, set it to null."""
+If a field is not in modification scope or doesn't need changes, set it to null.
+
+**CRITICAL JSON FORMATTING RULES:**
+1. All string fields containing code MUST properly escape special characters:
+   - Backslash: \\ → \\\\
+   - Double quote: " → \\"
+   - Newline: actual newline → \\n
+   - Tab: actual tab → \\t
+   - Curly braces in f-strings: f"{{variable}}" is OK (no escaping needed in JSON strings)
+2. For script_code field, ensure ALL newlines are escaped as \\n
+3. Test your JSON is valid before responding
+4. Do NOT wrap response in markdown code blocks"""
 
 
 ADAPTER_REPAIR_PROMPT = """You are a Python debugging expert. An adapter function failed during execution. Analyze the error and fix the code.

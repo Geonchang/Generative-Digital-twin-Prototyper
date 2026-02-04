@@ -1,6 +1,8 @@
 import json
 import logging
 from io import BytesIO
+from pathlib import Path
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,12 +13,58 @@ from app.tools.router import router as tools_router
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-)
+# 로그 디렉토리 생성
+LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+# 로그 파일 경로 (날짜별로 분리)
+log_filename = LOG_DIR / f"backend_{datetime.now().strftime('%Y%m%d')}.log"
+
+# 로그 포맷터
+log_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+# 파일 핸들러
+file_handler = logging.FileHandler(log_filename, encoding='utf-8')
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(log_formatter)
+
+# 콘솔 핸들러
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)  # 콘솔은 INFO 레벨만
+console_handler.setFormatter(log_formatter)
+
+# 루트 로거 설정
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+root_logger.addHandler(file_handler)
+root_logger.addHandler(console_handler)
+
+# 시작 메시지
+logging.info("=" * 80)
+logging.info(f"Backend started - Log file: {log_filename}")
+logging.info("=" * 80)
 
 app = FastAPI(title="Backend API", version="1.0.0")
+
+# 전역 예외 핸들러 (500 에러 로깅)
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    from fastapi.responses import JSONResponse
+
+    # 상세 에러 로깅
+    logging.error("=" * 80)
+    logging.error("[GLOBAL ERROR] 500 Internal Server Error")
+    logging.error(f"[GLOBAL ERROR] Request: {request.method} {request.url}")
+    logging.error(f"[GLOBAL ERROR] Exception Type: {type(exc).__name__}")
+    logging.error(f"[GLOBAL ERROR] Exception Message: {str(exc)}")
+    logging.error(f"[GLOBAL ERROR] Traceback:\n{traceback.format_exc()}")
+    logging.error("=" * 80)
+
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal server error: {str(exc)}"}
+    )
 
 # CORS 설정
 app.add_middleware(

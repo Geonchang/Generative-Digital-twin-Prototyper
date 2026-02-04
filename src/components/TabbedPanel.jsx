@@ -20,27 +20,6 @@ function TabbedPanel() {
     { id: 'scenarios', label: '시나리오', icon: '📁' },
   ];
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'bop':
-        return <BopTable />;
-      case 'equipments':
-        return <EquipmentsTable />;
-      case 'workers':
-        return <WorkersTable />;
-      case 'materials':
-        return <MaterialsTable />;
-      case 'obstacles':
-        return <ObstacleTable />;
-      case 'tools':
-        return <ToolsPanel />;
-      case 'scenarios':
-        return <ScenariosPanel />;
-      default:
-        return <BopTable />;
-    }
-  };
-
   return (
     <div style={styles.container}>
       {/* Tab Buttons */}
@@ -60,9 +39,29 @@ function TabbedPanel() {
         ))}
       </div>
 
-      {/* Tab Content */}
+      {/* Tab Content - 모든 탭을 렌더링하되 비활성 탭은 숨김 (상태 유지) */}
       <div style={styles.tabContent}>
-        {renderContent()}
+        <div style={{ display: activeTab === 'bop' ? 'block' : 'none', height: '100%' }}>
+          <BopTable />
+        </div>
+        <div style={{ display: activeTab === 'equipments' ? 'block' : 'none', height: '100%' }}>
+          <EquipmentsTable />
+        </div>
+        <div style={{ display: activeTab === 'workers' ? 'block' : 'none', height: '100%' }}>
+          <WorkersTable />
+        </div>
+        <div style={{ display: activeTab === 'materials' ? 'block' : 'none', height: '100%' }}>
+          <MaterialsTable />
+        </div>
+        <div style={{ display: activeTab === 'obstacles' ? 'block' : 'none', height: '100%' }}>
+          <ObstacleTable />
+        </div>
+        <div style={{ display: activeTab === 'tools' ? 'block' : 'none', height: '100%' }}>
+          <ToolsPanel />
+        </div>
+        <div style={{ display: activeTab === 'scenarios' ? 'block' : 'none', height: '100%' }}>
+          <ScenariosPanel />
+        </div>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@ import copy
 import inspect
 import traceback
 import logging
+import math
 from pathlib import Path
 from typing import Tuple, Optional, Dict, Any
 
@@ -22,6 +23,46 @@ log = logging.getLogger("tool_executor")
 SUBPROCESS_TIMEOUT_SEC = 60
 MAX_AUTO_REPAIR_ATTEMPTS = 2  # 자동 복구 최대 시도 횟수
 MAX_SCRIPT_REPAIR_ATTEMPTS = 1  # 스크립트 실행 오류 자동 복구 시도 횟수
+
+
+def _sanitize_json_floats(obj):
+    """
+    JSON에서 지원하지 않는 float 값(NaN, Infinity, -Infinity)을 정리합니다.
+
+    - NaN → null
+    - Infinity, -Infinity → null
+
+    Returns:
+        정리된 객체와 변경 여부
+    """
+    changed = False
+
+    if isinstance(obj, dict):
+        cleaned = {}
+        for key, value in obj.items():
+            cleaned_value, value_changed = _sanitize_json_floats(value)
+            cleaned[key] = cleaned_value
+            if value_changed:
+                changed = True
+        return cleaned, changed
+
+    elif isinstance(obj, list):
+        cleaned = []
+        for item in obj:
+            cleaned_item, item_changed = _sanitize_json_floats(item)
+            cleaned.append(cleaned_item)
+            if item_changed:
+                changed = True
+        return cleaned, changed
+
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            log.warning("[sanitize] Invalid float detected: %s → null", obj)
+            return None, True
+        return obj, False
+
+    else:
+        return obj, False
 
 
 def _detect_args_format_error(stderr: str) -> Optional[Dict[str, Any]]:
@@ -482,6 +523,27 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
                 "auto_repair_attempted": exec_log["auto_repair_attempts"] > 0,
             }
 
+        # === JSON 직렬화 불가능한 값 정리 (NaN, Infinity 등) ===
+        updated_bop, sanitized = _sanitize_json_floats(updated_bop)
+        if sanitized:
+            log.warning("[execute] BOP에서 유효하지 않은 float 값이 발견되어 정리되었습니다 (NaN/Infinity → null)")
+            exec_log["message"] = "도구 실행이 완료되었습니다. (일부 값이 정리되었습니다)"
+            exec_log["sanitized_invalid_floats"] = True
+
+        # JSON 직렬화 가능 여부 테스트
+        try:
+            json.dumps(updated_bop)
+        except (ValueError, TypeError) as e:
+            log.error("[execute] JSON 직렬화 실패: %s", str(e))
+            log.error("[execute] updated_bop (처음 1000자):\n%s", str(updated_bop)[:1000])
+            exec_log["message"] = f"JSON 직렬화 실패: {str(e)}"
+            exec_log["execution_time_sec"] = time.time() - start_time
+            return {
+                "success": False,
+                "message": exec_log["message"],
+                "execution_time_sec": exec_log["execution_time_sec"],
+            }
+
         # === 자동 복구된 코드가 있으면 레지스트리 업데이트 ===
         if current_pre_code != adapter.pre_process_code or current_post_code != adapter.post_process_code:
             from app.tools.tool_models import AdapterCode as AC
@@ -509,8 +571,8 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
             "success": True,
             "message": exec_log["message"],
             "updated_bop": updated_bop,
-            "tool_input": tool_input[:5000] if tool_input else None,
-            "tool_output": tool_output[:5000] if tool_output else None,
+            "tool_input": tool_input if tool_input else None,  # 전체 표시
+            "tool_output": tool_output if tool_output else None,  # 전체 표시
             "stdout": stdout[:2000] if stdout else None,
             "stderr": stderr[:500] if stderr else None,
             "execution_time_sec": exec_log["execution_time_sec"],

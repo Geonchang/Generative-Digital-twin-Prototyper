@@ -269,9 +269,20 @@ async def apply_improvement_endpoint(tool_id: str, req: ApplyImprovementRequest)
         # 새 버전 생성 시 tool_id 결정
         if req.create_new_version:
             # wall_generator -> wall_generator_v2 -> wall_generator_v3 ...
-            base_name = tool_id.rstrip('0123456789').rstrip('_v')
-            new_tool_id = generate_tool_id(f"{base_name}_v2")
-            new_tool_name = f"{old_metadata.tool_name}_v2"
+            import re
+            # 기존 버전 번호 추출 (예: tool_name_v2 → 2)
+            version_match = re.search(r'_v(\d+)$', tool_id)
+            if version_match:
+                # 이미 버전이 있으면 증가
+                current_version = int(version_match.group(1))
+                base_name = tool_id[:version_match.start()]
+                next_version = current_version + 1
+                new_tool_id = generate_tool_id(f"{base_name}_v{next_version}")
+                new_tool_name = f"{old_metadata.tool_name.rsplit('_v', 1)[0]}_v{next_version}"
+            else:
+                # 버전이 없으면 _v2 추가
+                new_tool_id = generate_tool_id(f"{tool_id}_v2")
+                new_tool_name = f"{old_metadata.tool_name}_v2"
         else:
             new_tool_id = tool_id
             new_tool_name = old_metadata.tool_name

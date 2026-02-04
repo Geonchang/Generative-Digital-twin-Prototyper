@@ -197,6 +197,12 @@ export const api = {
     return res.json();
   },
 
+  async getToolDetail(toolId) {
+    const res = await fetch(`/api/tools/${toolId}`);
+    if (!res.ok) throw new Error(`도구 상세 조회 실패 (${res.status})`);
+    return res.json();
+  },
+
   async deleteTool(toolId) {
     const res = await fetch(`/api/tools/${toolId}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`삭제 실패 (${res.status})`);

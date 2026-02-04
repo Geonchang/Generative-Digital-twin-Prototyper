@@ -32,6 +32,7 @@ function ToolsPanel() {
 
   // Detail
   const [selectedTool, setSelectedTool] = useState(null);
+  const [toolDetail, setToolDetail] = useState(null);  // 어댑터 코드 포함 상세 정보
   const [executing, setExecuting] = useState(false);
   const [execResult, setExecResult] = useState(null);
   const [toolParams, setToolParams] = useState({});
@@ -50,7 +51,22 @@ function ToolsPanel() {
   // Error
   const [error, setError] = useState('');
 
+  // 다중 선택
+  const [selectedToolIds, setSelectedToolIds] = useState([]);
+
   const fileInputRef = useRef(null);
+
+  // 다음 버전 번호 계산
+  const getNextVersionLabel = (toolId) => {
+    if (!toolId) return 'v2';
+    // _v3, _v2 등에서 버전 번호 추출
+    const match = toolId.match(/_v(\d+)$/);
+    if (match) {
+      const currentVersion = parseInt(match[1], 10);
+      return `v${currentVersion + 1}`;
+    }
+    return 'v2';  // 버전이 없으면 v2
+  };
 
   // BOP 변경 사항 계산
   const computeBopChanges = (original, updated) => {
@@ -142,6 +158,7 @@ function ToolsPanel() {
     try {
       const list = await api.listTools();
       setTools(list);
+      setSelectedToolIds([]);  // 선택 초기화
     } catch (err) {
       setError(err.message);
     } finally {
@@ -222,8 +239,9 @@ function ToolsPanel() {
 
   // === Detail View Handlers ===
 
-  const openDetail = (tool) => {
+  const openDetail = async (tool) => {
     setSelectedTool(tool);
+    setToolDetail(null);
     setExecResult(null);
     setPendingResult(null);
     setError('');
@@ -240,6 +258,15 @@ function ToolsPanel() {
     });
     setToolParams(defaults);
     setView('detail');
+
+    // 어댑터 코드를 포함한 상세 정보 로드
+    try {
+      const detail = await api.getToolDetail(tool.tool_id);
+      setToolDetail(detail);
+    } catch (err) {
+      console.error('[ToolsPanel] 도구 상세 조회 실패:', err);
+      // 실패해도 계속 진행 (어댑터 코드만 안 보일 뿐)
+    }
   };
 
   const handleExecute = async () => {
@@ -335,9 +362,47 @@ function ToolsPanel() {
     try {
       await api.deleteTool(selectedTool.tool_id);
       setSelectedTool(null);
+      setSelectedToolIds([]);  // 선택 초기화
       setView('main');
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  // 다중 삭제
+  const handleDeleteSelected = async () => {
+    if (selectedToolIds.length === 0) return;
+    if (!confirm(`선택한 ${selectedToolIds.length}개 도구를 삭제하시겠습니까?`)) return;
+
+    try {
+      setListLoading(true);
+      // 병렬로 삭제
+      await Promise.all(selectedToolIds.map(id => api.deleteTool(id)));
+      setSelectedToolIds([]);
+      await loadTools();  // 목록 새로고침
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  // 체크박스 토글
+  const toggleToolSelection = (toolId, e) => {
+    e.stopPropagation();  // 카드 클릭 이벤트 방지
+    setSelectedToolIds(prev =>
+      prev.includes(toolId)
+        ? prev.filter(id => id !== toolId)
+        : [...prev, toolId]
+    );
+  };
+
+  // 전체 선택/해제
+  const toggleSelectAll = () => {
+    if (selectedToolIds.length === tools.length) {
+      setSelectedToolIds([]);
+    } else {
+      setSelectedToolIds(tools.map(t => t.tool_id));
     }
   };
 
@@ -486,6 +551,29 @@ function ToolsPanel() {
         </div>
       </div>
 
+      {/* 다중 선택 도구 */}
+      {!listLoading && tools.length > 0 && (
+        <div style={{ padding: '8px 12px', backgroundColor: '#f8f9fa', borderRadius: 4, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', userSelect: 'none' }}>
+            <input
+              type="checkbox"
+              checked={selectedToolIds.length === tools.length && tools.length > 0}
+              onChange={toggleSelectAll}
+              style={{ cursor: 'pointer' }}
+            />
+            <span>전체 선택 ({selectedToolIds.length}/{tools.length})</span>
+          </label>
+          {selectedToolIds.length > 0 && (
+            <button
+              style={{ ...styles.dangerBtn, padding: '4px 12px', fontSize: 12 }}
+              onClick={handleDeleteSelected}
+            >
+              선택 삭제 ({selectedToolIds.length})
+            </button>
+          )}
+        </div>
+      )}
+
       {listLoading && <div style={styles.info}>불러오는 중...</div>}
 
       {!listLoading && tools.length === 0 && (
@@ -498,9 +586,25 @@ function ToolsPanel() {
       )}
 
       {tools.map(tool => (
-        <div key={tool.tool_id} style={styles.card} onClick={() => openDetail(tool)}>
+        <div
+          key={tool.tool_id}
+          style={{
+            ...styles.card,
+            backgroundColor: selectedToolIds.includes(tool.tool_id) ? '#e3f2fd' : 'white'
+          }}
+          onClick={() => openDetail(tool)}
+        >
           <div style={styles.cardHeader}>
-            <span style={styles.cardName}>{tool.tool_name}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={selectedToolIds.includes(tool.tool_id)}
+                onChange={(e) => toggleToolSelection(tool.tool_id, e)}
+                onClick={(e) => e.stopPropagation()}
+                style={{ cursor: 'pointer' }}
+              />
+              <span style={styles.cardName}>{tool.tool_name}</span>
+            </div>
             <span style={styles.badge}>{tool.execution_type}</span>
           </div>
           <div style={styles.cardDesc}>{tool.description}</div>
@@ -633,25 +737,35 @@ function ToolsPanel() {
   const renderToolOutput = (toolOutput) => {
     if (!toolOutput) return null;
     try {
+      // JSON 파싱 시도
       const parsed = JSON.parse(toolOutput);
+      // JSON 전체를 보기 좋게 표시
       return (
-        <div style={{ fontSize: 12, lineHeight: 1.5 }}>
-          {Object.entries(parsed).map(([key, value]) => (
-            <div key={key} style={{ marginBottom: 6 }}>
-              <span style={{ fontWeight: 600, color: '#555' }}>{key}: </span>
-              {typeof value === 'object' ? (
-                <pre style={{ ...styles.codePreview, maxHeight: 120, marginTop: 2 }}>
-                  {JSON.stringify(value, null, 2)}
-                </pre>
-              ) : (
-                <span style={{ color: '#333' }}>{String(value)}</span>
-              )}
-            </div>
-          ))}
-        </div>
+        <pre style={{
+          ...styles.codePreview,
+          maxHeight: '400px',  // 스크롤 가능
+          overflow: 'auto',
+          fontSize: 11,
+          lineHeight: 1.6,
+          whiteSpace: 'pre-wrap',  // 줄바꿈 허용
+          wordBreak: 'break-word'  // 긴 단어 줄바꿈
+        }}>
+          {JSON.stringify(parsed, null, 2)}
+        </pre>
       );
     } catch {
-      return <pre style={styles.codePreview}>{toolOutput}</pre>;
+      // JSON이 아니면 그대로 표시
+      return (
+        <pre style={{
+          ...styles.codePreview,
+          maxHeight: '400px',  // 스크롤 가능
+          overflow: 'auto',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word'
+        }}>
+          {toolOutput}
+        </pre>
+      );
     }
   };
 
@@ -818,11 +932,31 @@ function ToolsPanel() {
               </div>
             )}
 
+            {/* Pre-process Adapter Code */}
+            {toolDetail?.adapter?.pre_process_code && (
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
+                  🔧 Pre-process 코드 (BOP → 도구 입력)
+                </summary>
+                <pre style={{
+                  ...styles.codePreview,
+                  maxHeight: '300px',
+                  overflow: 'auto',
+                  fontSize: 11,
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}>
+                  {toolDetail.adapter.pre_process_code}
+                </pre>
+              </details>
+            )}
+
             {/* Tool Input Preview */}
             {execResult.tool_input && (
               <details style={{ marginTop: 8 }}>
                 <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
-                  📥 도구 입력 데이터
+                  📥 도구 입력 데이터 (어댑터 변환 후)
                 </summary>
                 {renderToolOutput(execResult.tool_input)}
               </details>
@@ -830,12 +964,32 @@ function ToolsPanel() {
 
             {/* Tool Output Preview */}
             {execResult.tool_output && (
-              <div style={{ marginTop: 8, borderTop: '1px solid #e0e0e0', paddingTop: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
-                  📤 도구 출력 결과
-                </div>
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
+                  📤 도구 출력 결과 (스크립트 생성)
+                </summary>
                 {renderToolOutput(execResult.tool_output)}
-              </div>
+              </details>
+            )}
+
+            {/* Post-process Adapter Code */}
+            {toolDetail?.adapter?.post_process_code && (
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
+                  🔧 Post-process 코드 (도구 출력 → BOP)
+                </summary>
+                <pre style={{
+                  ...styles.codePreview,
+                  maxHeight: '300px',
+                  overflow: 'auto',
+                  fontSize: 11,
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}>
+                  {toolDetail.adapter.post_process_code}
+                </pre>
+              </details>
             )}
 
             {execResult.stdout && (
@@ -1009,7 +1163,7 @@ function ToolsPanel() {
                       onClick={() => handleApplyImprovement(true)}
                       disabled={applying}
                     >
-                      {applying ? '적용 중...' : '새 버전으로 저장 (v2)'}
+                      {applying ? '적용 중...' : `새 버전으로 저장 (${getNextVersionLabel(selectedTool?.tool_id)})`}
                     </button>
                     <button
                       style={styles.dangerBtn}
@@ -1192,7 +1346,7 @@ const styles = {
     fontSize: '11px',
     lineHeight: '1.4',
     overflow: 'auto',
-    maxHeight: '200px',
+    maxHeight: 'none',  // 제한 없음 (개별적으로 필요시 오버라이드)
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-all',
     fontFamily: 'monospace',
