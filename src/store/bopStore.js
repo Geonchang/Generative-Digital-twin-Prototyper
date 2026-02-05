@@ -1436,7 +1436,7 @@ const useBopStore = create((set) => ({
     const newEquipment = {
       equipment_id: newId,
       name: data.name || defaultName,
-      type: data.type || 'machine'
+      type: data.type || 'manual_station'
     };
 
     return {

@@ -92,7 +92,10 @@ def get_tool(tool_id: str) -> Optional[ToolRegistryEntry]:
     with open(adapter_file, "r", encoding="utf-8") as f:
         adapter = AdapterCode(**json.load(f))
 
-    return ToolRegistryEntry(metadata=metadata, adapter=adapter)
+    # 스크립트 코드도 함께 반환
+    script_code = get_script_content(tool_id, metadata.file_name)
+
+    return ToolRegistryEntry(metadata=metadata, adapter=adapter, script_code=script_code)
 
 
 def delete_tool(tool_id: str) -> bool:

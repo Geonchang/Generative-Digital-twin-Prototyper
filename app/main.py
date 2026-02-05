@@ -39,6 +39,9 @@ root_logger.setLevel(logging.DEBUG)
 root_logger.addHandler(file_handler)
 root_logger.addHandler(console_handler)
 
+# urllib3 로거 레벨 조정 (API 키 노출 방지)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 # 시작 메시지
 logging.info("=" * 80)
 logging.info(f"Backend started - Log file: {log_filename}")

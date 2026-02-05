@@ -61,6 +61,7 @@ class AdapterCode(BaseModel):
 class ToolRegistryEntry(BaseModel):
     metadata: ToolMetadata
     adapter: AdapterCode
+    script_code: Optional[str] = Field(default=None, description="도구 스크립트 코드")
 
 
 # === API Request/Response ===

@@ -962,6 +962,26 @@ function ToolsPanel() {
               </details>
             )}
 
+            {/* Script Code (between input and output) */}
+            {toolDetail?.script_code && (
+              <details style={{ marginTop: 8 }}>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
+                  📜 실행 스크립트 코드
+                </summary>
+                <pre style={{
+                  ...styles.codePreview,
+                  maxHeight: '400px',
+                  overflow: 'auto',
+                  fontSize: 11,
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word'
+                }}>
+                  {toolDetail.script_code}
+                </pre>
+              </details>
+            )}
+
             {/* Tool Output Preview */}
             {execResult.tool_output && (
               <details style={{ marginTop: 8 }}>

@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 import requests
 from dotenv import load_dotenv
@@ -10,6 +11,12 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
 
 log = logging.getLogger("tool_analyzer")
+
+
+def _mask_api_key(text: str) -> str:
+    """에러 메시지에서 API 키를 마스킹합니다."""
+    # ?key=xxx 또는 &key=xxx 패턴 마스킹
+    return re.sub(r'([?&]key=)[^&\s]+', r'\1***MASKED***', str(text))
 
 
 def _strip_markdown_block(text: str) -> str:
@@ -104,7 +111,7 @@ async def analyze_script(source_code: str, file_name: str, sample_input: str = N
                 if attempt < max_retries - 1:
                     time.sleep(wait_time)
                 continue
-            last_error = f"API 호출 실패: {str(e)}"
+            last_error = f"API 호출 실패: {_mask_api_key(str(e))}"
             log.error("[analyze] %s", last_error)
             if attempt < max_retries - 1:
                 time.sleep(1)

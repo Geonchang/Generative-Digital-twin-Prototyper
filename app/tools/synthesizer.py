@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 import logging
 import requests
@@ -10,6 +11,11 @@ from app.tools.tool_models import ToolMetadata, AdapterCode
 from typing import Optional, Dict, Any
 
 log = logging.getLogger("tool_synthesizer")
+
+
+def _mask_api_key(text: str) -> str:
+    """에러 메시지에서 API 키를 마스킹합니다."""
+    return re.sub(r'([?&]key=)[^&\s]+', r'\1***MASKED***', str(text))
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
@@ -24,6 +30,90 @@ def _strip_markdown_block(text: str) -> str:
             lines = lines[:-1]
         text = '\n'.join(lines)
     return text.strip()
+
+
+def _extract_code_fields_and_parse(text: str, original_error: Exception) -> dict:
+    """
+    JSON 파싱 실패 시 코드 필드를 수동 추출하여 파싱합니다.
+    pre_process_code, post_process_code, script_code 필드의 docstring 문제 해결.
+    """
+    code_fields = ["pre_process_code", "post_process_code", "script_code"]
+    extracted_codes = {}
+    modified_text = text
+
+    for field in code_fields:
+        # 필드 시작 위치 찾기: "field_name": "
+        pattern_start = f'"{field}":\\s*"'
+        match_start = re.search(pattern_start, modified_text)
+
+        if match_start:
+            start_idx = match_start.end()  # 첫 번째 " 다음 위치
+
+            # 문자열 끝 찾기: 이스케이프되지 않은 " 찾기
+            # null인 경우 처리
+            if modified_text[match_start.start():].startswith(f'"{field}": null') or \
+               modified_text[match_start.start():].startswith(f'"{field}":null'):
+                continue
+
+            # 코드 내용 추출 (중첩된 따옴표 고려)
+            depth = 0
+            end_idx = start_idx
+            in_escape = False
+
+            for i in range(start_idx, len(modified_text)):
+                char = modified_text[i]
+
+                if in_escape:
+                    in_escape = False
+                    continue
+
+                if char == '\\':
+                    in_escape = True
+                    continue
+
+                if char == '"':
+                    # 이전 문자들이 이스케이프인지 확인
+                    num_backslashes = 0
+                    j = i - 1
+                    while j >= start_idx and modified_text[j] == '\\':
+                        num_backslashes += 1
+                        j -= 1
+
+                    # 홀수 개의 백슬래시면 이스케이프된 따옴표
+                    if num_backslashes % 2 == 0:
+                        end_idx = i
+                        break
+
+            if end_idx > start_idx:
+                code_content = modified_text[start_idx:end_idx]
+                extracted_codes[field] = code_content
+
+                # placeholder로 치환
+                full_match = modified_text[match_start.start():end_idx + 1]
+                modified_text = modified_text.replace(full_match, f'"{field}": "PLACEHOLDER_{field}"', 1)
+                log.info("[improve] %s 필드 추출 성공 (길이: %d)", field, len(code_content))
+
+    # 수정된 텍스트로 JSON 파싱 시도
+    try:
+        data = json.loads(modified_text)
+
+        # 추출한 코드 복원
+        for field, code in extracted_codes.items():
+            try:
+                # unicode escape 처리
+                decoded_code = code.encode('utf-8').decode('unicode_escape')
+                data[field] = decoded_code
+            except:
+                # 디코딩 실패 시 원본 사용
+                data[field] = code.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
+
+        log.info("[improve] 코드 필드 수동 추출 파싱 성공")
+        return data
+
+    except json.JSONDecodeError as e:
+        log.error("[improve] 수동 추출 후에도 파싱 실패: %s", str(e))
+        log.error("[improve] 수정된 텍스트 앞 500자:\n%s", modified_text[:500])
+        raise original_error
 
 
 async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None) -> AdapterCode:
@@ -121,13 +211,13 @@ async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None) ->
                 if attempt < max_retries - 1:
                     time.sleep(wait_time)
                 continue
-            last_error = f"API 호출 실패: {str(e)}"
+            last_error = f"API 호출 실패: {_mask_api_key(str(e))}"
             if attempt < max_retries - 1:
                 time.sleep(1)
             continue
 
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            last_error = f"응답 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
+            last_error = f"응답 파싱 실패 (시도 {attempt + 1}/{max_retries}): {_mask_api_key(str(e))}"
             if attempt < max_retries - 1:
                 time.sleep(1)
             continue
@@ -223,11 +313,11 @@ async def repair_adapter(
                 log.warning("[repair] Rate Limit - %d초 대기", wait_time)
                 time.sleep(wait_time)
                 continue
-            log.error("[repair] API 호출 실패: %s", str(e))
+            log.error("[repair] API 호출 실패: %s", _mask_api_key(str(e)))
             return None
 
         except (json.JSONDecodeError, KeyError) as e:
-            log.error("[repair] 응답 파싱 실패: %s", str(e))
+            log.error("[repair] 응답 파싱 실패: %s", _mask_api_key(str(e)))
             if attempt < max_retries - 1:
                 time.sleep(1)
                 continue
@@ -316,14 +406,14 @@ async def generate_tool_script(user_description: str) -> Optional[Dict[str, Any]
                 log.warning("[generate_script] Rate Limit - %d초 대기", wait_time)
                 time.sleep(wait_time)
                 continue
-            log.error("[generate_script] API 호출 실패: %s", str(e))
+            log.error("[generate_script] API 호출 실패: %s", _mask_api_key(str(e)))
             if attempt < max_retries - 1:
                 time.sleep(1)
                 continue
             return None
 
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            log.error("[generate_script] 응답 파싱 실패: %s", str(e))
+            log.error("[generate_script] 응답 파싱 실패: %s", _mask_api_key(str(e)))
             if attempt < max_retries - 1:
                 time.sleep(1)
                 continue
@@ -471,34 +561,15 @@ async def improve_tool(
             try:
                 data = json.loads(text)
             except json.JSONDecodeError as json_err:
-                # script_code 필드 때문에 파싱 실패 가능성 높음
-                # strict=False로 재시도
+                # 코드 필드(pre_process_code, post_process_code, script_code)의
+                # docstring(""") 이스케이프 문제로 파싱 실패 가능성 높음
                 log.warning("[improve] 표준 JSON 파싱 실패, strict=False로 재시도")
                 try:
                     data = json.loads(text, strict=False)
                 except:
-                    # 최후의 수단: script_code 추출 후 따로 처리
-                    log.warning("[improve] strict=False도 실패, script_code 수동 추출 시도")
-                    import re
-                    # script_code를 임시로 제거하고 파싱
-                    script_match = re.search(r'"script_code":\s*"([^"]*(?:\\"[^"]*)*)"', text, re.DOTALL)
-                    if script_match:
-                        script_code_value = script_match.group(1)
-                        # script_code를 임시 값으로 치환
-                        text_without_script = re.sub(
-                            r'"script_code":\s*"[^"]*(?:\\"[^"]*)*"',
-                            '"script_code": "PLACEHOLDER"',
-                            text
-                        )
-                        try:
-                            data = json.loads(text_without_script)
-                            # script_code 복원 (이스케이프 해제)
-                            data["script_code"] = script_code_value.encode().decode('unicode_escape')
-                            log.info("[improve] script_code 수동 추출 성공")
-                        except:
-                            raise json_err  # 원래 에러 발생
-                    else:
-                        raise json_err
+                    # 최후의 수단: 코드 필드들을 수동 추출 후 처리
+                    log.warning("[improve] strict=False도 실패, 코드 필드 수동 추출 시도")
+                    data = _extract_code_fields_and_parse(text, json_err)
             log.info("[improve] JSON 파싱 성공, 키: %s", list(data.keys()) if isinstance(data, dict) else "list")
 
             if isinstance(data, list) and len(data) > 0:
@@ -521,8 +592,8 @@ async def improve_tool(
                 log.warning("[improve] Rate Limit - %d초 대기", wait_time)
                 time.sleep(wait_time)
                 continue
-            log.error("[improve] API 호출 실패: %s", str(e))
-            log.error("[improve] 응답 내용: %s", e.response.text[:1000] if e.response else "No response")
+            log.error("[improve] API 호출 실패: %s", _mask_api_key(str(e)))
+            log.error("[improve] 응답 내용: %s", _mask_api_key(e.response.text[:1000]) if e.response else "No response")
             if attempt < max_retries - 1:
                 time.sleep(1)
                 continue
