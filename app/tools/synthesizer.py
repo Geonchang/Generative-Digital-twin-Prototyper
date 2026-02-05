@@ -32,6 +32,74 @@ def _strip_markdown_block(text: str) -> str:
     return text.strip()
 
 
+def _fix_unescaped_docstrings(text: str) -> str:
+    """
+    JSON 문자열 안의 이스케이프 안 된 Python docstring(triple quotes)을 수정합니다.
+
+    문제: Gemini가 script_code 안에서 triple quotes를 이스케이프 안 하는 경우
+    예: "script_code": "def foo():\\n    triple-quotes-docstring" (잘못됨)
+    수정: 이스케이프된 형태로 변환
+    """
+    # 코드 필드 내부에서 이스케이프 안 된 """ 찾아서 수정
+    code_fields = ["pre_process_code", "post_process_code", "script_code"]
+
+    for field in code_fields:
+        # 필드 시작 패턴
+        pattern = f'"{field}":\\s*"'
+        match = re.search(pattern, text)
+        if not match:
+            continue
+
+        field_start = match.end()
+
+        # 필드 값의 끝 찾기 (복잡한 휴리스틱 필요)
+        # JSON에서 코드 필드 다음에 오는 패턴: ", "next_field" 또는 "}\n" 등
+        # 가장 안전한 방법: 다음 필드 시작 또는 객체 끝 찾기
+        remaining = text[field_start:]
+
+        # 이스케이프 안 된 """ 패턴을 찾아서 \\\"\\\"\\\" 로 변환
+        # (?<!\\)는 앞에 \가 없는 경우
+        # 주의: JSON 문자열 내부에서는 \가 \\로 표현됨
+
+        # 간단한 접근: 연속된 """를 찾아서 교체 (이미 이스케이프된 것 제외)
+        # "\\\"\\\"\\\"" 패턴은 건드리지 않음
+
+    # 전체 텍스트에서 코드 값 내 """ 패턴 처리
+    # script_code나 다른 코드 필드에서 이스케이프 안 된 """ 찾기
+
+    # 더 직접적인 접근: \\n 이후에 오는 """는 docstring일 가능성 높음
+    # 패턴: \n    """ 또는 \n"""
+    # JSON 안에서는: \\n    """ 또는 \\n"""
+
+    # 이스케이프 안 된 """ (앞에 \가 없는)를 \\\"\\\"\\\"로 변환
+    # (?<!\\) 사용하되, JSON에서 \\는 실제 \를 의미하므로 주의
+
+    result = text
+
+    # 패턴 1: \\n 다음에 공백과 """가 오는 경우 (docstring 시작)
+    # \\n    """ -> \\n    \\\"\\\"\\\"
+    result = re.sub(
+        r'(\\n\s*)"""',
+        r'\1\\"\\"\\"',
+        result
+    )
+
+    # 패턴 2: """\\n (docstring 끝 부분)
+    result = re.sub(
+        r'"""(\\n)',
+        r'\\"\\"\\"\1',
+        result
+    )
+
+    # 패턴 3: 줄 끝의 """ (예: """\\n    pass)
+    # 이미 위에서 처리됨
+
+    if result != text:
+        log.info("[parse] docstring 이스케이프 수정 적용됨")
+
+    return result
+
+
 def _extract_code_fields_and_parse(text: str, original_error: Exception) -> dict:
     """
     JSON 파싱 실패 시 코드 필드를 수동 추출하여 파싱합니다.
@@ -556,6 +624,9 @@ async def improve_tool(
             text = _strip_markdown_block(text)
             log.info("[improve] Markdown 제거 후 길이: %d", len(text))
             log.info("[improve] 제거 후 앞 300자:\n%s", text[:300])
+
+            # 이스케이프 안 된 docstring 수정
+            text = _fix_unescaped_docstrings(text)
 
             # JSON 파싱 시도
             try:

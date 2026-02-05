@@ -30,6 +30,52 @@ def _strip_markdown_block(text: str) -> str:
     return text.strip()
 
 
+def _detect_argparse_format(source_code: str) -> str:
+    """
+    스크립트에서 argparse 사용 패턴을 감지하여 args_format을 반환합니다.
+
+    Returns:
+        str: args_format 문자열 또는 None
+    """
+    # argparse 사용 여부 확인
+    if 'argparse' not in source_code:
+        return None
+
+    if 'ArgumentParser' not in source_code:
+        return None
+
+    args = []
+
+    # --input 또는 -i 패턴 찾기
+    input_patterns = [
+        r"add_argument\s*\(\s*['\"]--input['\"]",
+        r"add_argument\s*\(\s*['\"]--input['\"].*?['\"](-i|--input)['\"]",
+        r"add_argument\s*\(\s*['\"]-i['\"]",
+    ]
+    for pattern in input_patterns:
+        if re.search(pattern, source_code):
+            args.append("--input {input_file}")
+            break
+
+    # --output 또는 -o 패턴 찾기
+    output_patterns = [
+        r"add_argument\s*\(\s*['\"]--output['\"]",
+        r"add_argument\s*\(\s*['\"]--output['\"].*?['\"](-o|--output)['\"]",
+        r"add_argument\s*\(\s*['\"]-o['\"]",
+    ]
+    for pattern in output_patterns:
+        if re.search(pattern, source_code):
+            args.append("--output {output_file}")
+            break
+
+    if args:
+        result = " ".join(args)
+        log.info("[analyze] argparse 감지됨, args_format='%s'", result)
+        return result
+
+    return None
+
+
 async def analyze_script(source_code: str, file_name: str, sample_input: str = None) -> dict:
     """LLM을 사용하여 스크립트의 입출력 스키마를 분석합니다."""
     log.info("[analyze] 호출됨 — file_name=%s, source_code 길이=%d, sample_input=%s",
@@ -99,6 +145,17 @@ async def analyze_script(source_code: str, file_name: str, sample_input: str = N
 
             if "execution_type" not in data:
                 data["execution_type"] = "python"
+
+            # args_format 자동 감지 (Gemini가 null을 반환한 경우)
+            input_schema = data.get("input_schema", {})
+            if isinstance(input_schema, dict):
+                current_args_format = input_schema.get("args_format")
+                if not current_args_format:
+                    detected_format = _detect_argparse_format(source_code)
+                    if detected_format:
+                        input_schema["args_format"] = detected_format
+                        data["input_schema"] = input_schema
+                        log.info("[analyze] args_format 자동 설정: %s", detected_format)
 
             log.info("[analyze] 분석 성공 — tool_name=%s", data.get("tool_name"))
             return data

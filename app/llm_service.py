@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import requests
 import time
@@ -9,6 +10,9 @@ from app.models import BOPData
 
 # .env 파일 로드
 load_dotenv()
+
+# 로거 설정
+log = logging.getLogger(__name__)
 
 # Gemini API 키 설정
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
@@ -115,27 +119,27 @@ async def generate_bop_from_text(user_input: str) -> dict:
             if e.response.status_code == 429:
                 wait_time = (2 ** attempt) * 2  # 2, 4, 8초
                 last_error = f"Rate Limit 초과 (시도 {attempt + 1}/{max_retries}). {wait_time}초 대기 후 재시도..."
-                print(last_error)
+                log.warning(last_error)
                 if attempt < max_retries - 1:
                     time.sleep(wait_time)
                 continue
             else:
                 last_error = f"API 호출 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-                print(last_error)
+                log.error(last_error)
                 if attempt < max_retries - 1:
                     time.sleep(1)
                 continue
 
         except json.JSONDecodeError as e:
             last_error = f"JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            print(last_error)
+            log.error(last_error)
             if attempt < max_retries - 1:
                 time.sleep(1)
             continue
 
         except Exception as e:
             last_error = f"BOP 생성 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            print(last_error)
+            log.error(last_error)
             if attempt < max_retries - 1:
                 time.sleep(1)
             continue
@@ -218,27 +222,27 @@ async def modify_bop(current_bop: dict, user_message: str) -> dict:
             if e.response.status_code == 429:
                 wait_time = (2 ** attempt) * 2  # 2, 4, 8초
                 last_error = f"Rate Limit 초과 (시도 {attempt + 1}/{max_retries}). {wait_time}초 대기 후 재시도..."
-                print(last_error)
+                log.warning(last_error)
                 if attempt < max_retries - 1:
                     time.sleep(wait_time)
                 continue
             else:
                 last_error = f"API 호출 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-                print(last_error)
+                log.error(last_error)
                 if attempt < max_retries - 1:
                     time.sleep(1)
                 continue
 
         except json.JSONDecodeError as e:
             last_error = f"JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            print(last_error)
+            log.error(last_error)
             if attempt < max_retries - 1:
                 time.sleep(1)
             continue
 
         except Exception as e:
             last_error = f"BOP 수정 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            print(last_error)
+            log.error(last_error)
             if attempt < max_retries - 1:
                 time.sleep(1)
             continue
@@ -317,7 +321,7 @@ async def unified_chat(user_message: str, current_bop: dict = None) -> dict:
             response_data = json.loads(response_text)
 
             # 디버깅: 응답 내용 출력
-            print(f"[DEBUG] LLM Response: {json.dumps(response_data, indent=2, ensure_ascii=False)[:500]}...")
+            log.info(f"[unified_chat] LLM Response: {json.dumps(response_data, indent=2, ensure_ascii=False)[:1000]}...")
 
             # 필수 필드 검증
             if "message" not in response_data:
@@ -327,14 +331,22 @@ async def unified_chat(user_message: str, current_bop: dict = None) -> dict:
             if "bop_data" in response_data:
                 bop_data = response_data["bop_data"]
 
+                # 공정별 리소스 매핑 상세 로그
+                processes = bop_data.get("processes", [])
+                log.info(f"[unified_chat] BOP 공정 수: {len(processes)}")
+                for proc in processes:
+                    proc_id = proc.get("process_id", "unknown")
+                    resources = proc.get("resources", [])
+                    log.info(f"[unified_chat] {proc_id}: resources={len(resources)}개")
+
                 # BOP 검증
                 is_valid, error_msg = validate_bop_data(bop_data)
                 if not is_valid:
-                    print(f"[ERROR] BOP 검증 실패: {error_msg}")
-                    print(f"[ERROR] 받은 BOP 데이터: {json.dumps(bop_data, indent=2, ensure_ascii=False)[:1000]}...")
+                    log.error(f"[unified_chat] BOP 검증 실패: {error_msg}")
+                    log.error(f"[unified_chat] 받은 BOP 데이터: {json.dumps(bop_data, indent=2, ensure_ascii=False)[:2000]}...")
                     raise ValueError(f"BOP 검증 실패: {error_msg}")
 
-                print(f"[DEBUG] BOP 검증 성공")
+                log.info(f"[unified_chat] BOP 검증 성공")
 
             return response_data
 
@@ -343,27 +355,27 @@ async def unified_chat(user_message: str, current_bop: dict = None) -> dict:
             if e.response.status_code == 429:
                 wait_time = (2 ** attempt) * 2  # 2, 4, 8초
                 last_error = f"Rate Limit 초과 (시도 {attempt + 1}/{max_retries}). {wait_time}초 대기 후 재시도..."
-                print(last_error)
+                log.warning(last_error)
                 if attempt < max_retries - 1:
                     time.sleep(wait_time)
                 continue
             else:
                 last_error = f"API 호출 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-                print(last_error)
+                log.error(last_error)
                 if attempt < max_retries - 1:
                     time.sleep(1)
                 continue
 
         except json.JSONDecodeError as e:
             last_error = f"JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            print(last_error)
+            log.error(last_error)
             if attempt < max_retries - 1:
                 time.sleep(1)
             continue
 
         except Exception as e:
             last_error = f"Unified chat 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            print(last_error)
+            log.error(last_error)
             if attempt < max_retries - 1:
                 time.sleep(1)
             continue

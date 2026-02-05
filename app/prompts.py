@@ -43,7 +43,8 @@ Output ONLY valid JSON (no markdown, no code blocks):
     }
   ],
   "equipments": [
-    {"equipment_id": "EQ001", "name": "6-axis Welding Robot", "type": "robot"}
+    {"equipment_id": "EQ001", "name": "Assembly Workstation", "type": "manual_station"},
+    {"equipment_id": "EQ002", "name": "6-axis Welding Robot", "type": "robot"}
   ],
   "workers": [
     {"worker_id": "W001", "name": "김철수"}
@@ -55,9 +56,15 @@ Output ONLY valid JSON (no markdown, no code blocks):
 
 # Rules
 
-## Process Generation
-- Include 3-6 processes
-- Each process represents ONE manufacturing step (welding, assembly, inspection, etc.)
+## Process Generation - Be Realistic and Detailed
+- Include 5-8 processes (NOT just 3 generic steps like "assembly, inspection, packaging")
+- Think about the ACTUAL product and its components:
+  - What parts need to be prepared/processed first?
+  - What sub-assemblies are created before final assembly?
+  - What specific joining/fastening methods are used?
+- Example for bicycle: Frame welding → Fork installation → Wheel assembly → Brake system → Drivetrain → Handlebar → Seat → Final inspection
+- Example for phone: PCB preparation → Component mounting → Display bonding → Battery installation → Case assembly → Camera module → Testing → Packaging
+- Each process represents ONE specific manufacturing step with clear input/output
 - Do NOT create sub-operations - keep processes as single units
 
 ## Process Location (Absolute Coordinates)
@@ -79,13 +86,31 @@ Output ONLY valid JSON (no markdown, no code blocks):
 - Last process: predecessor_ids=["P00N"], successor_ids=[]
 - You may create parallel branches if needed
 
-## Resources per Process
-- Each process should have 1-3 equipment, 1-2 workers, 1-3 materials
-- Resource type: "equipment", "worker", or "material"
+## BOP Design Thinking (IMPORTANT - Follow This Order)
+1. FIRST: Analyze the product - what components/parts does it consist of?
+2. SECOND: Determine assembly order - which parts are assembled first? What's the dependency?
+3. THIRD: Design realistic processes based on actual manufacturing steps
+4. FOURTH: Assign appropriate resources (equipment + operator + materials) to each process
+
+## Resources per Process - MANDATORY RULES
+⚠️ CRITICAL: Every process MUST have a valid resource combination:
+- MINIMUM: equipment + (worker OR robot)
+- NEVER: material-only process (INVALID - materials need equipment/worker to process them)
+- NEVER: equipment-only without operator (who operates it?)
+
+Valid combinations (pick one per process):
+- manual_station + worker + material (manual assembly with parts)
+- manual_station + worker (simple manual work)
+- manual_station + robot + material (semi-automated assembly)
+- manual_station + robot (automated workstation)
+- machine + worker + material (machine operation with operator)
+- machine + robot + material (fully automated machine)
+- robot + manual_station + material (robot picks from workstation)
 
 ### Equipment Resources
 - equipment_id format: "EQ{NUMBER:03d}" (e.g., "EQ001", "EQ002")
 - type: "robot", "machine", or "manual_station"
+- ⚠️ IMPORTANT: Each process needs at least one "manual_station" as workstation base
 - relative_location: Position within process space (KEEP COMPACT - x range: -1.5 to 1.5, z range: -1 to 1)
   - Main equipment: (0, 0, 0)
   - Secondary equipment: (1, 0, 0) or (-1, 0, 0)
@@ -183,18 +208,25 @@ BOP Schema (when included):
       ]
     }}
   ],
-  "equipments": [{{"equipment_id": "EQ001", "name": "...", "type": "robot"}}],
+  "equipments": [{{"equipment_id": "EQ001", "name": "...", "type": "manual_station"}}, {{"equipment_id": "EQ002", "name": "...", "type": "robot"}}],
   "workers": [{{"worker_id": "W001", "name": "..."}}],
   "materials": [{{"material_id": "M001", "name": "...", "unit": "kg"}}]
 }}
 
 Rules:
+- BOP Design Order: 1) Analyze product components 2) Determine assembly order 3) Design detailed processes 4) Assign resources
+- For BOP creation: 5-8 detailed processes (NOT just "assembly, inspection, packaging")
+  - Think about actual parts: what's assembled first? What sub-assemblies exist?
+  - Example: bicycle = frame welding → fork → wheels → brakes → drivetrain → handlebar → seat → inspection
 - Each process is a SINGLE manufacturing step (no sub-operations)
-- For BOP creation: 3-6 processes, realistic cycle times (10-300s)
+- ⚠️ MANDATORY resource rules per process:
+  - MINIMUM: equipment + (worker OR robot) - someone must operate the equipment
+  - NEVER material-only process (materials need equipment/operator)
+  - ALWAYS include "manual_station" as base workstation
+- Valid combos: manual_station+worker+material, manual_station+robot, machine+worker+material, etc.
 - For BOP modification: preserve structure unless explicitly asked to change
 - For QA: analyze BOP and answer, omit bop_data field
 - Process locations: CRITICAL y=0, z=0 always, x-axis spacing of 5 (x=0, 5, 10, 15, ...)
-- Resource types: equipment/worker/material with relative_location within process
 - Equipment type: "robot", "machine", or "manual_station"
 - CRITICAL: relative_location MUST be compact (x: -1.5 to 1.5, z: -1 to 1, y: always 0)
 - Output ONLY valid JSON, NO markdown, NO code blocks

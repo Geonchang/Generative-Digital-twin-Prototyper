@@ -45,8 +45,35 @@ Source Code:
 
 ## Rules
 1. input_schema.type: "csv", "json", "args" (argparse), or "stdin"
-2. args_format: Use {{input_file}}, {{output_file}} placeholders if script uses argparse
-3. For JSON type, include nested "structure" field showing all sub-fields
+2. For JSON type, include nested "structure" field showing all sub-fields
+
+## args_format Rules (CRITICAL - MUST SET IF SCRIPT USES ARGPARSE)
+**If script uses argparse with --input/--output arguments, you MUST set args_format!**
+
+How to detect argparse usage in script:
+- Look for `argparse.ArgumentParser()`
+- Look for `parser.add_argument('--input', ...)` or `'-i'`
+- Look for `parser.add_argument('--output', ...)` or `'-o'`
+
+If argparse is found, set args_format based on the argument names:
+- `--input INPUT --output OUTPUT` → `"args_format": "--input {{input_file}} --output {{output_file}}"`
+- `-i INPUT -o OUTPUT` → `"args_format": "-i {{input_file}} -o {{output_file}}"`
+- Only `--input` → `"args_format": "--input {{input_file}}"`
+
+**NEVER set args_format to null if script uses argparse! This will cause execution failure.**
+
+Example 1 - Script with argparse (MUST set args_format):
+```python
+parser.add_argument('--input', '-i', required=True, help='Input file')
+parser.add_argument('--output', '-o', required=True, help='Output file')
+```
+→ `"args_format": "--input {{input_file}} --output {{output_file}}"`
+
+Example 2 - Script without argparse (reads sys.argv[1]):
+```python
+input_file = sys.argv[1]
+```
+→ `"args_format": null` (executor passes file path as positional arg)
 
 ## params_schema Rules (CRITICAL - READ CAREFULLY)
 params_schema defines ALL user-provided input values needed to run the tool.
@@ -258,9 +285,11 @@ Output: {output_schema_json}
    - Use params for values not in BOP (e.g., process size)
    - For BOP-fallback params: `value = params.get('key') or bop_json.get('key')`
 
-2. `apply_result_to_bop(bop_json: dict, tool_output: str) -> dict`
-   - Parse tool output, update BOP, return complete updated BOP
+2. `apply_result_to_bop(bop_json: dict, tool_output: dict) -> dict`
+   - tool_output is already parsed as dict (executor handles JSON parsing)
+   - Update BOP fields based on tool output, return complete updated BOP
    - Preserve all existing BOP fields not being updated
+   - IMPORTANT: Just use tool_output directly, do NOT do `if isinstance(tool_output, str): ...`
 
 ## Field Mapping Examples
 
@@ -351,6 +380,19 @@ Tool Output (first 2000 chars):
 - obstacles[]: obstacle_id, name, type, position{{x,y,z}}, size{{width,height,depth}}, rotation_y
 - processes[].parallel_lines[]: location{{x,y,z}}, cycle_time_sec, etc.
 
+## Adapter Code Guidelines (CRITICAL)
+1. **tool_output is passed as a dict** (already JSON-parsed by executor)
+   - DO NOT check `if isinstance(tool_output, str): tool_output = {{}}`  ← THIS IS A BUG!
+   - Just use tool_output directly as a dict
+2. **Common bugs to fix:**
+   - `tool_output = {{}}` when output is string → WRONG, data is lost
+   - Not accessing nested fields properly (e.g., tool_output.get('results', []))
+   - Not updating BOP fields after reading tool output
+3. **When "BOP 반영이 안됨" (BOP not updated):**
+   - Check if tool_output data is being read correctly
+   - Verify bop_json fields are actually modified (parallel_count, cycle_time_sec, etc.)
+   - Ensure the modified bop_json is returned
+
 ## Instructions
 1. Analyze the user's feedback and execution context
 2. Only modify the components that are in scope
@@ -365,9 +407,16 @@ Tool Output (first 2000 chars):
   "changes_summary": ["변경1", "변경2", ...],
   "pre_process_code": "updated code or null if not modified",
   "post_process_code": "updated code or null if not modified",
-  "params_schema": [updated params array] or null if not modified,
+  "params_schema": [
+    {{"key": "param_name", "label": "한글 라벨", "type": "number|text", "default": value, "required": true|false, "description": "설명"}}
+  ] or null if not modified,
   "script_code": "updated script or null if not modified"
 }}
+
+**CRITICAL params_schema format:**
+- MUST use "key" (NOT "name")
+- MUST include: key, label (Korean), type, default, required, description
+- Example: {{"key": "margin", "label": "여백 (m)", "type": "number", "default": 1.0, "required": true, "description": "벽과 공정 사이 여백"}}
 
 If a field is not in modification scope or doesn't need changes, set it to null.
 
@@ -379,8 +428,12 @@ If a field is not in modification scope or doesn't need changes, set it to null.
    - Tab: actual tab → \\t
    - Curly braces in f-strings: f"{{variable}}" is OK (no escaping needed in JSON strings)
 2. For script_code field, ensure ALL newlines are escaped as \\n
-3. Test your JSON is valid before responding
-4. Do NOT wrap response in markdown code blocks"""
+3. **CRITICAL: Python docstrings (triple quotes) MUST be escaped!**
+   - `\"\"\"`  ← WRONG (breaks JSON)
+   - `\\"\\"\\"`  ← CORRECT (escaped triple quotes)
+   - Example: `"script_code": "def foo():\\n    \\"\\"\\"Docstring here.\\"\\"\\"\\n    pass"`
+4. Test your JSON is valid before responding
+5. Do NOT wrap response in markdown code blocks"""
 
 
 ADAPTER_REPAIR_PROMPT = """You are a Python debugging expert. An adapter function failed during execution. Analyze the error and fix the code.

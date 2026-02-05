@@ -30,20 +30,11 @@ function getEffectivePosition(resource, resourceIndex, totalResources) {
     return { x: relLoc.x, z: relLoc.z };
   }
 
-  // Auto-layout: grid placement within a 2×1.5 box
-  const boxWidth = 2;
-  const boxDepth = 1.5;
-  const cols = Math.ceil(Math.sqrt(totalResources));
-  const rows = Math.ceil(totalResources / cols);
-  const col = resourceIndex % cols;
-  const row = Math.floor(resourceIndex / cols);
-  const xSpacing = boxWidth / (cols + 1);
-  const zSpacing = boxDepth / (rows + 1);
+  // Auto-layout: Z축 수직 배치 (고정 간격)
+  const step = 0.9; // depth(0.6) + spacing(0.3)
+  const z = resourceIndex * step - (totalResources - 1) * step / 2;
 
-  return {
-    x: (col + 1) * xSpacing - boxWidth / 2,
-    z: (row + 1) * zSpacing - boxDepth / 2
-  };
+  return { x: 0, z: z };
 }
 
 // Calculate bounding box center for a process
@@ -68,7 +59,8 @@ function calculateBoundingBoxCenter(process, equipments) {
     const resourceRotation = resource.rotation_y || 0;
     const scale = resource.scale || { x: 1, y: 1, z: 1 };
 
-    console.log(`      - ${resource.resource_id}: relative (${x.toFixed(2)}, ${z.toFixed(2)})`);
+    const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
+    console.log(`      - ${resource.resource_id}: relLoc(${relLoc.x.toFixed(2)}, ${relLoc.z.toFixed(2)}) → effective(${x.toFixed(2)}, ${z.toFixed(2)})`);
 
     // Get equipment type if applicable
     let equipmentType = null;
