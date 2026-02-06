@@ -188,7 +188,16 @@ def _run_postprocessor(code: str, bop_data: dict, tool_output: str) -> dict:
     fn = namespace.get("apply_result_to_bop")
     if not fn:
         raise ValueError("Post-processor에 'apply_result_to_bop' 함수가 정의되어 있지 않습니다.")
-    result = fn(bop_data, tool_output)
+
+    # tool_output을 dict로 파싱하여 전달 (adapter 코드 단순화)
+    parsed_output = tool_output
+    if isinstance(tool_output, str):
+        try:
+            parsed_output = json_mod.loads(tool_output)
+        except json_mod.JSONDecodeError:
+            parsed_output = {"raw_output": tool_output}
+
+    result = fn(bop_data, parsed_output)
     if not isinstance(result, dict):
         raise ValueError("Post-processor는 dict를 반환해야 합니다.")
     return result

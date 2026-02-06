@@ -246,6 +246,15 @@ function EquipmentsTable() {
                 const scale = resource.scale || { x: 1, y: 1, z: 1 };
                 const rotationY = resource.rotation_y || 0;
 
+                // Effective position 계산 (auto-layout 적용)
+                const resourceIndex = process.resources.findIndex(r =>
+                  r.resource_type === resource.resource_type && r.resource_id === resource.resource_id
+                );
+                const totalResources = process.resources.length;
+                const effectivePos = (relLoc.x !== 0 || relLoc.z !== 0)
+                  ? { x: relLoc.x, z: relLoc.z }
+                  : { x: 0, z: resourceIndex * 0.9 - (totalResources - 1) * 0.9 / 2 };
+
                 const baseSize = getResourceSize('equipment', equipment.type);
                 const actualSize = {
                   x: baseSize.width * scale.x,
@@ -317,7 +326,7 @@ function EquipmentsTable() {
                     </td>
                     <td style={styles.td}>
                       <div style={styles.locationCell}>
-                        ({relLoc.x.toFixed(1)}, {relLoc.z.toFixed(1)})
+                        ({effectivePos.x.toFixed(1)}, {effectivePos.z.toFixed(1)})
                       </div>
                     </td>
                     <td style={styles.td}>

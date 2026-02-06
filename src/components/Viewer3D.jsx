@@ -94,19 +94,11 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
         x = relLoc.x;
         z = relLoc.z;
       } else {
-        // Auto-layout: ResourceMarker와 동일한 계산
-        const boxWidth = 2;
-        const boxDepth = 1.5;
+        // Auto-layout: Z축 수직 배치 (고정 간격) - bopStore.js와 동일
         const totalResources = resources.length;
-        const cols = Math.ceil(Math.sqrt(totalResources));
-        const rows = Math.ceil(totalResources / cols);
-        const col = resourceIndex % cols;
-        const row = Math.floor(resourceIndex / cols);
-        const xSpacing = boxWidth / (cols + 1);
-        const zSpacing = boxDepth / (rows + 1);
-
-        x = (col + 1) * xSpacing - boxWidth / 2;
-        z = (row + 1) * zSpacing - boxDepth / 2;
+        const step = 0.9; // depth(0.6) + spacing(0.3)
+        x = 0;
+        z = resourceIndex * step - (totalResources - 1) * step / 2;
       }
 
       const resourceRotation = resource.rotation_y || 0;
@@ -585,22 +577,11 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
       };
     }
 
-    // Auto-layout: 공정 박스 내에서 겹치지 않게 배치 (컴팩트하게)
-    const boxWidth = 2;  // X축 방향
-    const boxDepth = 1.5;  // Z축 방향
+    // Auto-layout: Z축 수직 배치 (고정 간격) - bopStore.js와 동일
+    const step = 0.9; // depth(0.6) + spacing(0.3)
+    const z = resourceIndex * step - (totalResources - 1) * step / 2;
 
-    const cols = Math.ceil(Math.sqrt(totalResources));
-    const rows = Math.ceil(totalResources / cols);
-    const col = resourceIndex % cols;
-    const row = Math.floor(resourceIndex / cols);
-
-    const xSpacing = boxWidth / (cols + 1);
-    const zSpacing = boxDepth / (rows + 1);
-
-    return {
-      x: (col + 1) * xSpacing - boxWidth / 2,
-      z: (row + 1) * zSpacing - boxDepth / 2
-    };
+    return { x: 0, z: z };
   };
 
   const autoPos = getPosition();

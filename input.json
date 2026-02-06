@@ -1,0 +1,1792 @@
+{
+  "processes": [
+    {
+      "process_id": "P001",
+      "parallel_count": 4,
+      "predecessor_ids": [],
+      "successor_ids": [
+        "P002"
+      ],
+      "parallel_lines": [
+        {
+          "parallel_index": 1,
+          "name": "P001",
+          "description": "메인 프레임과 서브 프레임을 용접하여 기본 골격 제작",
+          "cycle_time_sec": 180,
+          "location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 2,
+          "name": "프레임 용접",
+          "description": "메인 프레임과 서브 프레임을 용접하여 기본 골격 제작",
+          "cycle_time_sec": 180,
+          "location": {
+            "x": 0,
+            "y": 0,
+            "z": 5
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 3,
+          "name": "P001",
+          "description": "메인 프레임과 서브 프레임을 용접하여 기본 골격 제작",
+          "cycle_time_sec": 180,
+          "location": {
+            "x": 0,
+            "y": 0,
+            "z": 10
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 4,
+          "name": "P001",
+          "description": "메인 프레임과 서브 프레임을 용접하여 기본 골격 제작",
+          "cycle_time_sec": 180,
+          "location": {
+            "x": 0,
+            "y": 0,
+            "z": 15
+          },
+          "rotation_y": 0
+        }
+      ],
+      "resources": [
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ001",
+          "quantity": 1,
+          "role": "Main welding robot #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W001",
+          "quantity": 1,
+          "role": "Welding operator #1",
+          "relative_location": {
+            "x": 1,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M001",
+          "quantity": 5.2,
+          "role": "Frame material",
+          "relative_location": {
+            "x": -1.2,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ002",
+          "quantity": 1,
+          "role": "Main welding robot #2",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W002",
+          "quantity": 1,
+          "role": "Welding operator #2",
+          "relative_location": {
+            "x": 1,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M001",
+          "quantity": 5.2,
+          "role": "Frame material",
+          "relative_location": {
+            "x": -1.2,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ009",
+          "quantity": 1,
+          "role": "Main welding robot #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W010",
+          "quantity": 1,
+          "role": "Welding operator #1",
+          "relative_location": {
+            "x": 1,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M001",
+          "quantity": 5.2,
+          "role": "Frame material",
+          "relative_location": {
+            "x": -1.2,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ017",
+          "quantity": 1,
+          "role": "Main welding robot #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W020",
+          "quantity": 1,
+          "role": "Welding operator #1",
+          "relative_location": {
+            "x": 1,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M001",
+          "quantity": 5.2,
+          "role": "Frame material",
+          "relative_location": {
+            "x": -1.2,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        }
+      ]
+    },
+    {
+      "process_id": "P002",
+      "parallel_count": 3,
+      "predecessor_ids": [
+        "P001"
+      ],
+      "successor_ids": [
+        "P003"
+      ],
+      "parallel_lines": [
+        {
+          "parallel_index": 1,
+          "name": "P002",
+          "description": "프레임 표면 전처리 후 분체 도장 실시",
+          "cycle_time_sec": 120,
+          "location": {
+            "x": 3.663468291955464,
+            "y": 0,
+            "z": 1.5833980233554925
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 2,
+          "name": "P002",
+          "description": "프레임 표면 전처리 후 분체 도장 실시",
+          "cycle_time_sec": 120,
+          "location": {
+            "x": 3.663468291955464,
+            "y": 0,
+            "z": 6.5833980233554925
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 3,
+          "name": "P002",
+          "description": "프레임 표면 전처리 후 분체 도장 실시",
+          "cycle_time_sec": 120,
+          "location": {
+            "x": 3.663468291955464,
+            "y": 0,
+            "z": 11.583398023355493
+          },
+          "rotation_y": 0
+        }
+      ],
+      "resources": [
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ003",
+          "quantity": 1,
+          "role": "Powder coating booth",
+          "relative_location": {
+            "x": 0.7700398826932615,
+            "y": 0,
+            "z": 0.5774470793293546
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W009",
+          "quantity": 1,
+          "role": "Coating operator",
+          "relative_location": {
+            "x": 1.075,
+            "y": 0,
+            "z": -0.27744707932935453
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M002",
+          "quantity": 0.8,
+          "role": "Coating powder",
+          "relative_location": {
+            "x": -1.125,
+            "y": 0,
+            "z": -0.7774470793293545
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ010",
+          "quantity": 1,
+          "role": "Powder coating booth",
+          "relative_location": {
+            "x": 0.7700398826932615,
+            "y": 0,
+            "z": 0.5774470793293546
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W011",
+          "quantity": 1,
+          "role": "Coating operator",
+          "relative_location": {
+            "x": 1.075,
+            "y": 0,
+            "z": -0.27744707932935453
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M002",
+          "quantity": 0.8,
+          "role": "Coating powder",
+          "relative_location": {
+            "x": -1.125,
+            "y": 0,
+            "z": -0.7774470793293545
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ018",
+          "quantity": 1,
+          "role": "Powder coating booth",
+          "relative_location": {
+            "x": 0.7700398826932615,
+            "y": 0,
+            "z": 0.5774470793293546
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W021",
+          "quantity": 1,
+          "role": "Coating operator",
+          "relative_location": {
+            "x": 1.075,
+            "y": 0,
+            "z": -0.27744707932935453
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M002",
+          "quantity": 0.8,
+          "role": "Coating powder",
+          "relative_location": {
+            "x": -1.125,
+            "y": 0,
+            "z": -0.7774470793293545
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        }
+      ]
+    },
+    {
+      "process_id": "P003",
+      "parallel_count": 6,
+      "predecessor_ids": [
+        "P002"
+      ],
+      "successor_ids": [
+        "P004"
+      ],
+      "parallel_lines": [
+        {
+          "parallel_index": 1,
+          "name": "P003",
+          "description": "배터리, 모터, 컨트롤러 등 전장 부품 조립",
+          "cycle_time_sec": 240,
+          "location": {
+            "x": 10,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 2,
+          "name": "전장 조립",
+          "description": "배터리, 모터, 컨트롤러 등 전장 부품 조립",
+          "cycle_time_sec": 240,
+          "location": {
+            "x": 10,
+            "y": 0,
+            "z": 5
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 3,
+          "name": "P003",
+          "description": "배터리, 모터, 컨트롤러 등 전장 부품 조립",
+          "cycle_time_sec": 240,
+          "location": {
+            "x": 10,
+            "y": 0,
+            "z": 10
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 4,
+          "name": "P003",
+          "description": "배터리, 모터, 컨트롤러 등 전장 부품 조립",
+          "cycle_time_sec": 240,
+          "location": {
+            "x": 10,
+            "y": 0,
+            "z": 15
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 5,
+          "name": "P003",
+          "description": "배터리, 모터, 컨트롤러 등 전장 부품 조립",
+          "cycle_time_sec": 240,
+          "location": {
+            "x": 10,
+            "y": 0,
+            "z": 20
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 6,
+          "name": "P003",
+          "description": "배터리, 모터, 컨트롤러 등 전장 부품 조립",
+          "cycle_time_sec": 240,
+          "location": {
+            "x": 10,
+            "y": 0,
+            "z": 25
+          },
+          "rotation_y": 0
+        }
+      ],
+      "resources": [
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ004",
+          "quantity": 1,
+          "role": "Assembly workstation #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W003",
+          "quantity": 2,
+          "role": "Electronics assembler #1",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M003",
+          "quantity": 1,
+          "role": "Battery pack",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M004",
+          "quantity": 1,
+          "role": "Hub motor",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ006",
+          "quantity": 1,
+          "role": "Assembly workstation #2",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W007",
+          "quantity": 2,
+          "role": "Electronics assembler #2",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M003",
+          "quantity": 1,
+          "role": "Battery pack",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M004",
+          "quantity": 1,
+          "role": "Hub motor",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ011",
+          "quantity": 1,
+          "role": "Assembly workstation #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W012",
+          "quantity": 2,
+          "role": "Electronics assembler #1",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M003",
+          "quantity": 1,
+          "role": "Battery pack",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M004",
+          "quantity": 1,
+          "role": "Hub motor",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ012",
+          "quantity": 1,
+          "role": "Assembly workstation #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W013",
+          "quantity": 2,
+          "role": "Electronics assembler #1",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M003",
+          "quantity": 1,
+          "role": "Battery pack",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M004",
+          "quantity": 1,
+          "role": "Hub motor",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ019",
+          "quantity": 1,
+          "role": "Assembly workstation #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 4
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W022",
+          "quantity": 2,
+          "role": "Electronics assembler #1",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 4
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M003",
+          "quantity": 1,
+          "role": "Battery pack",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 4
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M004",
+          "quantity": 1,
+          "role": "Hub motor",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 4
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ020",
+          "quantity": 1,
+          "role": "Assembly workstation #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 5
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W023",
+          "quantity": 2,
+          "role": "Electronics assembler #1",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 5
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M003",
+          "quantity": 1,
+          "role": "Battery pack",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 5
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M004",
+          "quantity": 1,
+          "role": "Hub motor",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 5
+        }
+      ]
+    },
+    {
+      "process_id": "P004",
+      "parallel_count": 5,
+      "predecessor_ids": [
+        "P003"
+      ],
+      "successor_ids": [
+        "P005"
+      ],
+      "parallel_lines": [
+        {
+          "parallel_index": 1,
+          "name": "P004",
+          "description": "바퀴, 브레이크, 핸들 등 기계 부품 조립",
+          "cycle_time_sec": 200,
+          "location": {
+            "x": 15,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 2,
+          "name": "프레임 및 조립",
+          "description": "바퀴, 브레이크, 핸들 등 기계 부품 조립",
+          "cycle_time_sec": 200,
+          "location": {
+            "x": 14.975,
+            "y": 0,
+            "z": 6.418221649806577
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 3,
+          "name": "P004",
+          "description": "바퀴, 브레이크, 핸들 등 기계 부품 조립",
+          "cycle_time_sec": 200,
+          "location": {
+            "x": 15,
+            "y": 0,
+            "z": 10
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 4,
+          "name": "P004",
+          "description": "바퀴, 브레이크, 핸들 등 기계 부품 조립",
+          "cycle_time_sec": 200,
+          "location": {
+            "x": 15,
+            "y": 0,
+            "z": 15
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 5,
+          "name": "P004",
+          "description": "바퀴, 브레이크, 핸들 등 기계 부품 조립",
+          "cycle_time_sec": 200,
+          "location": {
+            "x": 15,
+            "y": 0,
+            "z": 20
+          },
+          "rotation_y": 0
+        }
+      ],
+      "resources": [
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ005",
+          "quantity": 1,
+          "role": "Assembly station #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W004",
+          "quantity": 2,
+          "role": "Mechanical assembler #1",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M005",
+          "quantity": 2,
+          "role": "Wheels",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M006",
+          "quantity": 2,
+          "role": "Brake set",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ007",
+          "quantity": 1,
+          "role": "Assembly station #2",
+          "relative_location": {
+            "x": 0.7630319247297113,
+            "y": 0,
+            "z": -1.1220768964925372
+          },
+          "rotation_y": 0.5235987755982988,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W008",
+          "quantity": 2,
+          "role": "Mechanical assembler #2",
+          "relative_location": {
+            "x": 0.925,
+            "y": 0,
+            "z": 1.2818845176278688
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M005",
+          "quantity": 2,
+          "role": "Wheels",
+          "relative_location": {
+            "x": -0.975,
+            "y": 0,
+            "z": 1.1818845176278687
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M006",
+          "quantity": 2,
+          "role": "Brake set",
+          "relative_location": {
+            "x": -0.975,
+            "y": 0,
+            "z": 0.3818845176278687
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ013",
+          "quantity": 1,
+          "role": "Assembly station #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W014",
+          "quantity": 2,
+          "role": "Mechanical assembler #1",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M005",
+          "quantity": 2,
+          "role": "Wheels",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M006",
+          "quantity": 2,
+          "role": "Brake set",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ014",
+          "quantity": 1,
+          "role": "Assembly station #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W015",
+          "quantity": 2,
+          "role": "Mechanical assembler #1",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M005",
+          "quantity": 2,
+          "role": "Wheels",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M006",
+          "quantity": 2,
+          "role": "Brake set",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ021",
+          "quantity": 1,
+          "role": "Assembly station #1",
+          "relative_location": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 4
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W024",
+          "quantity": 2,
+          "role": "Mechanical assembler #1",
+          "relative_location": {
+            "x": 0.9,
+            "y": 0,
+            "z": 0.5
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 4
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M005",
+          "quantity": 2,
+          "role": "Wheels",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": 0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 4
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M006",
+          "quantity": 2,
+          "role": "Brake set",
+          "relative_location": {
+            "x": -1,
+            "y": 0,
+            "z": -0.4
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 4
+        }
+      ]
+    },
+    {
+      "process_id": "P005",
+      "parallel_count": 4,
+      "predecessor_ids": [
+        "P004"
+      ],
+      "successor_ids": [],
+      "parallel_lines": [
+        {
+          "parallel_index": 1,
+          "name": "P005",
+          "description": "기능 테스트, 외관 검사 후 포장 처리",
+          "cycle_time_sec": 150,
+          "location": {
+            "x": 19.65270102383572,
+            "y": 0,
+            "z": 1.914182624705773
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 2,
+          "name": "P005",
+          "description": "기능 테스트, 외관 검사 후 포장 처리",
+          "cycle_time_sec": 150,
+          "location": {
+            "x": 19.65270102383572,
+            "y": 0,
+            "z": 6.914182624705773
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 3,
+          "name": "P005",
+          "description": "기능 테스트, 외관 검사 후 포장 처리",
+          "cycle_time_sec": 150,
+          "location": {
+            "x": 19.65270102383572,
+            "y": 0,
+            "z": 11.914182624705774
+          },
+          "rotation_y": 0
+        },
+        {
+          "parallel_index": 4,
+          "name": "P005",
+          "description": "기능 테스트, 외관 검사 후 포장 처리",
+          "cycle_time_sec": 150,
+          "location": {
+            "x": 19.65270102383572,
+            "y": 0,
+            "z": 16.914182624705774
+          },
+          "rotation_y": 0
+        }
+      ],
+      "resources": [
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ008",
+          "quantity": 1,
+          "role": "Test equipment",
+          "relative_location": {
+            "x": 0.9752992872514341,
+            "y": 0,
+            "z": -0.7811406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W005",
+          "quantity": 1,
+          "role": "Quality inspector",
+          "relative_location": {
+            "x": 0.874700712748566,
+            "y": 0,
+            "z": 0.9311406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W006",
+          "quantity": 1,
+          "role": "Packaging worker",
+          "relative_location": {
+            "x": -1.125299287251434,
+            "y": 0,
+            "z": 0.9311406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M007",
+          "quantity": 1,
+          "role": "Packaging box",
+          "relative_location": {
+            "x": 1.074700712748566,
+            "y": 0,
+            "z": -0.06885931734506845
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 0
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ015",
+          "quantity": 1,
+          "role": "Test equipment",
+          "relative_location": {
+            "x": 0.9752992872514341,
+            "y": 0,
+            "z": -0.7811406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W016",
+          "quantity": 1,
+          "role": "Quality inspector",
+          "relative_location": {
+            "x": 0.874700712748566,
+            "y": 0,
+            "z": 0.9311406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W017",
+          "quantity": 1,
+          "role": "Packaging worker",
+          "relative_location": {
+            "x": -1.125299287251434,
+            "y": 0,
+            "z": 0.9311406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M007",
+          "quantity": 1,
+          "role": "Packaging box",
+          "relative_location": {
+            "x": 1.074700712748566,
+            "y": 0,
+            "z": -0.06885931734506845
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 1
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ016",
+          "quantity": 1,
+          "role": "Test equipment",
+          "relative_location": {
+            "x": 0.9752992872514341,
+            "y": 0,
+            "z": -0.7811406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W018",
+          "quantity": 1,
+          "role": "Quality inspector",
+          "relative_location": {
+            "x": 0.874700712748566,
+            "y": 0,
+            "z": 0.9311406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W019",
+          "quantity": 1,
+          "role": "Packaging worker",
+          "relative_location": {
+            "x": -1.125299287251434,
+            "y": 0,
+            "z": 0.9311406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M007",
+          "quantity": 1,
+          "role": "Packaging box",
+          "relative_location": {
+            "x": 1.074700712748566,
+            "y": 0,
+            "z": -0.06885931734506845
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 2
+        },
+        {
+          "resource_type": "equipment",
+          "resource_id": "EQ022",
+          "quantity": 1,
+          "role": "Test equipment",
+          "relative_location": {
+            "x": 0.9752992872514341,
+            "y": 0,
+            "z": -0.7811406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W025",
+          "quantity": 1,
+          "role": "Quality inspector",
+          "relative_location": {
+            "x": 0.874700712748566,
+            "y": 0,
+            "z": 0.9311406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "worker",
+          "resource_id": "W026",
+          "quantity": 1,
+          "role": "Packaging worker",
+          "relative_location": {
+            "x": -1.125299287251434,
+            "y": 0,
+            "z": 0.9311406826549316
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        },
+        {
+          "resource_type": "material",
+          "resource_id": "M007",
+          "quantity": 1,
+          "role": "Packaging box",
+          "relative_location": {
+            "x": 1.074700712748566,
+            "y": 0,
+            "z": -0.06885931734506845
+          },
+          "rotation_y": 0,
+          "scale": {
+            "x": 1,
+            "y": 1,
+            "z": 1
+          },
+          "parallel_line_index": 3
+        }
+      ]
+    }
+  ]
+}
