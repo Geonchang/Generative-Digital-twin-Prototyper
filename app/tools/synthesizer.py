@@ -1,18 +1,16 @@
 import json
 import os
-import time
 import logging
-import requests
 import traceback
 from dotenv import load_dotenv
 from app.tools.tool_prompts import ADAPTER_SYNTHESIS_PROMPT, ADAPTER_REPAIR_PROMPT, SCRIPT_GENERATION_PROMPT, TOOL_IMPROVEMENT_PROMPT
 from app.tools.tool_models import ToolMetadata, AdapterCode
-from typing import Optional, Dict, Any
+from app.llm import get_provider
+from typing import Optional, Dict, Any, List
 
 log = logging.getLogger("tool_synthesizer")
 
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
 
 
 def _strip_markdown_block(text: str) -> str:
@@ -26,10 +24,24 @@ def _strip_markdown_block(text: str) -> str:
     return text.strip()
 
 
-async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None) -> AdapterCode:
+async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None, model: str = None) -> AdapterCode:
     """LLM을 사용하여 BOP ↔ Tool 어댑터 코드를 생성합니다."""
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다.")
+    import time
+    start_time = time.time()
+
+    log.info("=" * 60)
+    log.info("[synthesize] === 어댑터 생성 시작 ===")
+    log.info("[synthesize] tool_name=%s, source_code=%s",
+             metadata.tool_name, f"{len(source_code)} bytes" if source_code else "없음")
+
+    # Get default tool model if not specified
+    if not model:
+        model = os.getenv("DEFAULT_TOOL_MODEL", "gemini-2.0-flash")
+
+    log.info("[synthesize] model=%s", model)
+
+    # Get provider for the specified model
+    provider = get_provider(model)
 
     if source_code:
         source_code_section = (
@@ -62,35 +74,19 @@ async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None) ->
         params_schema_section=params_schema_section,
     )
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    log.info("[synthesize] 프롬프트 준비 완료: %d bytes", len(prompt))
 
     max_retries = 3
     last_error = None
 
     for attempt in range(max_retries):
+        log.info("[synthesize] LLM 호출 시도 %d/%d (model=%s)", attempt + 1, max_retries, model)
         try:
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.3,
-                },
-            }
-
-            response = requests.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=60,
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-            log.info("[synthesize] Gemini 원본 응답 (앞 1000자):\n%s", text[:1000])
-            text = _strip_markdown_block(text)
-
-            data = json.loads(text)
+            # LLM API 호출 (provider abstraction 사용)
+            data = await provider.generate_json(prompt, max_retries=1)
+            import json as json_lib
+            response_length = len(json_lib.dumps(data))
+            log.info("[synthesize] LLM 응답 수신: %d bytes", response_length)
             log.info("[synthesize] 파싱된 JSON 타입: %s, 키: %s", type(data).__name__, list(data.keys()) if isinstance(data, dict) else "N/A")
 
             # Gemini가 배열로 감싸서 반환하는 경우 첫 번째 요소 추출
@@ -108,36 +104,28 @@ async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None) ->
             if "pre_process_code" not in data or "post_process_code" not in data:
                 raise ValueError(f"응답에 pre_process_code 또는 post_process_code가 없습니다. 응답 키: {list(data.keys())}")
 
+            elapsed = time.time() - start_time
+            log.info("[synthesize] 어댑터 생성 성공 (소요 시간: %.2f초)", elapsed)
+            log.info("[synthesize] pre_process_code: %d bytes, post_process_code: %d bytes",
+                     len(data["pre_process_code"]), len(data["post_process_code"]))
+            log.info("[synthesize] === 생성 완료 ===")
+            log.info("=" * 60)
+
             return AdapterCode(
                 tool_id=metadata.tool_id,
                 pre_process_code=data["pre_process_code"],
                 post_process_code=data["post_process_code"],
             )
 
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                wait_time = (2 ** attempt) * 2
-                last_error = f"Rate Limit 초과 (시도 {attempt + 1}/{max_retries})"
-                if attempt < max_retries - 1:
-                    time.sleep(wait_time)
-                continue
-            last_error = f"API 호출 실패: {str(e)}"
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
-
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            last_error = f"응답 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
-
         except Exception as e:
-            last_error = f"어댑터 생성 실패: {str(e)}"
+            last_error = f"어댑터 생성 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
+            log.error("[synthesize] %s", last_error)
             if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
+                continue
 
+    elapsed = time.time() - start_time
+    log.error("[synthesize] 최종 실패 (소요 시간: %.2f초)", elapsed)
+    log.info("=" * 60)
     raise Exception(f"어댑터 코드 생성 실패: {last_error}")
 
 
@@ -146,6 +134,7 @@ async def repair_adapter(
     failed_code: str,
     error_info: Dict[str, Any],
     input_data: str,
+    model: str = None,
 ) -> Optional[str]:
     """
     실패한 어댑터 코드를 분석하고 수정합니다.
@@ -155,12 +144,20 @@ async def repair_adapter(
         failed_code: 실패한 코드
         error_info: 에러 정보 (type, message, traceback)
         input_data: 입력 데이터 (JSON 문자열)
+        model: 사용할 모델 (None이면 기본 도구 모델 사용)
 
     Returns:
         수정된 코드 문자열, 실패 시 None
     """
-    if not GEMINI_API_KEY:
-        log.error("[repair] GEMINI_API_KEY가 설정되지 않았습니다.")
+    # Get default tool model if not specified
+    if not model:
+        model = os.getenv("DEFAULT_TOOL_MODEL", "gemini-2.0-flash")
+
+    try:
+        # Get provider for the specified model
+        provider = get_provider(model)
+    except Exception as e:
+        log.error("[repair] Provider 생성 실패: %s", str(e))
         return None
 
     function_name = "convert_bop_to_input" if failed_function == "pre_process" else "apply_result_to_bop"
@@ -175,32 +172,28 @@ async def repair_adapter(
         function_name=function_name,
     )
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-
     max_retries = 2
     for attempt in range(max_retries):
         try:
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.2,  # 낮은 temperature로 일관된 수정
-                },
-            }
+            # LLM API 호출 (provider abstraction 사용)
+            try:
+                data = await provider.generate_json(prompt, max_retries=1)
+            except Exception as json_err:
+                # JSON 파싱 실패 시 응답 텍스트에서 직접 추출 시도
+                log.warning("[repair] JSON 파싱 실패, 텍스트에서 코드 추출 시도")
+                response_text = await provider.generate(prompt, max_retries=1)
 
-            response = requests.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=60,
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-            text = _strip_markdown_block(text)
-
-            data = json.loads(text)
+                import re
+                # fixed_code 필드를 정규식으로 추출
+                code_match = re.search(r'"fixed_code":\s*"((?:[^"\\]|\\.)*)"', response_text, re.DOTALL)
+                if code_match:
+                    fixed_code = code_match.group(1)
+                    # 이스케이프 시퀀스 처리
+                    fixed_code = fixed_code.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
+                    log.info("[repair] 정규식으로 코드 추출 성공 (길이: %d)", len(fixed_code))
+                    return fixed_code
+                else:
+                    raise json_err
 
             if isinstance(data, list) and len(data) > 0:
                 data = data[0]
@@ -217,35 +210,205 @@ async def repair_adapter(
 
             return fixed_code
 
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                wait_time = (2 ** attempt) * 2
-                log.warning("[repair] Rate Limit - %d초 대기", wait_time)
-                time.sleep(wait_time)
-                continue
-            log.error("[repair] API 호출 실패: %s", str(e))
-            return None
-
-        except (json.JSONDecodeError, KeyError) as e:
-            log.error("[repair] 응답 파싱 실패: %s", str(e))
-            if attempt < max_retries - 1:
-                time.sleep(1)
-                continue
-            return None
-
         except Exception as e:
-            log.error("[repair] 예외 발생: %s", str(e))
+            log.error("[repair] 예외 발생 (시도 %d/%d): %s", attempt + 1, max_retries, str(e))
+            if attempt < max_retries - 1:
+                continue
             return None
 
     return None
 
 
-async def generate_tool_script(user_description: str) -> Optional[Dict[str, Any]]:
+async def generate_schema_from_description(
+    user_description: str,
+    model: str = None
+) -> Optional[Dict[str, Any]]:
+    """
+    사용자 설명을 기반으로 입출력 스키마만 생성합니다.
+
+    Args:
+        user_description: 사용자가 원하는 도구 기능 설명
+        model: 사용할 모델 (None이면 기본 도구 모델 사용)
+
+    Returns:
+        생성된 스키마 정보 dict:
+        {
+            "tool_name": str,
+            "description": str,
+            "input_schema": dict,
+            "output_schema": dict,
+            "suggested_params": list
+        }
+        실패 시 None
+    """
+    import time
+    start_time = time.time()
+
+    log.info("=" * 60)
+    log.info("[generate_schema] === 스키마 생성 시작 ===")
+    log.info("[generate_schema] model=%s", model or "기본값")
+
+    # Get default tool model if not specified
+    if not model:
+        model = os.getenv("DEFAULT_TOOL_MODEL", "gemini-2.0-flash")
+
+    try:
+        provider = get_provider(model)
+    except Exception as e:
+        log.error("[generate_schema] Provider 생성 실패: %s", str(e))
+        return None
+
+    prompt = f"""You are a BOP (Bill of Process) tool schema designer.
+
+Given the user's description of a tool they want to create, generate ONLY the input/output schemas and parameter definitions.
+DO NOT generate actual script code yet.
+
+## User's Tool Description:
+{user_description}
+
+## Your Task:
+Analyze what data the tool needs to:
+1. **Receive as input** (from BOP data after adapter transformation)
+2. **Return as output** (to be transformed back to BOP by adapter)
+3. **Accept as user parameters** (configuration values from UI)
+
+## Output Format (JSON):
+Return a JSON object with these fields:
+
+```json
+{{
+  "tool_name": "descriptive_tool_name",
+  "description": "Clear description of what the tool does",
+  "input_schema": {{
+    "type": "json" | "dict" | "list" | "string",
+    "description": "What data the tool receives",
+    "structure": {{ /* ONLY for json/dict types: nested structure */ }},
+    "fields": [ /* ONLY for simple dicts: list of field names */ ]
+  }},
+  "output_schema": {{
+    "type": "json" | "dict" | "list" | "string",
+    "description": "What data the tool returns",
+    "structure": {{ /* ONLY for json/dict types: nested structure */ }},
+    "return_format": {{ /* Alternative to structure: describe format */ }}
+  }},
+  "suggested_params": [
+    {{
+      "key": "param_name",
+      "label": "User-friendly label",
+      "type": "string" | "number" | "boolean",
+      "required": true | false,
+      "default": null | <value>,
+      "description": "What this parameter controls"
+    }}
+  ],
+  "example_input": {{
+    /* Concrete, realistic example of input data that matches input_schema */
+    /* Use actual values, not placeholders like "value" or "example" */
+  }},
+  "example_output": {{
+    /* Concrete, realistic example of output data that matches output_schema */
+    /* Use actual values that users can immediately understand */
+  }}
+}}
+```
+
+## CRITICAL Rules:
+- **YOU MUST provide example_input and example_output** - these help users understand the data format
+- Examples should use concrete, realistic values (not "value", "example", "data")
+- For BOP-related data: use realistic process IDs (P001, P002), locations, etc.
+- **NEVER use "args_format" field** - it's only for command-line tools, not Python scripts
+- For json/dict types: use "structure" (nested dict) or "fields" (flat list)
+- For list types: use "description" to explain what's in the list
+- `input_schema.type`: Usually "json" or "dict" for structured BOP data
+- `output_schema.type`: Usually "json" or "dict" for modified BOP data
+- `suggested_params`: User-configurable values (thresholds, distances, options, etc.)
+- Be specific about what data the tool needs from BOP (processes, obstacles, workers, etc.)
+- Design schemas that are simple for both the script and the adapter
+
+**WRONG Example:**
+{{
+  "input_schema": {{
+    "type": "dict",
+    "args_format": {{"process_area": {{"type": "list"}}}}  ❌ NEVER DO THIS
+  }}
+}}
+
+**CORRECT Example:**
+{{
+  "input_schema": {{
+    "type": "dict",
+    "structure": {{"process_area": "list of [x, y] points"}},  ✅ CORRECT
+    "fields": ["process_area", "offset"]  ✅ OR THIS
+  }}
+}}
+
+Return ONLY the JSON object, no code.
+"""
+
+    log.info("[generate_schema] 프롬프트 준비 완료: %d bytes", len(prompt))
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        log.info("[generate_schema] LLM 호출 시도 %d/%d (model=%s)", attempt + 1, max_retries, model)
+        try:
+            data = await provider.generate_json(prompt, max_retries=1)
+            import json as json_lib
+            response_length = len(json_lib.dumps(data))
+            log.info("[generate_schema] LLM 응답 수신: %d bytes", response_length)
+
+            # 배열로 감싸진 경우 처리
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
+
+            # 필수 필드 검증
+            required_fields = ["tool_name", "description", "input_schema", "output_schema"]
+            for field in required_fields:
+                if field not in data:
+                    raise ValueError(f"응답에 {field}가 없습니다. 응답 키: {list(data.keys())}")
+
+            # 기본값 설정
+            if "suggested_params" not in data:
+                data["suggested_params"] = []
+
+            elapsed = time.time() - start_time
+            log.info("[generate_schema] 스키마 생성 완료: %s (소요 시간: %.2f초)", data["tool_name"], elapsed)
+            log.info("[generate_schema] input_type=%s, output_type=%s, params=%d개",
+                     data["input_schema"].get("type"),
+                     data["output_schema"].get("type"),
+                     len(data.get("suggested_params", [])))
+            log.info("[generate_schema] === 생성 완료 ===")
+            log.info("=" * 60)
+            return data
+
+        except Exception as e:
+            log.error("[generate_schema] 예외 발생 (시도 %d/%d): %s", attempt + 1, max_retries, str(e))
+            if attempt < max_retries - 1:
+                continue
+            elapsed = time.time() - start_time
+            log.error("[generate_schema] 최종 실패 (소요 시간: %.2f초)", elapsed)
+            log.info("=" * 60)
+            return None
+
+    elapsed = time.time() - start_time
+    log.error("[generate_schema] 모든 시도 실패 (소요 시간: %.2f초)", elapsed)
+    log.info("=" * 60)
+    return None
+
+
+async def generate_tool_script(
+    user_description: str,
+    model: str = None,
+    input_schema: Optional[Dict[str, Any]] = None,
+    output_schema: Optional[Dict[str, Any]] = None
+) -> Optional[Dict[str, Any]]:
     """
     사용자 설명을 기반으로 Python 도구 스크립트를 생성합니다.
 
     Args:
         user_description: 사용자가 원하는 도구 기능 설명
+        model: 사용할 모델 (None이면 기본 도구 모델 사용)
+        input_schema: 입력 스키마 (스키마 우선 방식)
+        output_schema: 출력 스키마 (스키마 우선 방식)
 
     Returns:
         생성된 스크립트 정보 dict:
@@ -257,39 +420,62 @@ async def generate_tool_script(user_description: str) -> Optional[Dict[str, Any]
         }
         실패 시 None
     """
-    if not GEMINI_API_KEY:
-        log.error("[generate_script] GEMINI_API_KEY가 설정되지 않았습니다.")
+    import time
+    start_time = time.time()
+
+    log.info("=" * 60)
+    log.info("[generate_script] === 스크립트 생성 시작 ===")
+    log.info("[generate_script] model=%s, 스키마 제공=%s",
+             model or "기본값", "있음" if (input_schema and output_schema) else "없음")
+
+    # Get default tool model if not specified
+    if not model:
+        model = os.getenv("DEFAULT_TOOL_MODEL", "gemini-2.0-flash")
+
+    try:
+        # Get provider for the specified model
+        provider = get_provider(model)
+    except Exception as e:
+        log.error("[generate_script] Provider 생성 실패: %s", str(e))
         return None
 
-    prompt = SCRIPT_GENERATION_PROMPT.format(user_description=user_description)
+    # 스키마 섹션 생성
+    if input_schema and output_schema:
+        import json as json_lib
+        schema_section = f"""## Required Input/Output Schema (IMPORTANT - Follow Exactly)
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+**Input Schema:**
+```json
+{json_lib.dumps(input_schema, indent=2, ensure_ascii=False)}
+```
+
+**Output Schema:**
+```json
+{json_lib.dumps(output_schema, indent=2, ensure_ascii=False)}
+```
+
+**CRITICAL:** Your script MUST accept input matching the Input Schema exactly and produce output matching the Output Schema exactly.
+The adapter will convert BOP data to this input format, and convert your output back to BOP format.
+DO NOT expect BOP structure directly - work ONLY with the schemas above.
+"""
+    else:
+        schema_section = ""
+
+    prompt = SCRIPT_GENERATION_PROMPT.format(
+        user_description=user_description,
+        input_output_schema_section=schema_section
+    )
+    log.info("[generate_script] 프롬프트 준비 완료: %d bytes", len(prompt))
 
     max_retries = 3
     for attempt in range(max_retries):
+        log.info("[generate_script] LLM 호출 시도 %d/%d (model=%s)", attempt + 1, max_retries, model)
         try:
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.4,
-                },
-            }
-
-            response = requests.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=90,  # 스크립트 생성은 시간이 더 걸릴 수 있음
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-            log.info("[generate_script] Gemini 응답 수신 (길이: %d)", len(text))
-            text = _strip_markdown_block(text)
-
-            data = json.loads(text)
+            # LLM API 호출 (provider abstraction 사용)
+            data = await provider.generate_json(prompt, max_retries=1)
+            import json as json_lib
+            response_length = len(json_lib.dumps(data))
+            log.info("[generate_script] LLM 응답 수신: %d bytes", response_length)
 
             # 배열로 감싸진 경우 처리
             if isinstance(data, list) and len(data) > 0:
@@ -307,32 +493,26 @@ async def generate_tool_script(user_description: str) -> Optional[Dict[str, Any]
             if "suggested_params" not in data:
                 data["suggested_params"] = []
 
-            log.info("[generate_script] 스크립트 생성 완료: %s", data["tool_name"])
+            elapsed = time.time() - start_time
+            log.info("[generate_script] 스크립트 생성 완료: %s (소요 시간: %.2f초)", data["tool_name"], elapsed)
+            log.info("[generate_script] script_code: %d bytes, params: %d개",
+                     len(data.get("script_code", "")), len(data.get("suggested_params", [])))
+            log.info("[generate_script] === 생성 완료 ===")
+            log.info("=" * 60)
             return data
 
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                wait_time = (2 ** attempt) * 2
-                log.warning("[generate_script] Rate Limit - %d초 대기", wait_time)
-                time.sleep(wait_time)
-                continue
-            log.error("[generate_script] API 호출 실패: %s", str(e))
-            if attempt < max_retries - 1:
-                time.sleep(1)
-                continue
-            return None
-
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            log.error("[generate_script] 응답 파싱 실패: %s", str(e))
-            if attempt < max_retries - 1:
-                time.sleep(1)
-                continue
-            return None
-
         except Exception as e:
-            log.error("[generate_script] 예외 발생: %s", str(e))
+            log.error("[generate_script] 예외 발생 (시도 %d/%d): %s", attempt + 1, max_retries, str(e))
+            if attempt < max_retries - 1:
+                continue
+            elapsed = time.time() - start_time
+            log.error("[generate_script] 최종 실패 (소요 시간: %.2f초)", elapsed)
+            log.info("=" * 60)
             return None
 
+    elapsed = time.time() - start_time
+    log.error("[generate_script] 모든 시도 실패 (소요 시간: %.2f초)", elapsed)
+    log.info("=" * 60)
     return None
 
 
@@ -348,6 +528,7 @@ async def improve_tool(
     modify_adapter: bool = True,
     modify_params: bool = True,
     modify_script: bool = False,
+    model: str = None,
 ) -> Optional[Dict[str, Any]]:
     """
     사용자 피드백을 기반으로 도구를 개선합니다.
@@ -363,8 +544,15 @@ async def improve_tool(
         }
         실패 시 None
     """
-    if not GEMINI_API_KEY:
-        log.error("[improve] GEMINI_API_KEY가 설정되지 않았습니다.")
+    # Get default tool model if not specified
+    if not model:
+        model = os.getenv("DEFAULT_TOOL_MODEL", "gemini-2.0-flash")
+
+    try:
+        # Get provider for the specified model
+        provider = get_provider(model)
+    except Exception as e:
+        log.error("[improve] Provider 생성 실패: %s", str(e))
         return None
 
     # 현재 코드 섹션 구성
@@ -397,8 +585,6 @@ async def improve_tool(
         modify_script="Yes" if modify_script else "No",
     )
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-
     log.info("=" * 60)
     log.info("[improve] === AI 개선 요청 시작 ===")
     log.info("[improve] tool_name=%s", tool_name)
@@ -410,95 +596,81 @@ async def improve_tool(
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            log.info("[improve] API 호출 시도 %d/%d", attempt + 1, max_retries)
+            log.info("[improve] LLM 호출 시도 %d/%d", attempt + 1, max_retries)
 
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    # responseMimeType 제거: JSON 출력이 불안정할 때 일반 텍스트로 받기
-                    # "responseMimeType": "application/json",
-                    "temperature": 0.2,  # 낮은 temperature로 일관성 향상
-                },
-            }
+            # LLM API 호출 (provider abstraction 사용)
+            # Note: improve_tool은 일반 텍스트로 응답을 받아서 파싱하므로 generate 사용
+            response_text = await provider.generate(prompt, max_retries=1)
 
-            response = requests.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=90,
-            )
+            log.info("[improve] LLM 응답 수신 (길이: %d)", len(response_text))
 
-            log.info("[improve] HTTP 응답 코드: %d", response.status_code)
-            response.raise_for_status()
-
-            result = response.json()
-
-            # 안전하게 응답 추출
-            candidates = result.get("candidates", [])
-            if not candidates:
-                log.error("[improve] 응답에 candidates가 없습니다: %s", result)
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                    continue
-                return None
-
-            content = candidates[0].get("content", {})
-            parts = content.get("parts", [])
-            if not parts:
-                log.error("[improve] 응답에 parts가 없습니다: %s", candidates[0])
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                    continue
-                return None
-
-            text = parts[0].get("text", "").strip()
-            if not text:
-                log.error("[improve] 응답 text가 비어있습니다")
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                    continue
-                return None
-
-            log.info("[improve] Gemini 응답 수신 (길이: %d)", len(text))
-            log.info("[improve] 응답 앞 500자:\n%s", text[:500])
-            log.info("[improve] 응답 뒤 500자:\n%s", text[-500:])
-
-            text = _strip_markdown_block(text)
-            log.info("[improve] Markdown 제거 후 길이: %d", len(text))
-            log.info("[improve] 제거 후 앞 300자:\n%s", text[:300])
+            # 마크다운 코드 블록 제거 후 JSON 파싱
+            text = _strip_markdown_block(response_text)
 
             # JSON 파싱 시도
             try:
                 data = json.loads(text)
             except json.JSONDecodeError as json_err:
-                # script_code 필드 때문에 파싱 실패 가능성 높음
-                # strict=False로 재시도
-                log.warning("[improve] 표준 JSON 파싱 실패, strict=False로 재시도")
+                # 코드 필드의 이스케이프 문제 해결 시도
+                log.warning("[improve] 표준 JSON 파싱 실패, 코드 필드 추출 시도")
+                import re
+
+                # 모든 코드 필드를 추출하고 플레이스홀더로 대체
+                code_fields = {}
+                modified_text = text
+
+                for field_name in ['pre_process_code', 'post_process_code', 'script_code']:
+                    # 필드 값을 추출 (간단한 방식)
+                    try:
+                        # "field_name": " 로 시작하는 부분 찾기
+                        field_start = modified_text.find(f'"{field_name}": "')
+                        if field_start == -1:
+                            continue
+
+                        # 시작 위치 이동 (": " 다음)
+                        value_start = field_start + len(f'"{field_name}": "')
+
+                        # 닫는 따옴표 찾기 (이스케이프된 따옴표는 무시)
+                        i = value_start
+                        code_value = ""
+                        while i < len(modified_text):
+                            if modified_text[i] == '\\' and i + 1 < len(modified_text):
+                                # 이스케이프 시퀀스
+                                code_value += modified_text[i:i+2]
+                                i += 2
+                            elif modified_text[i] == '"':
+                                # 닫는 따옴표 발견
+                                break
+                            else:
+                                code_value += modified_text[i]
+                                i += 1
+
+                        if i < len(modified_text):
+                            code_fields[field_name] = code_value
+                            # 플레이스홀더로 대체
+                            before = modified_text[:field_start]
+                            after = modified_text[i+1:]
+                            modified_text = before + f'"{field_name}": "PLACEHOLDER_{field_name}"' + after
+                    except Exception as e:
+                        log.warning(f"[improve] {field_name} 추출 실패: {e}")
+                        continue
+
                 try:
-                    data = json.loads(text, strict=False)
-                except:
-                    # 최후의 수단: script_code 추출 후 따로 처리
-                    log.warning("[improve] strict=False도 실패, script_code 수동 추출 시도")
-                    import re
-                    # script_code를 임시로 제거하고 파싱
-                    script_match = re.search(r'"script_code":\s*"([^"]*(?:\\"[^"]*)*)"', text, re.DOTALL)
-                    if script_match:
-                        script_code_value = script_match.group(1)
-                        # script_code를 임시 값으로 치환
-                        text_without_script = re.sub(
-                            r'"script_code":\s*"[^"]*(?:\\"[^"]*)*"',
-                            '"script_code": "PLACEHOLDER"',
-                            text
-                        )
-                        try:
-                            data = json.loads(text_without_script)
-                            # script_code 복원 (이스케이프 해제)
-                            data["script_code"] = script_code_value.encode().decode('unicode_escape')
-                            log.info("[improve] script_code 수동 추출 성공")
-                        except:
-                            raise json_err  # 원래 에러 발생
-                    else:
-                        raise json_err
+                    # 플레이스홀더로 대체된 JSON 파싱
+                    data = json.loads(modified_text)
+                    # 코드 필드 복원 (이스케이프 해제)
+                    for field_name, code_value in code_fields.items():
+                        if field_name in data:
+                            # 이스케이프 시퀀스 처리
+                            try:
+                                data[field_name] = code_value.encode('utf-8').decode('unicode_escape')
+                            except:
+                                # 이스케이프 실패 시 원본 사용
+                                data[field_name] = code_value.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
+                    log.info("[improve] 코드 필드 수동 추출 및 복원 성공")
+                except Exception as e2:
+                    log.error("[improve] 코드 필드 추출 방법도 실패: %s", str(e2))
+                    raise json_err
             log.info("[improve] JSON 파싱 성공, 키: %s", list(data.keys()) if isinstance(data, dict) else "list")
 
             if isinstance(data, list) and len(data) > 0:
@@ -515,41 +687,183 @@ async def improve_tool(
             log.info("=" * 60)
             return data
 
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                wait_time = (2 ** attempt) * 2
-                log.warning("[improve] Rate Limit - %d초 대기", wait_time)
-                time.sleep(wait_time)
-                continue
-            log.error("[improve] API 호출 실패: %s", str(e))
-            log.error("[improve] 응답 내용: %s", e.response.text[:1000] if e.response else "No response")
-            if attempt < max_retries - 1:
-                time.sleep(1)
-                continue
-            return None
-
         except json.JSONDecodeError as e:
-            log.error("[improve] JSON 파싱 실패: %s", str(e))
-            log.error("[improve] 파싱 위치: line %d, column %d", e.lineno if hasattr(e, 'lineno') else 0, e.colno if hasattr(e, 'colno') else 0)
-            log.error("[improve] 원본 텍스트 전체 (처음 2000자):\n%s", text[:2000] if 'text' in dir() else "N/A")
-            log.error("[improve] 원본 텍스트 전체 (마지막 500자):\n%s", text[-500:] if 'text' in dir() else "N/A")
+            log.error("[improve] JSON 파싱 실패 (시도 %d/%d): %s", attempt + 1, max_retries, str(e))
             if attempt < max_retries - 1:
-                time.sleep(1)
-                continue
-            return None
-
-        except (KeyError, ValueError) as e:
-            log.error("[improve] 데이터 추출 실패: %s", str(e))
-            log.error("[improve] traceback:\n%s", traceback.format_exc())
-            if attempt < max_retries - 1:
-                time.sleep(1)
                 continue
             return None
 
         except Exception as e:
-            log.error("[improve] 예외 발생: %s", str(e))
+            log.error("[improve] 예외 발생 (시도 %d/%d): %s", attempt + 1, max_retries, str(e))
             log.error("[improve] traceback:\n%s", traceback.format_exc())
+            if attempt < max_retries - 1:
+                continue
             return None
 
     log.error("[improve] 모든 재시도 실패")
+    return None
+
+
+async def improve_schema_from_feedback(
+    tool_name: str,
+    description: str,
+    current_input_schema: dict,
+    current_output_schema: dict,
+    current_params: Optional[List[dict]],
+    user_feedback: str,
+    model: str = None
+) -> Optional[Dict[str, Any]]:
+    """
+    사용자 피드백을 기반으로 스키마를 개선합니다.
+
+    Args:
+        tool_name: 도구명
+        description: 도구 설명
+        current_input_schema: 현재 입력 스키마
+        current_output_schema: 현재 출력 스키마
+        current_params: 현재 파라미터
+        user_feedback: 사용자 개선 요청
+        model: 사용할 모델
+
+    Returns:
+        개선된 스키마 정보 dict 또는 None
+    """
+    import time
+    start_time = time.time()
+
+    log.info("=" * 60)
+    log.info("[improve_schema] === 스키마 개선 시작 ===")
+    log.info("[improve_schema] tool_name=%s", tool_name)
+    log.info("[improve_schema] user_feedback=%s", user_feedback)
+
+    if not model:
+        model = os.getenv("DEFAULT_TOOL_MODEL", "gemini-2.0-flash")
+
+    try:
+        provider = get_provider(model)
+    except Exception as e:
+        log.error("[improve_schema] Provider 생성 실패: %s", str(e))
+        return None
+
+    import json as json_lib
+    
+    prompt = f"""You are improving a BOP tool schema based on user feedback.
+
+## Current Tool Information:
+- Tool Name: {tool_name}
+- Description: {description}
+
+## Current Schemas:
+Input Schema:
+```json
+{json_lib.dumps(current_input_schema, indent=2, ensure_ascii=False)}
+```
+
+Output Schema:
+```json
+{json_lib.dumps(current_output_schema, indent=2, ensure_ascii=False)}
+```
+
+Parameters:
+```json
+{json_lib.dumps(current_params or [], indent=2, ensure_ascii=False)}
+```
+
+## User's Improvement Request:
+{user_feedback}
+
+## Your Task:
+Improve the schemas based on the user's feedback. Return the improved schemas in the same format as the original.
+
+## Response Format (JSON only):
+{{
+  "input_schema": {{
+    "type": "json" | "dict" | "list" | "string",
+    "description": "What data the tool receives",
+    "structure": {{ /* ONLY for json/dict types: nested structure as dict */ }},
+    "fields": [ /* ONLY for simple dicts: array of STRING field names like ["field1", "field2"] */ ]
+  }},
+  "output_schema": {{
+    "type": "json" | "dict" | "list" | "string",
+    "description": "What data the tool returns",
+    "structure": {{ /* ONLY for json/dict types: nested structure as dict */ }},
+    "return_format": {{ /* Alternative to structure: describe format as dict */ }}
+  }},
+  "suggested_params": [
+    {{
+      "key": "param_name",
+      "label": "User-friendly label",
+      "type": "string" | "number" | "boolean",
+      "required": true | false,
+      "default": null | <value>,
+      "description": "What this parameter controls"
+    }}
+  ],
+  "example_input": {{
+    /* Concrete, realistic example of input data that matches input_schema */
+    /* Use actual values, not placeholders like "value" or "example" */
+  }},
+  "example_output": {{
+    /* Concrete, realistic example of output data that matches output_schema */
+    /* Use actual values that users can immediately understand */
+  }},
+  "changes_summary": [
+    "변경 사항 1 (한국어로 작성)",
+    "변경 사항 2 (한국어로 작성)"
+  ]
+}}
+
+## CRITICAL Rules:
+- **NEVER use "args_format" field** - it's only for command-line tools
+- For json/dict types: use "structure" (nested dict) or "fields" (flat string array)
+- **IMPORTANT**: "fields" must be an array of STRINGS, NOT objects/dicts
+  - WRONG: "fields": [{{"name": "x", "type": "number"}}] ❌
+  - CORRECT: "fields": ["x", "y", "z"] ✅
+- "structure" is for nested objects, use dict format
+  - Example: "structure": {{"position": {{"x": "number", "y": "number"}}}}
+- Provide concrete, realistic examples (not placeholders)
+- List all changes in changes_summary (in Korean)
+- Only modify what the user requested - keep other parts unchanged
+
+Return ONLY the JSON object, no markdown or code blocks.
+"""
+
+    log.info("[improve_schema] 프롬프트 준비 완료: %d bytes", len(prompt))
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        log.info("[improve_schema] LLM 호출 시도 %d/%d", attempt + 1, max_retries)
+        try:
+            data = await provider.generate_json(prompt, max_retries=1)
+            log.info("[improve_schema] LLM 응답 수신")
+
+            if isinstance(data, list) and len(data) > 0:
+                data = data[0]
+
+            # 필수 필드 검증
+            required_fields = ["input_schema", "output_schema", "changes_summary"]
+            for field in required_fields:
+                if field not in data:
+                    log.warning("[improve_schema] 필수 필드 누락: %s", field)
+                    if field == "changes_summary":
+                        data[field] = ["스키마가 개선되었습니다."]
+
+            # tool_name과 description 추가 (endpoint에서 필요)
+            data["tool_name"] = tool_name
+            data["description"] = description
+
+            elapsed = time.time() - start_time
+            log.info("[improve_schema] === 스키마 개선 완료 ===")
+            log.info("[improve_schema] 소요 시간: %.2f초", elapsed)
+            log.info("[improve_schema] 변경 사항: %s", data.get("changes_summary", []))
+            log.info("=" * 60)
+            return data
+
+        except Exception as e:
+            log.error("[improve_schema] 예외 발생 (시도 %d/%d): %s", attempt + 1, max_retries, str(e))
+            if attempt < max_retries - 1:
+                continue
+            return None
+
+    log.error("[improve_schema] 모든 재시도 실패")
     return None

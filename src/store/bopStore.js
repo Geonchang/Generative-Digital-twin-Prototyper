@@ -518,7 +518,14 @@ const useBopStore = create((set) => ({
   // Chat messages
   messages: [], // { role: 'user' | 'assistant', content: string, timestamp: Date }
 
+  // LLM Model Selection
+  selectedModel: 'gemini-2.5-flash',  // Default model
+  supportedModels: {},  // { modelId: { provider: string, display: string } }
+
   // Actions
+  setSelectedModel: (model) => set({ selectedModel: model }),
+  setSupportedModels: (models) => set({ supportedModels: models }),
+
   setBopData: (data) => {
     console.log('[STORE] setBopData called with:', data);
     // Automatically expand parallel processes

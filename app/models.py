@@ -224,6 +224,7 @@ class UnifiedChatRequest(BaseModel):
     """통합 채팅 요청 (생성/수정/QA)"""
     message: str
     current_bop: Optional[BOPData] = None
+    model: Optional[str] = None  # LLM 모델 선택 (None이면 기본 모델 사용)
 
 
 class UnifiedChatResponse(BaseModel):

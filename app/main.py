@@ -88,6 +88,13 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/api/models")
+async def get_supported_models():
+    """지원하는 LLM 모델 목록 반환"""
+    from app.llm import get_supported_models
+    return get_supported_models()
+
+
 @app.post("/api/generate")
 async def generate_bop(req: GenerateRequest) -> BOPData:
     """
@@ -140,8 +147,8 @@ async def unified_chat_endpoint(req: UnifiedChatRequest) -> UnifiedChatResponse:
         # current_bop을 dict로 변환 (있는 경우)
         current_bop_dict = req.current_bop.model_dump() if req.current_bop else None
 
-        # LLM 서비스를 통해 통합 처리
-        response_data = await unified_chat(req.message, current_bop_dict)
+        # LLM 서비스를 통해 통합 처리 (모델 파라미터 전달)
+        response_data = await unified_chat(req.message, current_bop_dict, req.model)
 
         # bop_data가 있으면 Pydantic 모델로 validation
         bop_data = None

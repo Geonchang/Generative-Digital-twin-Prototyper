@@ -92,7 +92,10 @@ def get_tool(tool_id: str) -> Optional[ToolRegistryEntry]:
     with open(adapter_file, "r", encoding="utf-8") as f:
         adapter = AdapterCode(**json.load(f))
 
-    return ToolRegistryEntry(metadata=metadata, adapter=adapter)
+    # 스크립트 소스 코드 읽기
+    source_code = get_script_content(tool_id, metadata.file_name)
+
+    return ToolRegistryEntry(metadata=metadata, adapter=adapter, source_code=source_code)
 
 
 def delete_tool(tool_id: str) -> bool:
@@ -171,6 +174,47 @@ def update_tool_metadata(tool_id: str, metadata: ToolMetadata) -> bool:
     try:
         with open(meta_file, "w", encoding="utf-8") as f:
             json.dump(metadata.model_dump(), f, indent=2, ensure_ascii=False)
+        return True
+    except Exception:
+        return False
+
+
+def update_tool_script(tool_id: str, file_name: str, source_code: str) -> bool:
+    """
+    도구의 스크립트 파일을 업데이트합니다.
+
+    Args:
+        tool_id: 도구 ID
+        file_name: 파일명
+        source_code: 소스 코드
+
+    Returns:
+        성공 여부
+    """
+    tool_dir = REGISTRY_DIR / tool_id
+    if not tool_dir.exists():
+        return False
+
+    script_dir = UPLOADS_DIR / tool_id
+    script_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # 줄바꿈 정규화
+        normalized_code = source_code.replace('\r\n', '\n').replace('\r', '\n')
+
+        with open(script_dir / file_name, "w", encoding="utf-8", newline='') as f:
+            f.write(normalized_code)
+
+        # 메타데이터에서 file_name 업데이트
+        meta_file = tool_dir / "metadata.json"
+        with open(meta_file, "r", encoding="utf-8") as f:
+            metadata_dict = json.load(f)
+
+        metadata_dict["file_name"] = file_name
+
+        with open(meta_file, "w", encoding="utf-8") as f:
+            json.dump(metadata_dict, f, indent=2, ensure_ascii=False)
+
         return True
     except Exception:
         return False

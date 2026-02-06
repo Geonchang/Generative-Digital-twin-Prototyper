@@ -2692,3 +2692,54 @@ Traceback (most recent call last):
 2026-02-04 13:02:09,489 [INFO] tool_router: [apply] params_schema 변경: Yes
 2026-02-04 13:02:09,489 [INFO] tool_router: [apply] script 변경: Yes
 2026-02-04 13:02:09,497 [INFO] tool_router: [apply] 저장 완료: column_placement_calculator_v6
+2026-02-04 13:02:12,426 [INFO] root: ================================================================================
+2026-02-04 13:02:12,426 [INFO] root: Backend started - Log file: C:\projects\26_gen_dt\logs\backend_20260204.log
+2026-02-04 13:02:12,427 [INFO] root: ================================================================================
+2026-02-04 13:02:14,507 [INFO] tool_router: [execute API] 도구 실행 요청: tool_id=column_placement_calculator_v6
+2026-02-04 13:02:14,507 [INFO] tool_router: [execute API] params={"width": 20, "length": 15, "interval": 2.5, "column_width": 0.2, "column_height": 3, "column_depth": 0.2}
+2026-02-04 13:02:14,508 [INFO] tool_router: [execute API] BOP 데이터: processes=5, obstacles=4
+2026-02-04 13:02:14,514 [INFO] tool_executor: ============================================================
+2026-02-04 13:02:14,515 [INFO] tool_executor: [execute] === 도구 실행 시작 ===
+2026-02-04 13:02:14,515 [INFO] tool_executor: [execute] tool_id=column_placement_calculator_v6, tool_name=column_placement_calculator_v6
+2026-02-04 13:02:14,516 [INFO] tool_executor: [execute] params={"width": 20, "length": 15, "interval": 2.5, "column_width": 0.2, "column_height": 3, "column_depth": 0.2}
+2026-02-04 13:02:14,516 [INFO] tool_executor: [execute] args_format=--input {input_file} --output {output_file}
+2026-02-04 13:02:14,520 [INFO] tool_executor: [execute] 스크립트 실행 시작: column_maker.py (args_format=--input {input_file} --output {output_file})
+2026-02-04 13:02:14,520 [DEBUG] tool_executor: [build_command] args_format: --input {input_file} --output {output_file} -> --input C:\projects\26_gen_dt\uploads\workdir\column_placement_calculator_v6_1770177734513\input_data.json --output C:\projects\26_gen_dt\uploads\workdir\column_placement_calculator_v6_1770177734513\output_data.json
+2026-02-04 13:02:14,521 [INFO] tool_executor: [build_command] 최종 명령어: C:\projects\26_gen_dt\venv\Scripts\python.exe C:\projects\26_gen_dt\uploads\scripts\column_placement_calculator_v6\column_maker.py --input C:\projects\26_gen_dt\uploads\workdir\column_placement_calculator_v6_1770177734513\input_data.json --output...
+2026-02-04 13:02:14,521 [INFO] tool_executor: [subprocess] 환경변수로 전달된 params: {'width': '20', 'length': '15', 'interval': '2.5', 'column_width': '0.2', 'column_height': '3', 'column_depth': '0.2'}
+2026-02-04 13:02:14,709 [INFO] tool_executor: [execute] 스크립트 실행 완료: return_code=0
+2026-02-04 13:02:14,730 [INFO] tool_executor: [execute] === 실행 완료 ===
+2026-02-04 13:02:14,731 [INFO] tool_executor: [execute] tool_input (처음 500자):
+{"width": 20, "length": 15, "interval": 2.5, "processes": [{"process_id": "P001", "parallel_count": 6, "predecessor_ids": [], "successor_ids": ["P002"], "parallel_lines": [{"parallel_index": 1, "name": "\ud504\ub808\uc784 \uc6a9\uc811", "description": "\uba54\uc778 \ud504\ub808\uc784\uacfc \uc11c\ube0c \ud504\ub808\uc784\uc744 \uc6a9\uc811\ud558\uc5ec \uae30\ubcf8 \uace8\uaca9 \uc81c\uc791", "cycle_time_sec": 180, "location": {"x": 0, "y": 0, "z": 0}, "rotation_y": 0}, {"parallel_index": 2, "nam
+2026-02-04 13:02:14,732 [INFO] tool_executor: [execute] tool_output (처음 500자):
+{
+    "meta": {
+        "width": 20.0,
+        "length": 15.0,
+        "interval": 2.5
+    },
+    "summary": {
+        "total_count": 62,
+        "columns_on_width": 9,
+        "columns_on_length": 7
+    },
+    "columns": [
+        {
+            "id": 1,
+            "x": 0.0,
+            "y": 2.5
+        },
+        {
+            "id": 2,
+            "x": 0.0,
+            "y": 5.0
+        },
+        {
+            "id": 3,
+            "x": 0.0,
+            "y": 7.5
+        },
+        {
+           
+2026-02-04 13:02:14,732 [INFO] tool_executor: ============================================================
+2026-02-04 13:02:14,740 [INFO] tool_router: [execute API] 실행 결과: success=True, message=도구 실행이 완료되었습니다.

@@ -11,12 +11,16 @@ from app.tools.tool_models import (
     ExecuteRequest, ExecuteResponse,
     ToolListItem, ToolRegistryEntry,
     ToolMetadata, AdapterCode, ParamDef,
+    GenerateSchemaRequest, GenerateSchemaResponse,
+    ImproveSchemaRequest,
     GenerateScriptRequest, GenerateScriptResponse,
     ImproveRequest, ImproveResponse, ApplyImprovementRequest,
+    RegisterSchemaOnlyRequest, RegisterSchemaOnlyResponse,
+    UpdateScriptRequest, UpdateScriptResponse,
 )
 from app.tools.analyzer import analyze_script
-from app.tools.synthesizer import synthesize_adapter, generate_tool_script, improve_tool
-from app.tools.registry import list_tools, get_tool, delete_tool, save_tool, generate_tool_id, get_script_content
+from app.tools.synthesizer import synthesize_adapter, generate_schema_from_description, improve_schema_from_feedback, generate_tool_script, improve_tool
+from app.tools.registry import list_tools, get_tool, delete_tool, save_tool, generate_tool_id, get_script_content, update_tool_script
 from app.tools.executor import execute_tool
 
 router = APIRouter(prefix="/api/tools", tags=["tools"])
@@ -25,12 +29,15 @@ router = APIRouter(prefix="/api/tools", tags=["tools"])
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_tool(req: AnalyzeRequest):
     """FR-1: 업로드된 스크립트의 입출력 스키마를 분석합니다."""
-    log.info("[analyze] 스크립트 분석 시작: %s (코드 길이: %d)", req.file_name, len(req.source_code))
+    log.info("[analyze] 스크립트 분석 시작: %s (코드 길이: %d), model=%s", req.file_name, len(req.source_code), req.model or "기본값")
     try:
         result = await analyze_script(
             source_code=req.source_code,
             file_name=req.file_name,
             sample_input=req.sample_input,
+            model=req.model,
+            input_schema_override=req.input_schema_override.model_dump() if req.input_schema_override else None,
+            output_schema_override=req.output_schema_override.model_dump() if req.output_schema_override else None,
         )
         log.info("[analyze] 분석 완료: tool_name=%s, input_type=%s, params=%d개",
                  result.get("tool_name"),
@@ -62,8 +69,8 @@ async def register_tool(req: RegisterRequest):
         log.info("[register] metadata 생성 완료")
 
         # LLM으로 어댑터 코드 자동 생성
-        log.info("[register] synthesize_adapter 호출")
-        adapter = await synthesize_adapter(metadata, source_code=req.source_code)
+        log.info("[register] synthesize_adapter 호출, model=%s", req.model or "기본값")
+        adapter = await synthesize_adapter(metadata, source_code=req.source_code, model=req.model)
         log.info("[register] adapter 생성 완료")
 
         # 레지스트리에 저장
@@ -81,6 +88,70 @@ async def register_tool(req: RegisterRequest):
         )
     except Exception as e:
         log.error("[register] 오류 발생:\n%s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"등록 실패: {str(e)}")
+
+
+@router.post("/register-schema-only", response_model=RegisterSchemaOnlyResponse)
+async def register_schema_only(req: RegisterSchemaOnlyRequest):
+    """스키마만으로 도구를 등록합니다 (스크립트는 나중에 업로드)."""
+    try:
+        log.info("=" * 60)
+        log.info("[register-schema-only] === 스키마 우선 등록 시작 ===")
+        log.info("[register-schema-only] tool_name=%s", req.tool_name)
+        log.info("[register-schema-only] input_type=%s, output_type=%s",
+                 req.input_schema.type, req.output_schema.type)
+
+        tool_id = generate_tool_id(req.tool_name)
+
+        # 임시 파일명 생성 (나중에 실제 스크립트 업로드 시 변경 가능)
+        temp_file_name = f"{tool_id}_placeholder.py"
+
+        metadata = ToolMetadata(
+            tool_id=tool_id,
+            tool_name=req.tool_name,
+            description=req.description,
+            execution_type=req.execution_type,
+            file_name=temp_file_name,
+            input_schema=req.input_schema,
+            output_schema=req.output_schema,
+            params_schema=req.params_schema,
+        )
+        log.info("[register-schema-only] metadata 생성 완료")
+
+        # 어댑터 코드 생성 (스크립트 없이)
+        log.info("[register-schema-only] synthesize_adapter 호출 (source_code=None), model=%s", req.model or "기본값")
+        adapter = await synthesize_adapter(metadata, source_code=None, model=req.model)
+        log.info("[register-schema-only] adapter 생성 완료")
+
+        # 플레이스홀더 스크립트 생성
+        placeholder_script = f"""# Placeholder script for {req.tool_name}
+# This script should be replaced with actual implementation
+
+def main():
+    raise NotImplementedError("스크립트가 아직 업로드되지 않았습니다. /api/tools/{tool_id}/script 엔드포인트를 통해 업로드하세요.")
+
+if __name__ == "__main__":
+    main()
+"""
+
+        # 레지스트리에 저장
+        save_tool(metadata, adapter, placeholder_script)
+        log.info("[register-schema-only] 저장 완료: %s", tool_id)
+        log.info("[register-schema-only] === 등록 완료 ===")
+        log.info("=" * 60)
+
+        return RegisterSchemaOnlyResponse(
+            success=True,
+            tool_id=tool_id,
+            tool_name=req.tool_name,
+            message=f"도구 '{req.tool_name}'의 스키마와 어댑터가 등록되었습니다. 스크립트는 나중에 업로드하세요.",
+            adapter_preview={
+                "pre_process_code": adapter.pre_process_code[:500],
+                "post_process_code": adapter.post_process_code[:500],
+            },
+        )
+    except Exception as e:
+        log.error("[register-schema-only] 오류:\n%s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"등록 실패: {str(e)}")
 
 
@@ -108,6 +179,42 @@ async def delete_tool_endpoint(tool_id: str):
     return {"message": f"도구 '{tool_id}'가 삭제되었습니다."}
 
 
+@router.put("/{tool_id}/script", response_model=UpdateScriptResponse)
+async def update_tool_script_endpoint(tool_id: str, req: UpdateScriptRequest):
+    """등록된 도구의 스크립트를 업데이트합니다 (스키마 우선 등록 후 사용)."""
+    log.info("=" * 60)
+    log.info("[update-script] === 스크립트 업데이트 ===")
+    log.info("[update-script] tool_id=%s, file_name=%s, code_length=%d",
+             tool_id, req.file_name, len(req.source_code))
+
+    try:
+        # 도구 존재 확인
+        entry = get_tool(tool_id)
+        if not entry:
+            raise HTTPException(status_code=404, detail=f"도구 '{tool_id}'를 찾을 수 없습니다.")
+
+        # 스크립트 업데이트
+        success = update_tool_script(tool_id, req.file_name, req.source_code)
+        if not success:
+            raise HTTPException(status_code=500, detail="스크립트 업데이트에 실패했습니다.")
+
+        log.info("[update-script] 스크립트 업데이트 완료")
+        log.info("=" * 60)
+
+        return UpdateScriptResponse(
+            success=True,
+            message=f"도구 '{tool_id}'의 스크립트가 업데이트되었습니다.",
+            tool_id=tool_id,
+            file_name=req.file_name,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        log.error("[update-script] 오류:\n%s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"업데이트 실패: {str(e)}")
+
+
 @router.post("/execute", response_model=ExecuteResponse)
 async def execute_tool_endpoint(req: ExecuteRequest):
     """FR-4: 등록된 도구를 BOP 데이터에 대해 실행합니다."""
@@ -127,11 +234,99 @@ async def execute_tool_endpoint(req: ExecuteRequest):
         raise HTTPException(status_code=500, detail=f"실행 실패: {str(e)}")
 
 
+@router.post("/generate-schema", response_model=GenerateSchemaResponse)
+async def generate_schema_endpoint(req: GenerateSchemaRequest):
+    """AI로 도구 스키마를 생성합니다 (AI 생성 1단계)."""
+    try:
+        log.info("[generate-schema] AI 스키마 생성 시작, model=%s", req.model or "기본값")
+        result = await generate_schema_from_description(req.description, model=req.model)
+        if result is None:
+            return GenerateSchemaResponse(
+                success=False,
+                message="스키마 생성에 실패했습니다. 다시 시도해 주세요."
+            )
+
+        # suggested_params를 ParamDef 모델로 변환
+        suggested_params = None
+        if result.get("suggested_params"):
+            suggested_params = [
+                ParamDef(**p) for p in result["suggested_params"]
+            ]
+
+        from app.tools.tool_models import InputSchema, OutputSchema
+        return GenerateSchemaResponse(
+            success=True,
+            tool_name=result.get("tool_name"),
+            description=result.get("description"),
+            input_schema=InputSchema(**result["input_schema"]),
+            output_schema=OutputSchema(**result["output_schema"]),
+            suggested_params=suggested_params,
+            example_input=result.get("example_input"),
+            example_output=result.get("example_output"),
+            message="스키마가 생성되었습니다."
+        )
+    except Exception as e:
+        log.error("[generate-schema] 오류:\n%s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"생성 실패: {str(e)}")
+
+
+@router.post("/improve-schema", response_model=GenerateSchemaResponse)
+async def improve_schema_endpoint(req: ImproveSchemaRequest):
+    """생성된 스키마를 사용자 피드백으로 개선합니다."""
+    try:
+        log.info("[improve-schema] tool_name=%s, feedback=%s", req.tool_name, req.user_feedback[:50])
+
+        result = await improve_schema_from_feedback(
+            tool_name=req.tool_name,
+            description=req.description,
+            current_input_schema=req.current_input_schema,
+            current_output_schema=req.current_output_schema,
+            current_params=req.current_params,
+            user_feedback=req.user_feedback,
+            model=req.model
+        )
+
+        if result is None:
+            raise HTTPException(status_code=500, detail="스키마 개선에 실패했습니다.")
+
+        from app.tools.tool_models import InputSchema, OutputSchema
+        suggested_params = [ParamDef(**p) for p in result.get("suggested_params", [])] if result.get("suggested_params") else None
+
+        log.info("[improve-schema] 개선 완료: 변경사항=%d개", len(result.get("changes_summary", [])))
+        return GenerateSchemaResponse(
+            success=True,
+            tool_name=result["tool_name"],
+            description=result["description"],
+            input_schema=InputSchema(**result["input_schema"]),
+            output_schema=OutputSchema(**result["output_schema"]),
+            suggested_params=suggested_params,
+            example_input=result.get("example_input"),
+            example_output=result.get("example_output"),
+            changes_summary=result.get("changes_summary"),
+            message="스키마가 개선되었습니다."
+        )
+    except Exception as e:
+        log.error("[improve-schema] 오류:\n%s", traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"개선 실패: {str(e)}")
+
+
 @router.post("/generate-script", response_model=GenerateScriptResponse)
 async def generate_script_endpoint(req: GenerateScriptRequest):
-    """AI로 도구 스크립트를 생성합니다."""
+    """AI로 도구 스크립트를 생성합니다 (AI 생성 2단계 또는 독립 실행)."""
     try:
-        result = await generate_tool_script(req.description)
+        log.info("[generate-script] model=%s, 스키마 제공=%s",
+                 req.model or "기본값", "있음" if (req.input_schema and req.output_schema) else "없음")
+
+        # 스키마가 제공된 경우 dict로 변환
+        input_schema_dict = req.input_schema.model_dump() if req.input_schema else None
+        output_schema_dict = req.output_schema.model_dump() if req.output_schema else None
+
+        result = await generate_tool_script(
+            req.description,
+            model=req.model,
+            input_schema=input_schema_dict,
+            output_schema=output_schema_dict
+        )
         if result is None:
             return GenerateScriptResponse(
                 success=False,
@@ -195,6 +390,7 @@ async def improve_tool_endpoint(tool_id: str, req: ImproveRequest):
             }
 
         # AI 개선 호출
+        log.info("[improve] model=%s", req.model or "기본값")
         result = await improve_tool(
             tool_name=metadata.tool_name,
             tool_description=metadata.description,
@@ -207,6 +403,7 @@ async def improve_tool_endpoint(tool_id: str, req: ImproveRequest):
             modify_adapter=req.modify_adapter,
             modify_params=req.modify_params,
             modify_script=req.modify_script,
+            model=req.model,
         )
 
         if result is None:

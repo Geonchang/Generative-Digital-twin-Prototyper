@@ -12,6 +12,9 @@ class ExecutionType(str, Enum):
 class SchemaType(str, Enum):
     CSV = "csv"
     JSON = "json"
+    DICT = "dict"
+    LIST = "list"
+    STRING = "string"
     ARGS = "args"
     STDIN = "stdin"
 
@@ -20,7 +23,7 @@ class InputSchema(BaseModel):
     type: SchemaType = Field(..., description="입력 형식 타입")
     columns: Optional[List[str]] = Field(default=None, description="CSV: 컬럼명 목록")
     fields: Optional[List[str]] = Field(default=None, description="JSON: 필드명 목록")
-    args_format: Optional[str] = Field(default=None, description="ARGS: 인수 패턴")
+    args_format: Optional[Any] = Field(default=None, description="ARGS: 인수 패턴 또는 dict/list 타입의 필드 설명")
     description: str = Field(..., description="입력 형식 설명")
 
 
@@ -28,6 +31,7 @@ class OutputSchema(BaseModel):
     type: SchemaType = Field(..., description="출력 형식 타입")
     columns: Optional[List[str]] = Field(default=None, description="CSV: 컬럼명 목록")
     fields: Optional[List[str]] = Field(default=None, description="JSON: 필드명 목록")
+    return_format: Optional[Any] = Field(default=None, description="dict/list 타입의 반환 형식 설명")
     description: str = Field(..., description="출력 형식 설명")
 
 
@@ -61,6 +65,7 @@ class AdapterCode(BaseModel):
 class ToolRegistryEntry(BaseModel):
     metadata: ToolMetadata
     adapter: AdapterCode
+    source_code: Optional[str] = Field(default=None, description="도구 스크립트 소스 코드")
 
 
 # === API Request/Response ===
@@ -69,6 +74,9 @@ class AnalyzeRequest(BaseModel):
     source_code: str = Field(..., description="분석할 소스 코드")
     file_name: str = Field(default="script.py", description="원본 파일명")
     sample_input: Optional[str] = Field(default=None, description="예제 입력 데이터")
+    model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
+    input_schema_override: Optional[InputSchema] = Field(default=None, description="입력 스키마 오버라이드 (제공 시 LLM 분석 스킵)")
+    output_schema_override: Optional[OutputSchema] = Field(default=None, description="출력 스키마 오버라이드 (제공 시 LLM 분석 스킵)")
 
 
 class AnalyzeResponse(BaseModel):
@@ -90,6 +98,7 @@ class RegisterRequest(BaseModel):
     output_schema: OutputSchema
     params_schema: Optional[List[ParamDef]] = None
     sample_input: Optional[str] = None
+    model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
 
 
 class RegisterResponse(BaseModel):
@@ -128,8 +137,43 @@ class ToolListItem(BaseModel):
     params_schema: Optional[List[ParamDef]] = None
 
 
-class GenerateScriptRequest(BaseModel):
+class GenerateSchemaRequest(BaseModel):
+    """스키마만 생성 요청 (AI 생성 1단계)"""
     description: str = Field(..., description="원하는 도구 기능 설명")
+    model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
+
+
+class GenerateSchemaResponse(BaseModel):
+    """스키마 생성 응답"""
+    success: bool
+    tool_name: Optional[str] = None
+    description: Optional[str] = None
+    input_schema: Optional[InputSchema] = None
+    output_schema: Optional[OutputSchema] = None
+    suggested_params: Optional[List[ParamDef]] = None
+    example_input: Optional[Any] = Field(default=None, description="입력 예시 데이터 (AI 생성)")
+    example_output: Optional[Any] = Field(default=None, description="출력 예시 데이터 (AI 생성)")
+    changes_summary: Optional[List[str]] = Field(default=None, description="변경 사항 요약 (개선 시)")
+    message: Optional[str] = None
+
+
+class ImproveSchemaRequest(BaseModel):
+    """스키마 개선 요청"""
+    tool_name: str = Field(..., description="도구명")
+    description: str = Field(..., description="도구 설명")
+    current_input_schema: dict = Field(..., description="현재 입력 스키마")
+    current_output_schema: dict = Field(..., description="현재 출력 스키마")
+    current_params: Optional[List[dict]] = Field(default=None, description="현재 파라미터")
+    user_feedback: str = Field(..., description="사용자 개선 요청")
+    model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
+
+
+class GenerateScriptRequest(BaseModel):
+    """스크립트 생성 요청 (AI 생성 2단계 또는 독립 실행)"""
+    description: str = Field(..., description="원하는 도구 기능 설명")
+    model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
+    input_schema: Optional[InputSchema] = Field(default=None, description="입력 스키마 (제공 시 이를 기반으로 스크립트 생성)")
+    output_schema: Optional[OutputSchema] = Field(default=None, description="출력 스키마 (제공 시 이를 기반으로 스크립트 생성)")
 
 
 class GenerateScriptResponse(BaseModel):
@@ -154,6 +198,7 @@ class ImproveRequest(BaseModel):
     modify_adapter: bool = Field(default=True, description="어댑터 코드 수정 여부")
     modify_params: bool = Field(default=True, description="파라미터 스키마 수정 여부")
     modify_script: bool = Field(default=False, description="스크립트 코드 수정 여부")
+    model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
 
 
 class ImproveResponse(BaseModel):
@@ -170,3 +215,35 @@ class ApplyImprovementRequest(BaseModel):
     params_schema: Optional[List[ParamDef]] = None
     script_code: Optional[str] = None
     create_new_version: bool = Field(default=True, description="새 버전으로 등록할지 여부")
+
+
+class RegisterSchemaOnlyRequest(BaseModel):
+    """스키마만으로 도구를 등록 (스크립트는 나중에 업로드)"""
+    tool_name: str = Field(..., description="도구 이름")
+    description: str = Field(..., description="도구 설명")
+    execution_type: ExecutionType = Field(default=ExecutionType.PYTHON, description="실행 타입")
+    input_schema: InputSchema = Field(..., description="입력 스키마")
+    output_schema: OutputSchema = Field(..., description="출력 스키마")
+    params_schema: Optional[List[ParamDef]] = Field(default=None, description="파라미터 스키마")
+    model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
+
+
+class RegisterSchemaOnlyResponse(BaseModel):
+    success: bool
+    tool_id: str
+    tool_name: str
+    message: str
+    adapter_preview: Optional[Dict[str, str]] = None
+
+
+class UpdateScriptRequest(BaseModel):
+    """등록된 도구의 스크립트 업데이트"""
+    source_code: str = Field(..., description="스크립트 소스 코드")
+    file_name: str = Field(..., description="스크립트 파일명")
+
+
+class UpdateScriptResponse(BaseModel):
+    success: bool
+    message: str
+    tool_id: str
+    file_name: str

@@ -6,8 +6,29 @@ function UnifiedChatPanel() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { messages, setBopData, addMessage, exportBopData } = useBopStore();
+  const { messages, setBopData, addMessage, exportBopData, selectedModel, setSelectedModel, supportedModels, setSupportedModels } = useBopStore();
   const messagesEndRef = useRef(null);
+
+  // Load supported models on component mount
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        console.log('[DEBUG] Fetching /api/models...');
+        const response = await fetch('/api/models');
+        console.log('[DEBUG] Response status:', response.status);
+        if (response.ok) {
+          const models = await response.json();
+          console.log('[DEBUG] Models loaded:', models);
+          setSupportedModels(models);
+        } else {
+          console.error('[DEBUG] Response not OK:', response.status);
+        }
+      } catch (err) {
+        console.error('Failed to load models:', err);
+      }
+    };
+    loadModels();
+  }, [setSupportedModels]);
 
   // 메시지 추가 시 자동 스크롤
   useEffect(() => {
@@ -33,8 +54,13 @@ function UnifiedChatPanel() {
       const collapsedBop = exportBopData();
       const currentMessages = useBopStore.getState().messages;
 
-      // 통합 채팅 API 호출 (Gemini 직접 호출)
-      const response = await api.unifiedChat(userMessage, collapsedBop, currentMessages);
+      // BOP가 비어있으면 null로 전송 (프로세스가 없는 경우)
+      const bopToSend = collapsedBop && collapsedBop.processes && collapsedBop.processes.length > 0
+        ? collapsedBop
+        : null;
+
+      // 통합 채팅 API 호출 (선택된 모델 사용)
+      const response = await api.unifiedChat(userMessage, bopToSend, currentMessages, selectedModel);
 
       console.log('[DEBUG] API Response:', response);
       console.log('[DEBUG] BOP Data exists:', !!response.bop_data);
@@ -52,9 +78,10 @@ function UnifiedChatPanel() {
       }
     } catch (err) {
       console.error('[ERROR] API call failed:', err);
-      setError(err.message);
+      const errorMessage = err.message || String(err);
+      setError(errorMessage);
       // 에러 메시지도 히스토리에 추가
-      addMessage('assistant', `오류: ${err.message}`);
+      addMessage('assistant', `오류: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -69,7 +96,23 @@ function UnifiedChatPanel() {
 
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>AI 어시스턴트</h2>
+      <div style={styles.titleBar}>
+        <h2 style={styles.title}>AI 어시스턴트</h2>
+        {Object.keys(supportedModels).length > 0 && (
+          <select
+            style={styles.modelSelect}
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            disabled={loading}
+          >
+            {Object.entries(supportedModels).map(([modelId, modelInfo]) => (
+              <option key={modelId} value={modelId}>
+                {modelInfo.display}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
 
       {/* 대화 히스토리 */}
       <div style={styles.messagesContainer}>
@@ -144,13 +187,26 @@ const styles = {
     height: '100%',
     backgroundColor: '#fff',
   },
-  title: {
-    margin: '0',
+  titleBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: '15px 20px',
-    fontSize: '18px',
-    fontWeight: 'bold',
     borderBottom: '1px solid #e0e0e0',
     backgroundColor: '#f8f9fa',
+  },
+  title: {
+    margin: '0',
+    fontSize: '18px',
+    fontWeight: 'bold',
+  },
+  modelSelect: {
+    padding: '5px 10px',
+    borderRadius: '4px',
+    border: '1px solid #ccc',
+    fontSize: '13px',
+    backgroundColor: '#fff',
+    cursor: 'pointer',
   },
   messagesContainer: {
     flex: 1,

@@ -55,6 +55,13 @@ Output ONLY valid JSON (no markdown, no code blocks):
 
 # Rules
 
+## 3D Coordinate System (Three.js)
+- **X-axis (Horizontal)**: Left (-) to Right (+) | Factory floor width
+- **Y-axis (Vertical)**: Down (-) to Up (+) | Height from ground (always use 0 for ground level)
+- **Z-axis (Depth)**: Front (-) to Back (+) | Factory floor depth
+- **Units**: 1 unit = 1 meter
+- **View**: Top-down view shows X (horizontal) and Z (vertical/depth)
+
 ## Process Generation
 - Include 3-6 processes
 - Each process represents ONE manufacturing step (welding, assembly, inspection, etc.)
@@ -86,24 +93,27 @@ Output ONLY valid JSON (no markdown, no code blocks):
 ### Equipment Resources
 - equipment_id format: "EQ{NUMBER:03d}" (e.g., "EQ001", "EQ002")
 - type: "robot", "machine", or "manual_station"
-- relative_location: Position within process space (KEEP COMPACT - x range: -1.5 to 1.5, z range: -1 to 1)
-  - Main equipment: (0, 0, 0)
-  - Secondary equipment: (1, 0, 0) or (-1, 0, 0)
+- relative_location: Position relative to process center (KEEP COMPACT)
+  - Main equipment: {"x": 0, "y": 0, "z": 0} (center)
+  - Secondary equipment: {"x": 1, "y": 0, "z": 0} (right) or {"x": -1, "y": 0, "z": 0} (left)
+  - Valid range: x: -1.5 to 1.5m, z: -1 to 1m, y: always 0
 
 ### Worker Resources
 - worker_id format: "W{NUMBER:03d}" (e.g., "W001")
-- relative_location: Offset from process center (KEEP COMPACT - x range: -1.5 to 1.5, z range: -1 to 1)
-  - Primary worker: (0.8, 0, 0.5)
-  - Secondary worker: (-0.8, 0, 0.5)
-  - Inspector: (0, 0, 0.8)
+- relative_location: Position relative to process center (KEEP COMPACT)
+  - Primary operator: {"x": 0.8, "y": 0, "z": 0.5} (right-front)
+  - Secondary worker: {"x": -0.8, "y": 0, "z": 0.5} (left-front)
+  - Inspector: {"x": 0, "y": 0, "z": 0.8} (back)
+  - Valid range: x: -1.5 to 1.5m, z: -1 to 1m, y: always 0
 
 ### Material Resources
 - material_id format: "M{NUMBER:03d}" (e.g., "M001", "M002")
 - unit: "kg", "ea", "m", "L", etc.
 - quantity: Realistic amount used in this process
-- relative_location: Material staging area (KEEP COMPACT - x range: -1.5 to 1.5, z range: -1 to 1)
-  - Input materials: (-0.8, 0, 0.3)
-  - Output materials: (0.8, 0, 0.3)
+- relative_location: Staging area relative to process center (KEEP COMPACT)
+  - Input materials: {"x": -0.8, "y": 0, "z": 0.3} (left side)
+  - Output materials: {"x": 0.8, "y": 0, "z": 0.3} (right side)
+  - Valid range: x: -1.5 to 1.5m, z: -1 to 1m, y: always 0
 
 ## Other Requirements
 - Parallel_count: Number of parallel production lines (usually 1)
@@ -189,6 +199,14 @@ BOP Schema (when included):
 }}
 
 Rules:
+
+3D Coordinate System (Three.js):
+- X-axis (horizontal): Left to Right | Factory width | Process flow direction
+- Y-axis (vertical): Up/Down | Height (ALWAYS 0 for ground level)
+- Z-axis (depth): Front to Back | Parallel lines spacing
+- Units: 1 unit = 1 meter
+
+Process Rules:
 - Each process is a SINGLE manufacturing step (no sub-operations)
 - For BOP creation: 3-6 processes, realistic cycle times (10-300s)
 - For BOP modification: preserve structure unless explicitly asked to change

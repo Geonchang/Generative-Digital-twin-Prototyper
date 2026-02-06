@@ -1,17 +1,13 @@
 import json
 import os
-import requests
-import time
 from typing import Tuple, Optional
 from dotenv import load_dotenv
 from app.prompts import SYSTEM_PROMPT, MODIFY_PROMPT_TEMPLATE, UNIFIED_CHAT_PROMPT_TEMPLATE
 from app.models import BOPData
+from app.llm import get_provider
 
 # .env 파일 로드
 load_dotenv()
-
-# Gemini API 키 설정
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
 
 
 def validate_bop_data(bop_data: dict) -> Tuple[bool, str]:
@@ -44,12 +40,13 @@ def validate_bop_data(bop_data: dict) -> Tuple[bool, str]:
         return False, f"검증 중 오류 발생: {str(e)}"
 
 
-async def generate_bop_from_text(user_input: str) -> dict:
+async def generate_bop_from_text(user_input: str, model: str = None) -> dict:
     """
-    사용자 입력을 받아 Gemini API를 통해 BOP JSON을 생성합니다.
+    사용자 입력을 받아 LLM을 통해 BOP JSON을 생성합니다.
 
     Args:
         user_input: 사용자의 생산 라인 요청 텍스트
+        model: 사용할 모델 (None이면 기본 모델 사용)
 
     Returns:
         dict: 파싱된 BOP JSON 데이터
@@ -57,8 +54,12 @@ async def generate_bop_from_text(user_input: str) -> dict:
     Raises:
         Exception: API 호출 실패 또는 JSON 파싱 실패 시
     """
-    if not GEMINI_API_KEY or GEMINI_API_KEY == "your_key_here":
-        raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
+    # Get default model if not specified
+    if not model:
+        model = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash")
+
+    # Get provider for the specified model
+    provider = get_provider(model)
 
     # System prompt + user input 결합
     full_prompt = f"{SYSTEM_PROMPT}\n\nUser request: {user_input}"
@@ -69,35 +70,8 @@ async def generate_bop_from_text(user_input: str) -> dict:
 
     for attempt in range(max_retries):
         try:
-            # Gemini API REST 호출
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-
-            headers = {
-                'Content-Type': 'application/json'
-            }
-
-            payload = {
-                "contents": [{
-                    "parts": [{
-                        "text": full_prompt
-                    }]
-                }]
-            }
-
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
-            response.raise_for_status()
-
-            result = response.json()
-            response_text = result['candidates'][0]['content']['parts'][0]['text'].strip()
-
-            # 마크다운 코드 블록 제거 (```json ... ``` 형태)
-            if response_text.startswith("```"):
-                lines = response_text.split('\n')
-                # 첫 줄과 마지막 줄 제거
-                response_text = '\n'.join(lines[1:-1])
-
-            # JSON 파싱
-            bop_data = json.loads(response_text)
+            # LLM API 호출 (provider abstraction 사용)
+            bop_data = await provider.generate_json(full_prompt, max_retries=1)
 
             # BOP 검증
             is_valid, error_msg = validate_bop_data(bop_data)
@@ -110,47 +84,24 @@ async def generate_bop_from_text(user_input: str) -> dict:
 
             return bop_data
 
-        except requests.exceptions.HTTPError as e:
-            # Rate Limit 에러 처리
-            if e.response.status_code == 429:
-                wait_time = (2 ** attempt) * 2  # 2, 4, 8초
-                last_error = f"Rate Limit 초과 (시도 {attempt + 1}/{max_retries}). {wait_time}초 대기 후 재시도..."
-                print(last_error)
-                if attempt < max_retries - 1:
-                    time.sleep(wait_time)
-                continue
-            else:
-                last_error = f"API 호출 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-                print(last_error)
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                continue
-
-        except json.JSONDecodeError as e:
-            last_error = f"JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            print(last_error)
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
-
         except Exception as e:
             last_error = f"BOP 생성 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
             print(last_error)
             if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
+                continue
 
     # 모든 재시도 실패
     raise Exception(f"BOP 생성 실패: {last_error}")
 
 
-async def modify_bop(current_bop: dict, user_message: str) -> dict:
+async def modify_bop(current_bop: dict, user_message: str, model: str = None) -> dict:
     """
     현재 BOP와 사용자 수정 요청을 받아 업데이트된 BOP를 생성합니다.
 
     Args:
         current_bop: 현재 BOP 데이터 (dict)
         user_message: 사용자의 수정 요청 메시지
+        model: 사용할 모델 (None이면 기본 모델 사용)
 
     Returns:
         dict: 업데이트된 BOP JSON 데이터
@@ -158,8 +109,12 @@ async def modify_bop(current_bop: dict, user_message: str) -> dict:
     Raises:
         Exception: API 호출 실패 또는 JSON 파싱 실패 시
     """
-    if not GEMINI_API_KEY or GEMINI_API_KEY == "your_key_here":
-        raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
+    # Get default model if not specified
+    if not model:
+        model = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash")
+
+    # Get provider for the specified model
+    provider = get_provider(model)
 
     # 현재 BOP를 JSON 문자열로 변환 (들여쓰기 포함)
     current_bop_json = json.dumps(current_bop, indent=2, ensure_ascii=False)
@@ -176,35 +131,8 @@ async def modify_bop(current_bop: dict, user_message: str) -> dict:
 
     for attempt in range(max_retries):
         try:
-            # Gemini API REST 호출
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-
-            headers = {
-                'Content-Type': 'application/json'
-            }
-
-            payload = {
-                "contents": [{
-                    "parts": [{
-                        "text": full_prompt
-                    }]
-                }]
-            }
-
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
-            response.raise_for_status()
-
-            result = response.json()
-            response_text = result['candidates'][0]['content']['parts'][0]['text'].strip()
-
-            # 마크다운 코드 블록 제거 (```json ... ``` 형태)
-            if response_text.startswith("```"):
-                lines = response_text.split('\n')
-                # 첫 줄과 마지막 줄 제거
-                response_text = '\n'.join(lines[1:-1])
-
-            # JSON 파싱
-            updated_bop = json.loads(response_text)
+            # LLM API 호출 (provider abstraction 사용)
+            updated_bop = await provider.generate_json(full_prompt, max_retries=1)
 
             # BOP 검증
             is_valid, error_msg = validate_bop_data(updated_bop)
@@ -213,47 +141,24 @@ async def modify_bop(current_bop: dict, user_message: str) -> dict:
 
             return updated_bop
 
-        except requests.exceptions.HTTPError as e:
-            # Rate Limit 에러 처리
-            if e.response.status_code == 429:
-                wait_time = (2 ** attempt) * 2  # 2, 4, 8초
-                last_error = f"Rate Limit 초과 (시도 {attempt + 1}/{max_retries}). {wait_time}초 대기 후 재시도..."
-                print(last_error)
-                if attempt < max_retries - 1:
-                    time.sleep(wait_time)
-                continue
-            else:
-                last_error = f"API 호출 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-                print(last_error)
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                continue
-
-        except json.JSONDecodeError as e:
-            last_error = f"JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            print(last_error)
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
-
         except Exception as e:
             last_error = f"BOP 수정 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
             print(last_error)
             if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
+                continue
 
     # 모든 재시도 실패
     raise Exception(f"BOP 수정 실패: {last_error}")
 
 
-async def unified_chat(user_message: str, current_bop: dict = None) -> dict:
+async def unified_chat(user_message: str, current_bop: dict = None, model: str = None) -> dict:
     """
     통합 채팅 엔드포인트: BOP 생성, 수정, QA를 모두 처리합니다.
 
     Args:
         user_message: 사용자 메시지
         current_bop: 현재 BOP 데이터 (없으면 None)
+        model: 사용할 모델 (None이면 기본 모델 사용)
 
     Returns:
         dict: {
@@ -264,8 +169,12 @@ async def unified_chat(user_message: str, current_bop: dict = None) -> dict:
     Raises:
         Exception: API 호출 실패 또는 JSON 파싱 실패 시
     """
-    if not GEMINI_API_KEY or GEMINI_API_KEY == "your_key_here":
-        raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
+    # Get default model if not specified
+    if not model:
+        model = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash")
+
+    # Get provider for the specified model
+    provider = get_provider(model)
 
     # 컨텍스트 구성
     if current_bop:
@@ -286,35 +195,8 @@ async def unified_chat(user_message: str, current_bop: dict = None) -> dict:
 
     for attempt in range(max_retries):
         try:
-            # Gemini API REST 호출
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
-
-            headers = {
-                'Content-Type': 'application/json'
-            }
-
-            payload = {
-                "contents": [{
-                    "parts": [{
-                        "text": full_prompt
-                    }]
-                }]
-            }
-
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
-            response.raise_for_status()
-
-            result = response.json()
-            response_text = result['candidates'][0]['content']['parts'][0]['text'].strip()
-
-            # 마크다운 코드 블록 제거 (```json ... ``` 형태)
-            if response_text.startswith("```"):
-                lines = response_text.split('\n')
-                # 첫 줄과 마지막 줄 제거
-                response_text = '\n'.join(lines[1:-1])
-
-            # JSON 파싱
-            response_data = json.loads(response_text)
+            # LLM API 호출 (provider abstraction 사용)
+            response_data = await provider.generate_json(full_prompt, max_retries=1)
 
             # 디버깅: 응답 내용 출력
             print(f"[DEBUG] LLM Response: {json.dumps(response_data, indent=2, ensure_ascii=False)[:500]}...")
@@ -338,35 +220,11 @@ async def unified_chat(user_message: str, current_bop: dict = None) -> dict:
 
             return response_data
 
-        except requests.exceptions.HTTPError as e:
-            # Rate Limit 에러 처리
-            if e.response.status_code == 429:
-                wait_time = (2 ** attempt) * 2  # 2, 4, 8초
-                last_error = f"Rate Limit 초과 (시도 {attempt + 1}/{max_retries}). {wait_time}초 대기 후 재시도..."
-                print(last_error)
-                if attempt < max_retries - 1:
-                    time.sleep(wait_time)
-                continue
-            else:
-                last_error = f"API 호출 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-                print(last_error)
-                if attempt < max_retries - 1:
-                    time.sleep(1)
-                continue
-
-        except json.JSONDecodeError as e:
-            last_error = f"JSON 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            print(last_error)
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
-
         except Exception as e:
             last_error = f"Unified chat 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
             print(last_error)
             if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
+                continue
 
     # 모든 재시도 실패
     raise Exception(f"Unified chat 실패: {last_error}")

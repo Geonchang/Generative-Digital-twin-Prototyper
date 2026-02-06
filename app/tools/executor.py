@@ -21,8 +21,8 @@ from app.tools.synthesizer import repair_adapter
 log = logging.getLogger("tool_executor")
 
 SUBPROCESS_TIMEOUT_SEC = 60
-MAX_AUTO_REPAIR_ATTEMPTS = 2  # 자동 복구 최대 시도 횟수
-MAX_SCRIPT_REPAIR_ATTEMPTS = 1  # 스크립트 실행 오류 자동 복구 시도 횟수
+MAX_AUTO_REPAIR_ATTEMPTS = 0  # 자동 복구 비활성화
+MAX_SCRIPT_REPAIR_ATTEMPTS = 0  # 스크립트 실행 오류 자동 복구 비활성화
 
 
 def _sanitize_json_floats(obj):
@@ -123,7 +123,7 @@ def _safe_builtins():
     allowed = [
         'abs', 'all', 'any', 'bool', 'dict', 'enumerate', 'filter',
         'float', 'format', 'int', 'isinstance', 'len', 'list', 'map',
-        'max', 'min', 'print', 'range', 'round', 'set', 'sorted',
+        'max', 'min', 'next', 'print', 'range', 'round', 'set', 'sorted',
         'str', 'sum', 'tuple', 'type', 'zip', 'None', 'True', 'False',
         'KeyError', 'ValueError', 'TypeError', 'IndexError', 'Exception',
     ]
@@ -161,12 +161,13 @@ def _run_preprocessor(code: str, bop_data: dict, params: Optional[Dict[str, Any]
     fn = namespace.get("convert_bop_to_input")
     if not fn:
         raise ValueError("Pre-processor에 'convert_bop_to_input' 함수가 정의되어 있지 않습니다.")
-    # 기존 1인자 어댑터와 호환: params 파라미터가 있는 경우에만 전달
+
+    # Pre-processor는 반드시 2개 파라미터(bop_json, params)를 받아야 함
     sig = inspect.signature(fn)
-    if len(sig.parameters) >= 2:
-        result = fn(bop_data, params or {})
-    else:
-        result = fn(bop_data)
+    if len(sig.parameters) < 2:
+        raise ValueError("Pre-processor 'convert_bop_to_input'는 반드시 2개의 파라미터(bop_json, params)를 받아야 합니다.")
+
+    result = fn(bop_data, params or {})
     if not isinstance(result, str):
         result = json.dumps(result, ensure_ascii=False)
     return result
@@ -268,12 +269,8 @@ def _execute_subprocess(
         "SYSTEMROOT": os.environ.get("SYSTEMROOT", ""),  # Windows needs this
     }
 
-    # === params를 환경변수로 전달 ===
-    if params:
-        for key, val in params.items():
-            if val is not None:
-                env[key] = str(val)
-        log.info("[subprocess] 환경변수로 전달된 params: %s", {k: v for k, v in env.items() if k not in ["PATH", "PYTHONPATH", "SYSTEMROOT"]})
+    # NOTE: 파라미터는 pre-processor에서 JSON에 포함되어 전달됩니다.
+    # 환경변수를 통한 파라미터 전달은 사용하지 않습니다.
 
     try:
         result = subprocess.run(
@@ -386,6 +383,8 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
         if tool_input is None:
             exec_log["message"] = f"Pre-processor 실행 오류: {str(pre_error)}"
             exec_log["execution_time_sec"] = time.time() - start_time
+            log.error("[execute] Pre-processor 최종 실패: %s", exec_log["message"])
+            log.error("[execute] Pre-processor 에러 상세: %s", str(pre_error))
             return {
                 "success": False,
                 "message": exec_log["message"],
@@ -401,6 +400,15 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
         input_file = work_dir / f"input_data{input_suffix}"
         with open(input_file, "w", encoding="utf-8") as f:
             f.write(tool_input)
+
+        # 입력 파일 내용 로깅 (디버깅용)
+        log.info("[execute] 입력 파일 작성 완료: %s (길이: %d bytes)", input_file.name, len(tool_input))
+        if len(tool_input) == 0:
+            log.error("[execute] 경고: 입력 파일이 비어 있습니다!")
+        elif len(tool_input) < 200:
+            log.info("[execute] 입력 파일 내용: %s", tool_input)
+        else:
+            log.info("[execute] 입력 파일 미리보기: %s...", tool_input[:200])
 
         output_suffix_map = {"csv": ".csv", "json": ".json"}
         output_suffix = output_suffix_map.get(
@@ -433,6 +441,7 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
         if return_code != 0:
             log.warning("[execute] 스크립트 오류 발생: return_code=%d", return_code)
             log.warning("[execute] stderr: %s", stderr[:500] if stderr else "None")
+            log.warning("[execute] stdout: %s", stdout[:1000] if stdout else "None")
 
             # === 스크립트 오류 자가 진단 ===
             args_error = _detect_args_format_error(stderr)
@@ -465,6 +474,10 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
                 exec_log["message"] = f"스크립트가 오류 코드 {return_code}로 종료되었습니다."
 
             exec_log["execution_time_sec"] = time.time() - start_time
+
+            # 최종 실패 메시지 로깅
+            log.error("[execute] 최종 실패: %s", exec_log["message"])
+
             return {
                 "success": False,
                 "message": exec_log["message"],

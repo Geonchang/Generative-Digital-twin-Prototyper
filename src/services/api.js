@@ -1,4 +1,3 @@
-import { chat as geminiChat } from './gemini.js';
 import * as XLSX from 'xlsx';
 
 function downloadBlob(blob, filename) {
@@ -15,13 +14,32 @@ function downloadBlob(blob, filename) {
 export const api = {
   /**
    * 통합 채팅 API 호출 (생성/수정/QA 통합)
-   * @param {string} message - 사용자 메시지 (unused, kept for API compatibility)
+   * @param {string} message - 사용자 메시지
    * @param {Object|null} currentBop - 현재 BOP 데이터 (collapsed 형식)
-   * @param {Array} messages - 대화 히스토리 배열
+   * @param {Array} messages - 대화 히스토리 배열 (currently unused)
+   * @param {string|null} model - LLM 모델 (null이면 기본 모델 사용)
    * @returns {Promise<Object>} { message: string, bop_data: Object|null }
    */
-  async unifiedChat(message, currentBop = null, messages = []) {
-    return geminiChat(messages, currentBop);
+  async unifiedChat(message, currentBop = null, messages = [], model = null) {
+    const body = { message, current_bop: currentBop };
+    if (model) body.model = model;
+
+    const res = await fetch('/api/chat/unified', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error('[API Error] Status:', res.status, 'Detail:', err);
+      const errorMsg = typeof err.detail === 'string'
+        ? err.detail
+        : JSON.stringify(err.detail || err) || `채팅 실패 (${res.status})`;
+      throw new Error(errorMsg);
+    }
+
+    return res.json();
   },
 
   /**
@@ -165,11 +183,16 @@ export const api = {
 
   // === Tool Management API (FastAPI backend) ===
 
-  async analyzeScript(sourceCode, fileName, sampleInput = null) {
+  async analyzeScript(sourceCode, fileName, sampleInput = null, inputSchemaOverride = null, outputSchemaOverride = null) {
+    const body = { source_code: sourceCode, file_name: fileName };
+    if (sampleInput) body.sample_input = sampleInput;
+    if (inputSchemaOverride) body.input_schema_override = inputSchemaOverride;
+    if (outputSchemaOverride) body.output_schema_override = outputSchemaOverride;
+
     const res = await fetch('/api/tools/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source_code: sourceCode, file_name: fileName, sample_input: sampleInput }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -187,6 +210,32 @@ export const api = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `등록 실패 (${res.status})`);
+    }
+    return res.json();
+  },
+
+  async registerSchemaOnly(schemaData) {
+    const res = await fetch('/api/tools/register-schema-only', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(schemaData),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `스키마 등록 실패 (${res.status})`);
+    }
+    return res.json();
+  },
+
+  async updateToolScript(toolId, fileName, sourceCode) {
+    const res = await fetch(`/api/tools/${toolId}/script`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_name: fileName, source_code: sourceCode }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `스크립트 업데이트 실패 (${res.status})`);
     }
     return res.json();
   },
@@ -224,11 +273,52 @@ export const api = {
     return res.json();
   },
 
-  async generateScript(description) {
+  async generateSchema(description, model = null) {
+    const body = { description };
+    if (model) body.model = model;
+    const res = await fetch('/api/tools/generate-schema', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `스키마 생성 실패 (${res.status})`);
+    }
+    return res.json();
+  },
+
+  async improveSchema(toolName, description, inputSchema, outputSchema, params, userFeedback, model = null) {
+    const body = {
+      tool_name: toolName,
+      description: description,
+      current_input_schema: inputSchema,
+      current_output_schema: outputSchema,
+      current_params: params,
+      user_feedback: userFeedback,
+    };
+    if (model) body.model = model;
+    const res = await fetch('/api/tools/improve-schema', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `스키마 개선 실패 (${res.status})`);
+    }
+    return res.json();
+  },
+
+  async generateScript(description, inputSchema = null, outputSchema = null, model = null) {
+    const body = { description };
+    if (inputSchema) body.input_schema = inputSchema;
+    if (outputSchema) body.output_schema = outputSchema;
+    if (model) body.model = model;
     const res = await fetch('/api/tools/generate-script', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

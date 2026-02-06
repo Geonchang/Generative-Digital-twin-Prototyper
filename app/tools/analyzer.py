@@ -1,14 +1,11 @@
 import json
 import logging
 import os
-import time
-import requests
 from dotenv import load_dotenv
 from app.tools.tool_prompts import TOOL_ANALYSIS_PROMPT
+from app.llm import get_provider
 
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("VITE_GEMINI_API_KEY")
-
 log = logging.getLogger("tool_analyzer")
 
 
@@ -23,14 +20,59 @@ def _strip_markdown_block(text: str) -> str:
     return text.strip()
 
 
-async def analyze_script(source_code: str, file_name: str, sample_input: str = None) -> dict:
-    """LLM을 사용하여 스크립트의 입출력 스키마를 분석합니다."""
-    log.info("[analyze] 호출됨 — file_name=%s, source_code 길이=%d, sample_input=%s",
-             file_name, len(source_code), "있음" if sample_input else "없음")
+async def analyze_script(
+    source_code: str,
+    file_name: str,
+    sample_input: str = None,
+    model: str = None,
+    input_schema_override: dict = None,
+    output_schema_override: dict = None
+) -> dict:
+    """LLM을 사용하여 스크립트의 입출력 스키마를 분석합니다.
 
-    if not GEMINI_API_KEY:
-        log.error("[analyze] GEMINI_API_KEY가 설정되지 않았습니다")
-        raise ValueError("GEMINI_API_KEY가 설정되지 않았습니다.")
+    Args:
+        source_code: 분석할 소스 코드
+        file_name: 파일명
+        sample_input: 샘플 입력 데이터
+        model: 사용할 LLM 모델
+        input_schema_override: 입력 스키마 오버라이드 (제공 시 분석 스킵)
+        output_schema_override: 출력 스키마 오버라이드 (제공 시 분석 스킵)
+    """
+    import time
+    start_time = time.time()
+
+    log.info("=" * 60)
+    log.info("[analyze] === 스크립트 분석 시작 ===")
+    log.info("[analyze] file_name=%s, source_code=%d bytes, sample_input=%s",
+             file_name, len(source_code), "있음" if sample_input else "없음")
+    log.info("[analyze] model=%s, 스키마 오버라이드=%s",
+             model or "기본값", "있음" if (input_schema_override or output_schema_override) else "없음")
+
+    # 스키마 오버라이드가 모두 제공된 경우 LLM 분석 스킵
+    if input_schema_override and output_schema_override:
+        log.info("[analyze] 스키마 오버라이드 제공됨 - LLM 분석 스킵")
+
+        # 기본 도구명 추출 (파일명에서)
+        import re
+        tool_name = re.sub(r'\.py$', '', file_name).replace('_', ' ').title()
+
+        result = {
+            "tool_name": tool_name,
+            "description": f"{tool_name} (스키마 기반 등록)",
+            "execution_type": "python",
+            "input_schema": input_schema_override,
+            "output_schema": output_schema_override,
+            "params_schema": None,
+        }
+        log.info("[analyze] 스키마 오버라이드 적용 완료 — tool_name=%s", result["tool_name"])
+        return result
+
+    # Get default tool model if not specified
+    if not model:
+        model = os.getenv("DEFAULT_TOOL_MODEL", "gemini-2.0-flash")
+
+    # Get provider for the specified model
+    provider = get_provider(model)
 
     sample_section = ""
     if sample_input:
@@ -40,39 +82,19 @@ async def analyze_script(source_code: str, file_name: str, sample_input: str = N
         source_code=source_code,
         sample_input_section=sample_section,
     )
-    log.debug("[analyze] 프롬프트 길이: %d", len(prompt))
-
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    log.info("[analyze] 프롬프트 준비 완료: %d bytes", len(prompt))
 
     max_retries = 3
     last_error = None
 
     for attempt in range(max_retries):
-        log.info("[analyze] 시도 %d/%d", attempt + 1, max_retries)
+        log.info("[analyze] LLM 호출 시도 %d/%d (model=%s)", attempt + 1, max_retries, model)
         try:
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "responseMimeType": "application/json",
-                    "temperature": 0.3,
-                },
-            }
-
-            response = requests.post(
-                url,
-                headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=60,
-            )
-            log.info("[analyze] Gemini HTTP 응답 status=%d", response.status_code)
-            response.raise_for_status()
-
-            result = response.json()
-            text = result["candidates"][0]["content"]["parts"][0]["text"].strip()
-            log.info("[analyze] Gemini 원본 응답 텍스트 (앞 500자):\n%s", text[:500])
-            text = _strip_markdown_block(text)
-
-            data = json.loads(text)
+            # LLM API 호출 (provider abstraction 사용)
+            data = await provider.generate_json(prompt, max_retries=1)
+            response_length = len(json.dumps(data))
+            log.info("[analyze] LLM 응답 수신: %d bytes", response_length)
+            text = json.dumps(data)
 
             # Gemini가 배열로 감싸서 반환하는 경우 첫 번째 요소 추출
             if isinstance(data, list):
@@ -93,36 +115,19 @@ async def analyze_script(source_code: str, file_name: str, sample_input: str = N
             if "execution_type" not in data:
                 data["execution_type"] = "python"
 
-            log.info("[analyze] 분석 성공 — tool_name=%s", data.get("tool_name"))
+            elapsed = time.time() - start_time
+            log.info("[analyze] 분석 성공 — tool_name=%s (소요 시간: %.2f초)", data.get("tool_name"), elapsed)
+            log.info("[analyze] === 분석 완료 ===")
+            log.info("=" * 60)
             return data
 
-        except requests.exceptions.HTTPError as e:
-            if e.response.status_code == 429:
-                wait_time = (2 ** attempt) * 2
-                last_error = f"Rate Limit 초과 (시도 {attempt + 1}/{max_retries})"
-                log.warning("[analyze] %s — %d초 대기", last_error, wait_time)
-                if attempt < max_retries - 1:
-                    time.sleep(wait_time)
-                continue
-            last_error = f"API 호출 실패: {str(e)}"
-            log.error("[analyze] %s", last_error)
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
-
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            last_error = f"응답 파싱 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
-            log.error("[analyze] %s", last_error)
-            if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
-
         except Exception as e:
-            last_error = f"분석 실패: {str(e)}"
+            last_error = f"분석 실패 (시도 {attempt + 1}/{max_retries}): {str(e)}"
             log.error("[analyze] %s", last_error)
             if attempt < max_retries - 1:
-                time.sleep(1)
-            continue
+                continue
 
-    log.error("[analyze] 최종 실패: %s", last_error)
+    elapsed = time.time() - start_time
+    log.error("[analyze] 최종 실패: %s (소요 시간: %.2f초)", last_error, elapsed)
+    log.info("=" * 60)
     raise Exception(f"스크립트 분석 실패: {last_error}")
