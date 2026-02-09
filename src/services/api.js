@@ -266,11 +266,17 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.detail || `실행 실패 (${res.status})`);
+      // HTTP 오류 시에도 백엔드가 제공한 상세 정보 보존
+      const error = new Error(data.detail || `실행 실패 (${res.status})`);
+      // 백엔드 응답에 오류 정보가 있으면 에러 객체에 추가
+      if (data.stdout) error.stdout = data.stdout;
+      if (data.stderr) error.stderr = data.stderr;
+      if (data.tool_output) error.tool_output = data.tool_output;
+      throw error;
     }
-    return res.json();
+    return data;
   },
 
   async generateSchema(description, model = null) {

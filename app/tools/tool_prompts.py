@@ -7,6 +7,12 @@ Source Code:
 
 {sample_input_section}
 
+**Analysis Instructions:**
+- If sample input data is provided, use it to understand the actual data structure
+- If schema hints are provided, validate them against the code and improve if needed
+- Priority: Sample data > Schema hints > Code analysis
+- Always verify the schema matches what the code actually expects/produces
+
 ## BOP Available Fields (GDP System Data)
 - project_title: string
 - target_uph: int
@@ -141,14 +147,15 @@ Available BOP fields:
 
 ## Script Requirements
 1. Read input from a JSON file path passed as first positional argument (sys.argv[1])
-2. **ALL data and parameters are in the input JSON** - adapters merge BOP data + user params
-3. Output results to stdout as JSON (print JSON string)
-4. Include clear docstring explaining input/output format
-5. Include example input JSON in comments
-6. Handle errors gracefully with informative messages
-7. Use only standard library (json, math, sys, os)
-8. **DO NOT use argparse** - Input file is the only command-line argument
-9. **DO NOT use os.getenv()** - Everything is in the JSON
+2. Write output to a JSON file path passed as second positional argument (sys.argv[2])
+3. **ALL data and parameters are in the input JSON** - adapters merge BOP data + user params
+4. **Output results to the output JSON file** - NOT stdout
+5. Include clear docstring explaining input/output format
+6. Include example input JSON in comments
+7. Handle errors gracefully with informative messages
+8. Use only standard library (json, math, sys, os)
+9. **DO NOT use argparse** - Only input/output file paths as arguments
+10. **DO NOT use os.getenv()** - Everything is in the JSON
 
 ## Script Template
 ```python
@@ -158,7 +165,7 @@ Available BOP fields:
 Description: [Brief description]
 
 Usage:
-    python script_name.py <input.json>
+    python script_name.py <input.json> <output.json>
 
 Input JSON format (from file):
     {{
@@ -167,7 +174,7 @@ Input JSON format (from file):
         ...
     }}
 
-Output JSON format (to stdout):
+Output JSON format (to file):
     {{
         "result_field1": ...,
         "result_field2": ...,
@@ -205,33 +212,44 @@ def process_data(data):
 
 def main():
     # Check arguments
-    if len(sys.argv) < 2:
-        print(json.dumps({{"error": "Usage: python script.py <input.json>"}}))
+    if len(sys.argv) < 3:
+        error = {{"error": "Usage: python script.py <input.json> <output.json>"}}
+        print(json.dumps(error))
         sys.exit(1)
 
     input_file = sys.argv[1]
+    output_file = sys.argv[2]
 
     # Read input JSON (contains both BOP data and user parameters)
     if not os.path.exists(input_file):
-        print(json.dumps({{"error": f"Input file not found: {{input_file}}"}}))
+        error = {{"error": f"Input file not found: {{input_file}}"}}
+        print(json.dumps(error))
         sys.exit(1)
 
     try:
         with open(input_file, 'r', encoding='utf-8') as f:
             input_data = json.load(f)
     except Exception as e:
-        print(json.dumps({{"error": f"Failed to read input: {{str(e)}}"}}))
+        error = {{"error": f"Failed to read input: {{str(e)}}"}}
+        print(json.dumps(error))
         sys.exit(1)
 
     # Process
     try:
         result = process_data(input_data)
     except Exception as e:
-        print(json.dumps({{"error": f"Processing failed: {{str(e)}}"}}))
+        error = {{"error": f"Processing failed: {{str(e)}}"}}
+        print(json.dumps(error))
         sys.exit(1)
 
-    # Output result to stdout as JSON
-    print(json.dumps(result, ensure_ascii=False))
+    # Write output to file
+    try:
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        error = {{"error": f"Failed to write output: {{str(e)}}"}}
+        print(json.dumps(error))
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
@@ -318,8 +336,11 @@ Output: {output_schema_json}
    - For BOP-fallback params: `value = params.get('key') or bop_json.get('key')`
    - Return as string (CSV/JSON/args)
 
-2. `apply_result_to_bop(bop_json: dict, tool_output: str) -> dict`
-   - Parse tool output, update BOP, return complete updated BOP
+2. `apply_result_to_bop(bop_json: dict, tool_output: dict) -> dict`
+   - **CRITICAL**: tool_output is ALREADY PARSED as dict by the executor
+   - **DO NOT call json.loads(tool_output)** - it will cause an error!
+   - tool_output is already a Python dict, use it directly
+   - Update BOP with tool results, return complete updated BOP
    - Preserve all existing BOP fields not being updated
 
 ## Field Mapping Examples
@@ -378,6 +399,28 @@ for process in bop_json.get('processes', []):
             'location': line.get('location'),
             'cycle_time': line.get('cycle_time_sec')
         }}
+```
+
+**Post-processor example** (CRITICAL - tool_output is already dict):
+```python
+def apply_result_to_bop(bop_json, tool_output):
+    # ❌ WRONG - DO NOT DO THIS:
+    # result = json.loads(tool_output)  # ERROR! tool_output is already dict!
+
+    # ✅ CORRECT - tool_output is already parsed dict:
+    updated_processes = tool_output.get('processes', [])
+
+    # Update BOP processes with new locations
+    for updated_proc in updated_processes:
+        proc_id = updated_proc.get('process_id')
+        new_location = updated_proc.get('location')
+
+        for proc in bop_json.get('processes', []):
+            if proc.get('process_id') == proc_id:
+                for line in proc.get('parallel_lines', []):
+                    line['location'] = new_location
+
+    return bop_json
 ```
 
 ## Rules
@@ -454,9 +497,15 @@ Tool Output (first 2000 chars):
    - Example script: `offset = data.get("wall_offset", 1.0)`
    - DO NOT use os.getenv() in scripts
    - DO NOT use argparse for parameters
-6. For params_schema: add/remove/modify parameters as requested
-7. For script code: improve the core logic as requested
-8. **CRITICAL - Check args_format issues:**
+6. **CRITICAL - Post-processor (apply_result_to_bop):**
+   - **tool_output parameter is ALREADY A DICT** (parsed by executor)
+   - **DO NOT call json.loads(tool_output)** - this will cause "JSON object must be str" error
+   - Correct: `result = tool_output.get('key')`
+   - Wrong: `result = json.loads(tool_output)` ❌
+   - The executor automatically parses JSON output before passing to post-processor
+7. For params_schema: add/remove/modify parameters as requested
+8. For script code: improve the core logic as requested
+9. **CRITICAL - Check args_format issues:**
    - If stderr shows "error: the following arguments are required: --input/-i, --output/-o"
    - This means the script uses argparse but args_format is missing/incorrect
    - Since args_format cannot be modified through improvement API, you MUST:
@@ -468,7 +517,7 @@ Tool Output (first 2000 chars):
      * Script expects `-i` and `-o`: "-i {{input_file}} -o {{output_file}}"
      * Script expects positional args: "{{input_file}}"
      * With custom parameters: "--input {{input_file}} --threshold {{threshold}}"
-7. Explain what you changed and why
+10. Explain what you changed and why
 
 ## Response Format (JSON only, no markdown)
 {{
@@ -570,7 +619,14 @@ IMPORTANT Notes:
 1. Analyze the error cause
 2. Fix the code to handle the correct data structure
 3. Ensure the fix handles edge cases (empty arrays, missing keys)
-4. **CRITICAL - Forbidden modules**: NEVER import or use: logging, os, sys, subprocess, pathlib, datetime
+4. **CRITICAL - Post-processor specific:**
+   - If fixing `apply_result_to_bop`: tool_output parameter is ALREADY A DICT
+   - Common error: "JSON object must be str, bytes or bytearray, not dict"
+   - Cause: Calling `json.loads(tool_output)` when tool_output is already parsed
+   - Fix: Remove json.loads() and use tool_output directly as dict
+   - Correct: `result = tool_output.get('key')`
+   - Wrong: `result = json.loads(tool_output)` ❌
+5. **CRITICAL - Forbidden modules**: NEVER import or use: logging, os, sys, subprocess, pathlib, datetime
    - Adapter code runs in a restricted environment
    - Use print() instead of logging
    - Only allowed modules: json, csv, io, math, statistics, copy, re

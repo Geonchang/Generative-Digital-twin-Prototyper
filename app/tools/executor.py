@@ -253,8 +253,9 @@ def _build_command(
         parts = args_str.split()
         cmd.extend(parts)
     else:
-        # Fallback: just pass input file as positional arg
+        # Fallback: pass input and output files as positional args
         cmd.append(str(input_file))
+        cmd.append(str(output_file))
 
     log.info("[build_command] 최종 명령어: %s", ' '.join(cmd[:5]) + ('...' if len(cmd) > 5 else ''))
     return cmd
@@ -496,13 +497,38 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
                 "error_diagnosis": args_error,
             }
 
-        # 7. 도구 출력 수집 (output file 우선, 없으면 stdout)
-        tool_output = stdout
+        # 7. 도구 출력 수집 (output file에서 읽기)
+        tool_output = None
         if output_file.exists():
-            with open(output_file, "r", encoding="utf-8") as f:
-                tool_output = f.read()
+            try:
+                with open(output_file, "r", encoding="utf-8") as f:
+                    tool_output = f.read()
+                log.info("[execute] Output 파일 읽기 완료: %s (%d bytes)", output_file.name, len(tool_output))
+            except Exception as e:
+                log.error("[execute] Output 파일 읽기 실패: %s", str(e))
+                tool_output = None
+
+        # Fallback: output 파일이 없으면 stdout 사용 (하위 호환성)
+        if not tool_output:
+            log.warning("[execute] Output 파일 없음 - stdout 사용 (하위 호환)")
+            tool_output = stdout
 
         exec_log["output"] = tool_output
+
+        # 로그에 input/output 내용 기록
+        log.info("[execute] === Input/Output 내용 ===")
+        if len(tool_input) < 500:
+            log.info("[execute] Input: %s", tool_input)
+        else:
+            log.info("[execute] Input (처음 500자): %s...", tool_input[:500])
+
+        if tool_output and len(tool_output) < 500:
+            log.info("[execute] Output: %s", tool_output)
+        elif tool_output:
+            log.info("[execute] Output (처음 500자): %s...", tool_output[:500])
+        else:
+            log.warning("[execute] Output 없음")
+        log.info("[execute] =========================")
 
         # === Post-processor 실행 (자동 복구 포함) ===
         updated_bop = None
@@ -537,10 +563,17 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
         if updated_bop is None:
             exec_log["message"] = f"Post-processor 실행 오류: {str(post_error)}"
             exec_log["execution_time_sec"] = time.time() - start_time
+
+            # Post-processor 오류 시에도 상세 정보 반환 (AI 개선 시 사용)
+            import traceback
+            error_details = ''.join(traceback.format_exception(type(post_error), post_error, post_error.__traceback__))
+
             return {
                 "success": False,
                 "message": exec_log["message"],
                 "stdout": stdout[:2000] if stdout else None,
+                "stderr": (stderr[:2000] if stderr else "") + f"\n\n[Post-processor Error]\n{error_details[:1000]}",
+                "tool_output": tool_output[:2000] if tool_output else None,
                 "execution_time_sec": exec_log["execution_time_sec"],
                 "auto_repair_attempted": exec_log["auto_repair_attempts"] > 0,
             }

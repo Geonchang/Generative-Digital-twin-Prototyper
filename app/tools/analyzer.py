@@ -48,24 +48,8 @@ async def analyze_script(
     log.info("[analyze] model=%s, 스키마 오버라이드=%s",
              model or "기본값", "있음" if (input_schema_override or output_schema_override) else "없음")
 
-    # 스키마 오버라이드가 모두 제공된 경우 LLM 분석 스킵
-    if input_schema_override and output_schema_override:
-        log.info("[analyze] 스키마 오버라이드 제공됨 - LLM 분석 스킵")
-
-        # 기본 도구명 추출 (파일명에서)
-        import re
-        tool_name = re.sub(r'\.py$', '', file_name).replace('_', ' ').title()
-
-        result = {
-            "tool_name": tool_name,
-            "description": f"{tool_name} (스키마 기반 등록)",
-            "execution_type": "python",
-            "input_schema": input_schema_override,
-            "output_schema": output_schema_override,
-            "params_schema": None,
-        }
-        log.info("[analyze] 스키마 오버라이드 적용 완료 — tool_name=%s", result["tool_name"])
-        return result
+    # 스키마 오버라이드는 "참고 정보"로 활용 (완전 스킵하지 않음)
+    # AI가 스키마를 검증하고 필요시 개선할 수 있도록
 
     # Get default tool model if not specified
     if not model:
@@ -74,15 +58,29 @@ async def analyze_script(
     # Get provider for the specified model
     provider = get_provider(model)
 
+    # 샘플 입력 섹션
     sample_section = ""
     if sample_input:
-        sample_section = f"Sample Input Data:\n```\n{sample_input}\n```"
+        sample_section = f"## Sample Input Data (Use This as Reference)\n```\n{sample_input}\n```\n"
+
+    # 스키마 오버라이드 섹션 (참고 정보로 제공)
+    schema_hint_section = ""
+    if input_schema_override or output_schema_override:
+        schema_hint_section = "## User-Provided Schema Hints (Validate and Improve if Needed)\n"
+        if input_schema_override:
+            schema_hint_section += f"Input Schema Hint:\n```json\n{json.dumps(input_schema_override, indent=2, ensure_ascii=False)}\n```\n"
+        if output_schema_override:
+            schema_hint_section += f"Output Schema Hint:\n```json\n{json.dumps(output_schema_override, indent=2, ensure_ascii=False)}\n```\n"
+        schema_hint_section += "**Important**: Use these as reference but analyze the code to verify and improve them.\n\n"
 
     prompt = TOOL_ANALYSIS_PROMPT.format(
         source_code=source_code,
-        sample_input_section=sample_section,
+        sample_input_section=sample_section + schema_hint_section,
     )
-    log.info("[analyze] 프롬프트 준비 완료: %d bytes", len(prompt))
+    log.info("[analyze] 프롬프트 준비 완료: %d bytes (샘플=%s, 스키마힌트=%s)",
+             len(prompt),
+             "있음" if sample_input else "없음",
+             "있음" if (input_schema_override or output_schema_override) else "없음")
 
     max_retries = 3
     last_error = None

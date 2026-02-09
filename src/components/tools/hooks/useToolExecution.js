@@ -115,7 +115,16 @@ export function useToolExecution() {
         }
       }
     } catch (err) {
-      setExecResult({ success: false, message: err.message });
+      // API 오류 시에도 상세 정보 보존 (개선 요청 시 사용)
+      const errorResult = {
+        success: false,
+        message: err.message,
+        // HTTP 응답 본문에 오류 정보가 있을 수 있음
+        stderr: err.stderr || err.message,
+        stdout: err.stdout || null,
+        tool_output: err.tool_output || null,
+      };
+      setExecResult(errorResult);
     } finally {
       setExecuting(false);
     }

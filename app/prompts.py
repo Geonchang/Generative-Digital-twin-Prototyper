@@ -14,7 +14,6 @@ Output ONLY valid JSON (no markdown, no code blocks):
       "description": "Brief description",
       "cycle_time_sec": 120.0,
       "parallel_count": 1,
-      "location": {"x": 0, "y": 0, "z": 0},
       "predecessor_ids": [],
       "successor_ids": ["P002"],
       "resources": [
@@ -22,21 +21,18 @@ Output ONLY valid JSON (no markdown, no code blocks):
           "resource_type": "equipment",
           "resource_id": "EQ001",
           "quantity": 1,
-          "relative_location": {"x": 0, "y": 0, "z": 0},
           "role": "Main welding robot"
         },
         {
           "resource_type": "worker",
           "resource_id": "W001",
           "quantity": 1,
-          "relative_location": {"x": 0.8, "y": 0, "z": 0.5},
           "role": "Quality inspector"
         },
         {
           "resource_type": "material",
           "resource_id": "M001",
           "quantity": 2.5,
-          "relative_location": {"x": -0.8, "y": 0, "z": 0.3},
           "role": "Raw material"
         }
       ]
@@ -55,29 +51,10 @@ Output ONLY valid JSON (no markdown, no code blocks):
 
 # Rules
 
-## 3D Coordinate System (Three.js)
-- **X-axis (Horizontal)**: Left (-) to Right (+) | Factory floor width
-- **Y-axis (Vertical)**: Down (-) to Up (+) | Height from ground (always use 0 for ground level)
-- **Z-axis (Depth)**: Front (-) to Back (+) | Factory floor depth
-- **Units**: 1 unit = 1 meter
-- **View**: Top-down view shows X (horizontal) and Z (vertical/depth)
-
 ## Process Generation
 - Include 3-6 processes
 - Each process represents ONE manufacturing step (welding, assembly, inspection, etc.)
 - Do NOT create sub-operations - keep processes as single units
-
-## Process Location (Absolute Coordinates)
-- ⚠️ CRITICAL RULE: ALL processes MUST have y=0, z=0 ⚠️
-- DO NOT change y or z values - they are FIXED at 0
-- ONLY x-axis increases for sequential processes (left to right)
-- Example locations (NEVER change y or z):
-  * P001: {"x": 0, "y": 0, "z": 0}
-  * P002: {"x": 5, "y": 0, "z": 0}
-  * P003: {"x": 10, "y": 0, "z": 0}
-  * P004: {"x": 15, "y": 0, "z": 0}
-- Continue in increments of 5 along x-axis ONLY
-- IF YOU SET y≠0 OR z≠0, THE OUTPUT IS INVALID
 
 ## Process Flow (Predecessor/Successor)
 - Create sequential flow: P001 → P002 → P003 → ...
@@ -89,36 +66,38 @@ Output ONLY valid JSON (no markdown, no code blocks):
 ## Resources per Process
 - Each process should have 1-3 equipment, 1-2 workers, 1-3 materials
 - Resource type: "equipment", "worker", or "material"
+- DO NOT include "location" or "relative_location" fields - coordinates will be auto-generated
 
 ### Equipment Resources
 - equipment_id format: "EQ{NUMBER:03d}" (e.g., "EQ001", "EQ002")
 - type: "robot", "machine", or "manual_station"
-- relative_location: Position relative to process center (KEEP COMPACT)
-  - Main equipment: {"x": 0, "y": 0, "z": 0} (center)
-  - Secondary equipment: {"x": 1, "y": 0, "z": 0} (right) or {"x": -1, "y": 0, "z": 0} (left)
-  - Valid range: x: -1.5 to 1.5m, z: -1 to 1m, y: always 0
+- Include: resource_type, resource_id, quantity, role
+- ⚠️ CRITICAL RULE: If a process has workers OR robots, it MUST include at least 1 "manual_station" type equipment
+  * This is the workbench/workstation where workers perform tasks
+  * Example: Worker + Manual_station (required), or Robot + Manual_station (required)
+  * NEVER have workers or robots without a manual_station
 
 ### Worker Resources
 - worker_id format: "W{NUMBER:03d}" (e.g., "W001")
-- relative_location: Position relative to process center (KEEP COMPACT)
-  - Primary operator: {"x": 0.8, "y": 0, "z": 0.5} (right-front)
-  - Secondary worker: {"x": -0.8, "y": 0, "z": 0.5} (left-front)
-  - Inspector: {"x": 0, "y": 0, "z": 0.8} (back)
-  - Valid range: x: -1.5 to 1.5m, z: -1 to 1m, y: always 0
+- Include: resource_type, resource_id, quantity, role
+- ⚠️ If you add a worker, you MUST also add a manual_station equipment to the same process
 
 ### Material Resources
 - material_id format: "M{NUMBER:03d}" (e.g., "M001", "M002")
 - unit: "kg", "ea", "m", "L", etc.
 - quantity: Realistic amount used in this process
-- relative_location: Staging area relative to process center (KEEP COMPACT)
-  - Input materials: {"x": -0.8, "y": 0, "z": 0.3} (left side)
-  - Output materials: {"x": 0.8, "y": 0, "z": 0.3} (right side)
-  - Valid range: x: -1.5 to 1.5m, z: -1 to 1m, y: always 0
+- Include: resource_type, resource_id, quantity, unit, role
 
 ## Other Requirements
 - Parallel_count: Number of parallel production lines (usually 1)
 - Calculate realistic cycle times (10-300 seconds per process)
-- Always set y=0 for all locations (ground level)
+
+## Validation Checklist (MUST follow)
+Before outputting JSON, verify:
+✓ Every process with workers has at least 1 manual_station equipment
+✓ Every process with robot equipment has at least 1 manual_station equipment
+✓ Equipment types are correct: "robot", "machine", or "manual_station"
+✓ No coordinates in output (location/relative_location fields)
 
 NO markdown, NO code blocks, ONLY JSON.
 """
@@ -135,7 +114,8 @@ Update the BOP accordingly while maintaining:
 - Simplified process structure (no sub-operations)
 - Equipment/Worker/Material reference integrity
 - Sequential predecessor/successor relationships
-- Process location spacing (y=0, z=0, x-axis increments of 5)
+- DO NOT modify "location" or "relative_location" fields unless explicitly requested
+- If adding new processes/resources, DO NOT include location/relative_location fields
 
 Output ONLY the complete updated JSON (no markdown, no code blocks).
 """
@@ -165,7 +145,6 @@ BOP Schema (when included):
       "description": "...",
       "cycle_time_sec": 120.0,
       "parallel_count": 1,
-      "location": {{"x": 0, "y": 0, "z": 0}},
       "predecessor_ids": [],
       "successor_ids": ["P002"],
       "resources": [
@@ -173,49 +152,50 @@ BOP Schema (when included):
           "resource_type": "equipment",
           "resource_id": "EQ001",
           "quantity": 1,
-          "relative_location": {{"x": 0, "y": 0, "z": 0}},
-          "role": "Main equipment"
+          "role": "Workstation"
         }},
         {{
           "resource_type": "worker",
           "resource_id": "W001",
           "quantity": 1,
-          "relative_location": {{"x": 0.8, "y": 0, "z": 0.5}},
           "role": "Operator"
         }},
         {{
           "resource_type": "material",
           "resource_id": "M001",
           "quantity": 2.5,
-          "relative_location": {{"x": -0.8, "y": 0, "z": 0.3}},
           "role": "Input material"
         }}
       ]
     }}
   ],
-  "equipments": [{{"equipment_id": "EQ001", "name": "...", "type": "robot"}}],
+  "equipments": [
+    {{"equipment_id": "EQ001", "name": "Assembly Workstation", "type": "manual_station"}},
+    {{"equipment_id": "EQ002", "name": "Welding Robot", "type": "robot"}}
+  ],
   "workers": [{{"worker_id": "W001", "name": "..."}}],
   "materials": [{{"material_id": "M001", "name": "...", "unit": "kg"}}]
 }}
 
 Rules:
 
-3D Coordinate System (Three.js):
-- X-axis (horizontal): Left to Right | Factory width | Process flow direction
-- Y-axis (vertical): Up/Down | Height (ALWAYS 0 for ground level)
-- Z-axis (depth): Front to Back | Parallel lines spacing
-- Units: 1 unit = 1 meter
-
 Process Rules:
 - Each process is a SINGLE manufacturing step (no sub-operations)
 - For BOP creation: 3-6 processes, realistic cycle times (10-300s)
 - For BOP modification: preserve structure unless explicitly asked to change
 - For QA: analyze BOP and answer, omit bop_data field
-- Process locations: CRITICAL y=0, z=0 always, x-axis spacing of 5 (x=0, 5, 10, 15, ...)
-- Resource types: equipment/worker/material with relative_location within process
+- Resource types: equipment/worker/material
 - Equipment type: "robot", "machine", or "manual_station"
-- CRITICAL: relative_location MUST be compact (x: -1.5 to 1.5, z: -1 to 1, y: always 0)
-- Output ONLY valid JSON, NO markdown, NO code blocks
+- DO NOT include "location" or "relative_location" fields - coordinates will be auto-generated
+- If modifying existing BOP, preserve existing location/relative_location fields unless explicitly changing layout
+
+⚠️ CRITICAL Equipment Rules:
+- If a process has workers, it MUST include at least 1 "manual_station" type equipment
+- If a process has robot equipment, it SHOULD also include at least 1 "manual_station" for worker supervision
+- Manual_station = workbench/workstation where workers perform tasks
+- NEVER have workers without a manual_station
+
+Output ONLY valid JSON, NO markdown, NO code blocks
 
 Examples:
 
@@ -223,7 +203,7 @@ User: "자전거 제조 라인 BOP 만들어줘"
 Response: {{"message": "자전거 제조 라인 BOP를 생성했습니다...", "bop_data": {{...}}}}
 
 User: "프레임 용접 공정에 품질 검사 작업자 추가해줘"
-Response: {{"message": "품질 검사 작업자를 추가했습니다.", "bop_data": {{...}}}}
+Response: {{"message": "품질 검사 작업자를 추가했습니다. 수작업대도 함께 추가했습니다.", "bop_data": {{...}}}}
 
 User: "현재 bottleneck이 뭐야?"
 Response: {{"message": "현재 bottleneck은 P001 'Frame Welding' 공정입니다..."}}

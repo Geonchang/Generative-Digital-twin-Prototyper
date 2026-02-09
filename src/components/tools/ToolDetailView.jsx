@@ -84,6 +84,21 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
     setError('');
     setImproveResult(null);
 
+    // 디버깅: execution_context 확인
+    console.log('[DEBUG] ===== 개선 요청 시작 =====');
+    console.log('[DEBUG] execResult:', JSON.stringify(execResult, null, 2));
+    const ctx = execResult ? {
+      success: execResult.success,
+      stdout: execResult.stdout,
+      stderr: execResult.stderr,
+      tool_output: execResult.tool_output,
+    } : null;
+    console.log('[DEBUG] executionContext:', JSON.stringify(ctx, null, 2));
+    console.log('[DEBUG] stdout 길이:', execResult?.stdout?.length || 0);
+    console.log('[DEBUG] stderr 길이:', execResult?.stderr?.length || 0);
+    console.log('[DEBUG] tool_output 길이:', execResult?.tool_output?.length || 0);
+    console.log('[DEBUG] ==============================');
+
     try {
       const result = await api.improveTool(tool.tool_id, {
         userFeedback: improveFeedback,

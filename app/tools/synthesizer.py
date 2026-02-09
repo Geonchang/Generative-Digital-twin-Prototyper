@@ -258,7 +258,7 @@ async def generate_schema_from_description(
         log.error("[generate_schema] Provider 생성 실패: %s", str(e))
         return None
 
-    prompt = f"""You are a BOP (Bill of Process) tool schema designer.
+    prompt = f"""You are a BOP (Bill of Process) tool schema designer for a manufacturing digital twin system.
 
 Given the user's description of a tool they want to create, generate ONLY the input/output schemas and parameter definitions.
 DO NOT generate actual script code yet.
@@ -267,82 +267,208 @@ DO NOT generate actual script code yet.
 {user_description}
 
 ## Your Task:
-Analyze what data the tool needs to:
-1. **Receive as input** (from BOP data after adapter transformation)
-2. **Return as output** (to be transformed back to BOP by adapter)
-3. **Accept as user parameters** (configuration values from UI)
+1. **Understand the tool's purpose** - What problem does it solve?
+2. **Identify tool type** - Spatial layout? Data analysis? Optimization? Calculation? Validation?
+3. **Select relevant data** - Only include BOP fields needed for this specific tool
+4. **Design input/output** - Simple, focused schemas that serve the tool's purpose
+5. **Define parameters** - User-configurable values (thresholds, options, etc.)
+
+## Available BOP Data Sources (Reference Only - Use What's Needed)
+
+**Processes:**
+- process_id, cycle_time_sec, parallel_count
+- location {{x, y, z}} (3D position), rotation_y
+- predecessor_ids[], successor_ids[]
+- resources[] (equipment/worker/material assignments)
+
+**Equipment:**
+- equipment_id, name, type (robot|machine|manual_station)
+
+**Workers:**
+- worker_id, name, skill_level (Junior|Mid|Senior)
+
+**Materials:**
+- material_id, name, unit (ea|kg|m)
+
+**Obstacles:**
+- obstacle_id, type (zone|fence|pillar|wall)
+- position {{x, y, z}}, size {{width, height, depth}}, rotation_y
+
+**Project:**
+- project_title, target_uph
+
+## Tool Type Examples (Choose Relevant Pattern)
+
+### Type 1: Spatial Layout Tools
+Purpose: Relocate, arrange, or optimize 3D positions
+```json
+// ✅ GOOD - Obstacle avoidance
+{{
+  "example_input": {{
+    "processes": [
+      {{"process_id": "P001", "location": {{"x": 0, "y": 0, "z": 0}}, "size": {{"width": 2.0, "height": 2.5, "depth": 1.5}}}},
+      {{"process_id": "P002", "location": {{"x": 2.5, "y": 0, "z": 0}}, "size": {{"width": 2.0, "height": 2.5, "depth": 1.5}}}}
+    ],
+    "obstacles": [
+      {{"obstacle_id": "OBS001", "type": "zone", "position": {{"x": 2.0, "y": 0, "z": 0}}, "size": {{"width": 3.0, "height": 2.5, "depth": 3.0}}}}
+    ],
+    "min_clearance": 0.5
+  }}
+}}
+
+// ❌ BAD - Wrong domain (time instead of space)
+{{
+  "example_input": {{
+    "processes": [{{"process_id": "P001", "start_time": "10:00", "area": [[10,20], [30,20]]}}]
+  }}
+}}
+```
+
+### Type 2: Data Analysis Tools
+Purpose: Analyze, calculate statistics, find bottlenecks
+```json
+// ✅ GOOD - Cycle time bottleneck analysis
+{{
+  "example_input": {{
+    "processes": [
+      {{"process_id": "P001", "cycle_time_sec": 45.0, "parallel_count": 2}},
+      {{"process_id": "P002", "cycle_time_sec": 120.0, "parallel_count": 1}},
+      {{"process_id": "P003", "cycle_time_sec": 30.0, "parallel_count": 3}}
+    ],
+    "target_uph": 100.0
+  }},
+  "example_output": {{
+    "bottleneck_process_id": "P002",
+    "bottleneck_cycle_time": 120.0,
+    "required_parallel_count": 4,
+    "current_uph": 60.0,
+    "improvement_suggestions": ["P002 공정 병렬라인 추가 필요"]
+  }}
+}}
+
+// ❌ BAD - Vague placeholders
+{{
+  "example_input": {{
+    "data": "process information",
+    "parameters": "analysis options"
+  }}
+}}
+```
+
+### Type 3: Resource Optimization Tools
+Purpose: Assign workers, equipment, or materials optimally
+```json
+// ✅ GOOD - Worker assignment by skill
+{{
+  "example_input": {{
+    "processes": [
+      {{"process_id": "P001", "required_skill": "Senior", "location": {{"x": 0, "y": 0, "z": 0}}}},
+      {{"process_id": "P002", "required_skill": "Mid", "location": {{"x": 5, "y": 0, "z": 0}}}}
+    ],
+    "available_workers": [
+      {{"worker_id": "W001", "skill_level": "Senior", "assigned": false}},
+      {{"worker_id": "W002", "skill_level": "Mid", "assigned": false}}
+    ],
+    "max_travel_distance": 10.0
+  }},
+  "example_output": {{
+    "assignments": [
+      {{"process_id": "P001", "worker_id": "W001", "distance": 0}},
+      {{"process_id": "P002", "worker_id": "W002", "distance": 5.0}}
+    ]
+  }}
+}}
+```
+
+### Type 4: Calculation/Aggregation Tools
+Purpose: Calculate totals, counts, sums, averages
+```json
+// ✅ GOOD - Material usage calculation
+{{
+  "example_input": {{
+    "processes": [
+      {{"process_id": "P001", "materials": [{{"material_id": "M-001", "quantity_per_unit": 2.5}}]}},
+      {{"process_id": "P002", "materials": [{{"material_id": "M-001", "quantity_per_unit": 1.0}}]}}
+    ],
+    "materials_list": [
+      {{"material_id": "M-001", "name": "강판", "unit": "kg"}}
+    ],
+    "production_volume": 1000
+  }},
+  "example_output": {{
+    "material_requirements": [
+      {{"material_id": "M-001", "total_quantity": 3500.0, "unit": "kg"}}
+    ]
+  }}
+}}
+```
+
+### Type 5: Validation/Check Tools
+Purpose: Detect errors, conflicts, invalid configurations
+```json
+// ✅ GOOD - Process sequence validation
+{{
+  "example_input": {{
+    "processes": [
+      {{"process_id": "P001", "predecessor_ids": [], "successor_ids": ["P002"]}},
+      {{"process_id": "P002", "predecessor_ids": ["P001"], "successor_ids": ["P003"]}},
+      {{"process_id": "P003", "predecessor_ids": ["P002"], "successor_ids": ["P001"]}}
+    ]
+  }},
+  "example_output": {{
+    "has_errors": true,
+    "errors": [
+      {{"type": "circular_dependency", "process_ids": ["P001", "P002", "P003"]}}
+    ]
+  }}
+}}
+```
+
+## CRITICAL Rules for Examples
+
+### ❌ NEVER Use These:
+- Generic placeholders: "value", "example", "data", "string", "array"
+- Wrong domain: start_time, end_time, schedule, duration (unless explicitly time-based tool)
+- Wrong field names: pos (use position/location), id (use specific_id), area (use location+size)
+- Vague structures: "array of items", "list of data"
+
+### ✅ ALWAYS Use These:
+- **Concrete values**: 2.5, 120.0, "P001", "Senior", "robot"
+- **Exact field names**: process_id, location, position, cycle_time_sec, skill_level
+- **Realistic ranges**: distances (0.5-50m), times (10-300s), counts (1-10)
+- **Minimal data**: Only fields needed for THIS tool's purpose
+- **Korean labels**: "최소 간격 (m)", "목표 UPH", "스킬 레벨"
 
 ## Output Format (JSON):
-Return a JSON object with these fields:
-
 ```json
 {{
   "tool_name": "descriptive_tool_name",
   "description": "Clear description of what the tool does",
   "input_schema": {{
-    "type": "json" | "dict" | "list" | "string",
+    "type": "json" | "dict",
     "description": "What data the tool receives",
-    "structure": {{ /* ONLY for json/dict types: nested structure */ }},
-    "fields": [ /* ONLY for simple dicts: list of field names */ ]
+    "structure": {{ /* nested structure */ }} OR "fields": [ /* field list */ ]
   }},
   "output_schema": {{
-    "type": "json" | "dict" | "list" | "string",
+    "type": "json" | "dict",
     "description": "What data the tool returns",
-    "structure": {{ /* ONLY for json/dict types: nested structure */ }},
-    "return_format": {{ /* Alternative to structure: describe format */ }}
+    "structure": {{ /* nested structure */ }} OR "return_format": {{ /* format */ }}
   }},
   "suggested_params": [
-    {{
-      "key": "param_name",
-      "label": "User-friendly label",
-      "type": "string" | "number" | "boolean",
-      "required": true | false,
-      "default": null | <value>,
-      "description": "What this parameter controls"
-    }}
+    {{"key": "param_name", "label": "한글 라벨", "type": "number"|"text", "required": true|false, "default": value, "description": "설명"}}
   ],
-  "example_input": {{
-    /* Concrete, realistic example of input data that matches input_schema */
-    /* Use actual values, not placeholders like "value" or "example" */
-  }},
-  "example_output": {{
-    /* Concrete, realistic example of output data that matches output_schema */
-    /* Use actual values that users can immediately understand */
-  }}
+  "example_input": {{ /* CONCRETE example matching input_schema */ }},
+  "example_output": {{ /* CONCRETE example matching output_schema */ }}
 }}
 ```
 
-## CRITICAL Rules:
-- **YOU MUST provide example_input and example_output** - these help users understand the data format
-- Examples should use concrete, realistic values (not "value", "example", "data")
-- For BOP-related data: use realistic process IDs (P001, P002), locations, etc.
-- **NEVER use "args_format" field** - it's only for command-line tools, not Python scripts
-- For json/dict types: use "structure" (nested dict) or "fields" (flat list)
-- For list types: use "description" to explain what's in the list
-- `input_schema.type`: Usually "json" or "dict" for structured BOP data
-- `output_schema.type`: Usually "json" or "dict" for modified BOP data
-- `suggested_params`: User-configurable values (thresholds, distances, options, etc.)
-- Be specific about what data the tool needs from BOP (processes, obstacles, workers, etc.)
-- Design schemas that are simple for both the script and the adapter
+**Remember:**
+- Understand the tool's PURPOSE first
+- Select ONLY the BOP fields needed
+- Provide CONCRETE, REALISTIC examples
+- NEVER use "args_format" field
 
-**WRONG Example:**
-{{
-  "input_schema": {{
-    "type": "dict",
-    "args_format": {{"process_area": {{"type": "list"}}}}  ❌ NEVER DO THIS
-  }}
-}}
-
-**CORRECT Example:**
-{{
-  "input_schema": {{
-    "type": "dict",
-    "structure": {{"process_area": "list of [x, y] points"}},  ✅ CORRECT
-    "fields": ["process_area", "offset"]  ✅ OR THIS
-  }}
-}}
-
-Return ONLY the JSON object, no code.
+Return ONLY the JSON object, no markdown code blocks.
 """
 
     log.info("[generate_schema] 프롬프트 준비 완료: %d bytes", len(prompt))
