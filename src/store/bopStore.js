@@ -1,28 +1,95 @@
 import { create } from 'zustand';
 
-// Helper function: Get resource size based on type (copied from Viewer3D.jsx)
+// ===================================================================
+// Helper: Resource Size (must match Viewer3D.jsx)
+// ===================================================================
+
 function getResourceSize(resourceType, equipmentType) {
   if (resourceType === 'equipment') {
     switch (equipmentType) {
       case 'robot':
-        return { width: 0.6, height: 1.8, depth: 0.6 };
+        return { width: 1.4, height: 1.7, depth: 0.6 };
       case 'machine':
-        return { width: 0.8, height: 1.2, depth: 0.8 };
+        return { width: 2.1, height: 1.9, depth: 1.0 };
       case 'manual_station':
-        return { width: 0.6, height: 1.0, depth: 0.6 };
+        return { width: 1.6, height: 1.0, depth: 0.8 };
       default:
         return { width: 0.4, height: 0.4, depth: 0.4 };
     }
   } else if (resourceType === 'worker') {
-    return { width: 0.5, height: 1.6, depth: 0.5 };
+    return { width: 0.5, height: 1.7, depth: 0.3 };
   } else if (resourceType === 'material') {
     return { width: 0.4, height: 0.25, depth: 0.4 };
   }
   return { width: 0.4, height: 0.4, depth: 0.4 };
 }
 
-// Get effective position for a resource (handles auto-layout fallback)
-// Must match Viewer3D.jsx ResourceMarker.getPosition() and ProcessBox.calculateBoundingBox()
+function computeResourceSize(resource, equipments) {
+  if (resource.resource_type === 'equipment') {
+    const eq = (equipments || []).find(e => e.equipment_id === resource.resource_id);
+    return getResourceSize('equipment', eq?.type);
+  }
+  return getResourceSize(resource.resource_type);
+}
+
+// Ensure all resource_assignments have computed_size
+function ensureComputedSizes(bopData) {
+  if (!bopData) return bopData;
+
+  // 1) resource_assignments에 computed_size 보장
+  const equipments = bopData.equipments || [];
+  const updatedAssignments = (bopData.resource_assignments || []).map(ra => {
+    if (ra.computed_size) return ra;
+    return { ...ra, computed_size: computeResourceSize(ra, equipments) };
+  });
+
+  // 2) process_details에 computed_size (바운딩박스) 보장
+  const updatedDetails = (bopData.process_details || []).map(pd => {
+    const resources = updatedAssignments.filter(
+      r => r.process_id === pd.process_id && (r.parallel_index || 1) === (pd.parallel_index || 1)
+    );
+    if (resources.length === 0) {
+      return { ...pd, computed_size: { width: 0.5, height: 0.5, depth: 0.5 } };
+    }
+    let minX = Infinity, maxX = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    let maxHeight = 0;
+    resources.forEach((r, idx) => {
+      const relLoc = r.relative_location || { x: 0, y: 0, z: 0 };
+      let x = relLoc.x, z = relLoc.z;
+      // auto-layout 폴백 (Viewer3D와 동일)
+      if (x === 0 && z === 0 && resources.length > 1) {
+        const step = 0.9;
+        z = idx * step - (resources.length - 1) * step / 2;
+      }
+      const size = r.computed_size || { width: 0.4, height: 0.4, depth: 0.4 };
+      const scale = r.scale || { x: 1, y: 1, z: 1 };
+      const aw = size.width * (scale.x || 1);
+      const ad = size.depth * (scale.z || 1);
+      const ah = size.height * (scale.y || 1);
+      minX = Math.min(minX, x - aw / 2);
+      maxX = Math.max(maxX, x + aw / 2);
+      minZ = Math.min(minZ, z - ad / 2);
+      maxZ = Math.max(maxZ, z + ad / 2);
+      maxHeight = Math.max(maxHeight, ah);
+    });
+    return {
+      ...pd,
+      computed_size: {
+        width: Math.round((maxX - minX) * 100) / 100,
+        height: Math.round(maxHeight * 100) / 100,
+        depth: Math.round((maxZ - minZ) * 100) / 100,
+      }
+    };
+  });
+
+  return { ...bopData, resource_assignments: updatedAssignments, process_details: updatedDetails };
+}
+
+// ===================================================================
+// Helper: Effective Position (auto-layout fallback)
+// ===================================================================
+
 function getEffectivePosition(resource, resourceIndex, totalResources) {
   const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
 
@@ -30,20 +97,20 @@ function getEffectivePosition(resource, resourceIndex, totalResources) {
     return { x: relLoc.x, z: relLoc.z };
   }
 
-  // Auto-layout: Z축 수직 배치 (고정 간격)
-  const step = 0.9; // depth(0.6) + spacing(0.3)
+  // Auto-layout: Z-axis vertical layout (fixed spacing)
+  const step = 0.9;
   const z = resourceIndex * step - (totalResources - 1) * step / 2;
 
   return { x: 0, z: z };
 }
 
-// Calculate bounding box center for a process
-function calculateBoundingBoxCenter(process, equipments) {
-  const resources = process.resources || [];
+// ===================================================================
+// Helper: Bounding Box & Normalize
+// ===================================================================
 
-  console.log(`    [calculateBoundingBoxCenter] 공정: ${process.name}, 리소스 ${resources.length}개`);
-
-  if (resources.length === 0) {
+// Calculate bounding box center for a set of resources
+function calculateBoundingBoxCenter(resources, equipments) {
+  if (!resources || resources.length === 0) {
     return { centerX: 0, centerZ: 0 };
   }
 
@@ -59,21 +126,16 @@ function calculateBoundingBoxCenter(process, equipments) {
     const resourceRotation = resource.rotation_y || 0;
     const scale = resource.scale || { x: 1, y: 1, z: 1 };
 
-    const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
-    console.log(`      - ${resource.resource_id}: relLoc(${relLoc.x.toFixed(2)}, ${relLoc.z.toFixed(2)}) → effective(${x.toFixed(2)}, ${z.toFixed(2)})`);
-
-    // Get equipment type if applicable
     let equipmentType = null;
     if (resource.resource_type === 'equipment' && equipments) {
       const equipmentData = equipments.find(e => e.equipment_id === resource.resource_id);
       equipmentType = equipmentData?.type;
     }
 
-    const baseSize = getResourceSize(resource.resource_type, equipmentType);
+    const baseSize = resource.computed_size || getResourceSize(resource.resource_type, equipmentType);
     const actualWidth = baseSize.width * scale.x;
     const actualDepth = baseSize.depth * scale.z;
 
-    // Calculate 4 corners considering rotation
     const halfWidth = actualWidth / 2;
     const halfDepth = actualDepth / 2;
     const corners = [
@@ -83,7 +145,6 @@ function calculateBoundingBoxCenter(process, equipments) {
       { x: -halfWidth, z: halfDepth }
     ];
 
-    // Rotate each corner
     corners.forEach(corner => {
       const rotatedX = corner.x * Math.cos(resourceRotation) + corner.z * Math.sin(resourceRotation);
       const rotatedZ = -corner.x * Math.sin(resourceRotation) + corner.z * Math.cos(resourceRotation);
@@ -98,271 +159,66 @@ function calculateBoundingBoxCenter(process, equipments) {
     });
   });
 
-  const centerX = (minX + maxX) / 2;
-  const centerZ = (minZ + maxZ) / 2;
-
-  console.log(`    바운딩 박스 센터: (${centerX.toFixed(2)}, ${centerZ.toFixed(2)})`);
-
-  return { centerX, centerZ };
+  return { centerX: (minX + maxX) / 2, centerZ: (minZ + maxZ) / 2 };
 }
 
-// Normalize process center: adjust process.location and resource positions
+// Normalize process center: adjust detail.location and resource relative_locations
 // so that boundingBox.center is always (0, 0)
-function normalizeProcessCenter(process, equipments) {
-  console.log(`  [normalizeProcessCenter] 시작`);
-  console.log(`    현재 공정 위치: (${process.location.x.toFixed(2)}, ${process.location.z.toFixed(2)})`);
+function normalizeProcessCenter(bopData, processId, parallelIndex) {
+  const detail = (bopData.process_details || []).find(
+    d => d.process_id === processId && d.parallel_index === parallelIndex
+  );
+  if (!detail) return bopData;
 
-  const { centerX, centerZ } = calculateBoundingBoxCenter(process, equipments);
+  const resources = (bopData.resource_assignments || []).filter(
+    r => r.process_id === processId && r.parallel_index === parallelIndex
+  );
 
-  // If already centered, no change needed
+  const { centerX, centerZ } = calculateBoundingBoxCenter(resources, bopData.equipments);
+
   if (Math.abs(centerX) < 0.001 && Math.abs(centerZ) < 0.001) {
-    console.log(`    이미 중앙 정렬됨 (center: ${centerX.toFixed(3)}, ${centerZ.toFixed(3)})`);
-    return process;
+    return bopData;
   }
 
-  console.log(`    센터 오프셋: (${centerX.toFixed(2)}, ${centerZ.toFixed(2)}) - 조정 필요!`);
-
-  const processRotation = process.rotation_y || 0;
-
-  // Adjust process.location by rotating the offset
+  const processRotation = detail.rotation_y || 0;
   const rotatedOffsetX = centerX * Math.cos(processRotation) + centerZ * Math.sin(processRotation);
   const rotatedOffsetZ = -centerX * Math.sin(processRotation) + centerZ * Math.cos(processRotation);
 
-  console.log(`    회전된 오프셋: (${rotatedOffsetX.toFixed(2)}, ${rotatedOffsetZ.toFixed(2)})`);
-
   const newLocation = {
-    x: process.location.x + rotatedOffsetX,
-    y: process.location.y || 0,
-    z: process.location.z + rotatedOffsetZ
+    x: (detail.location?.x || 0) + rotatedOffsetX,
+    y: detail.location?.y || 0,
+    z: (detail.location?.z || 0) + rotatedOffsetZ
   };
 
-  console.log(`    새 공정 위치: (${newLocation.x.toFixed(2)}, ${newLocation.z.toFixed(2)})`);
-  console.log(`    모든 리소스의 relative_location 조정 (center offset 빼기)`);
-
-  // Adjust all resources' relative_location by subtracting the center offset
-  // Use effective position (including auto-layout fallback) to preserve world positions
-  const updatedResources = process.resources.map((resource, resourceIndex) => {
-    const effectivePos = getEffectivePosition(resource, resourceIndex, process.resources.length);
-    const newRel = {
-      x: effectivePos.x - centerX,
-      y: resource.relative_location?.y || 0,
-      z: effectivePos.z - centerZ
-    };
-    console.log(`      ${resource.resource_id}: (${effectivePos.x.toFixed(2)}, ${effectivePos.z.toFixed(2)}) → (${newRel.x.toFixed(2)}, ${newRel.z.toFixed(2)})`);
-    return {
-      ...resource,
-      relative_location: newRel
-    };
+  const updatedDetails = bopData.process_details.map(d => {
+    if (d.process_id === processId && d.parallel_index === parallelIndex) {
+      return { ...d, location: newLocation };
+    }
+    return d;
   });
 
-  return {
-    ...process,
-    location: newLocation,
-    resources: updatedResources
-  };
-}
-
-// Expand parallel processes: convert parallel_count format to separate processes
-// New JSON structure: all details in parallel_lines, no representative values at process level
-function expandParallelProcesses(bopData) {
-  if (!bopData || !bopData.processes) return bopData;
-
-  const expandedProcesses = [];
-  let additionalEquipments = [];
-  let additionalWorkers = [];
-  // Build a mutable bopData reference for cumulative ID generation
-  const mutableBopData = {
-    equipments: [...(bopData.equipments || [])],
-    workers: [...(bopData.workers || [])]
-  };
-
-  bopData.processes.forEach(process => {
-    const parallelCount = process.parallel_count || 1;
-    const parallelLines = process.parallel_lines || [];
-
-    // Get first line info for parent process display (fallback to old structure for compatibility)
-    const firstLine = parallelLines[0] || {};
-    const parentName = firstLine.name || process.name || process.process_id;
-    const parentDescription = firstLine.description ?? process.description ?? '';
-    const parentCycleTime = firstLine.cycle_time_sec ?? process.cycle_time_sec ?? 60;
-
-    // ALL processes become parent + child(ren) structure
-    const parentProcess = {
-      process_id: process.process_id,
-      name: parentName,
-      description: parentDescription,
-      cycle_time_sec: parentCycleTime,
-      is_parent: true,
-      children: Array.from({ length: parallelCount }, (_, i) =>
-        `${process.process_id}-${String(i + 1).padStart(2, '0')}`
-      ),
-      predecessor_ids: process.predecessor_ids || [],
-      successor_ids: process.successor_ids || []
-    };
-    expandedProcesses.push(parentProcess);
-
-    // Compute line 0 resources once for fallback cloning
-    const line0Resources = (process.resources || [])
-      .filter(r =>
-        r.parallel_line_index === undefined ||
-        r.parallel_line_index === null ||
-        r.parallel_line_index === 0
-      )
-      .map(r => {
-        const { parallel_line_index, ...rest } = r;
-        return rest;
-      });
-
-    // Create child processes (actual parallel lines)
-    for (let i = 0; i < parallelCount; i++) {
-      // Filter resources assigned to this parallel line
-      // - Material (1:N shared): unindexed materials go to ALL lines
-      // - Equipment/Worker (1:1): unindexed ones go to line 0 only; line i>0 only gets explicit assignments
-      const stripPLI = r => { const { parallel_line_index, ...rest } = r; return rest; };
-      let res = (process.resources || [])
-        .filter(r => {
-          const isUnindexed = r.parallel_line_index === undefined || r.parallel_line_index === null;
-          // Materials without index are shared across all lines
-          if (r.resource_type === 'material' && isUnindexed) return true;
-          // Line 0: include unindexed equipment/workers + explicitly assigned
-          if (i === 0) return isUnindexed || r.parallel_line_index === 0;
-          // Line i>0: only explicitly assigned
-          return r.parallel_line_index === i;
-        })
-        .map(stripPLI);
-
-      // If no equipment/workers for this line (i>0), clone them from line #0
-      // Also copy materials from line 0 if this line has none (1:N sharing)
-      if (i > 0) {
-        const hasEqOrWorker = res.some(r => r.resource_type === 'equipment' || r.resource_type === 'worker');
-        if (!hasEqOrWorker) {
-          const line0EqWorkers = line0Resources.filter(r => r.resource_type !== 'material');
-          const { clonedResources, newEquipments, newWorkers } =
-            cloneResourcesForNewLine(line0EqWorkers, mutableBopData);
-          const hasMaterials = res.some(r => r.resource_type === 'material');
-          const materialCopies = hasMaterials ? [] :
-            line0Resources.filter(r => r.resource_type === 'material').map(r => ({ ...r }));
-          res = [...clonedResources, ...materialCopies, ...res];
-          additionalEquipments.push(...newEquipments);
-          additionalWorkers.push(...newWorkers);
-          mutableBopData.equipments.push(...newEquipments);
-          mutableBopData.workers.push(...newWorkers);
+  const updatedAssignments = bopData.resource_assignments.map(r => {
+    if (r.process_id === processId && r.parallel_index === parallelIndex) {
+      const resourceIdx = resources.indexOf(r);
+      const effectivePos = getEffectivePosition(r, resourceIdx, resources.length);
+      return {
+        ...r,
+        relative_location: {
+          x: effectivePos.x - centerX,
+          y: r.relative_location?.y || 0,
+          z: effectivePos.z - centerZ
         }
-      }
-
-      // Get line info from parallel_lines (new structure) or fallback to process level (old structure)
-      const lineInfo = parallelLines[i] || {};
-
-      // For new lines without location, use first line as base and offset by Z axis
-      const baseLocation = firstLine.location || process.location || { x: 0, y: 0, z: 0 };
-      const childLocation = lineInfo.location || {
-        x: baseLocation.x,
-        y: baseLocation.y || 0,
-        z: baseLocation.z + i * 5  // Z축으로 5m 간격
       };
-      const childRotation = lineInfo.rotation_y ?? firstLine.rotation_y ?? process.rotation_y ?? 0;
-      const childName = lineInfo.name || firstLine.name || process.name || process.process_id;
-      const childDescription = lineInfo.description ?? firstLine.description ?? process.description ?? '';
-      const childCycleTime = lineInfo.cycle_time_sec ?? firstLine.cycle_time_sec ?? process.cycle_time_sec ?? 60;
-
-      const childProcess = {
-        process_id: `${process.process_id}-${String(i + 1).padStart(2, '0')}`,
-        name: childName,
-        description: childDescription,
-        cycle_time_sec: childCycleTime,
-        parent_id: process.process_id,
-        parallel_index: i + 1,  // 1-based
-        location: childLocation,
-        rotation_y: childRotation,
-        predecessor_ids: process.predecessor_ids || [],
-        successor_ids: process.successor_ids || [],
-        resources: res
-      };
-      expandedProcesses.push(childProcess);
     }
+    return r;
   });
 
-  return {
-    ...bopData,
-    processes: expandedProcesses,
-    equipments: [...(bopData.equipments || []), ...additionalEquipments],
-    workers: [...(bopData.workers || []), ...additionalWorkers]
-  };
+  return { ...bopData, process_details: updatedDetails, resource_assignments: updatedAssignments };
 }
 
-// Collapse parallel processes: convert separate processes back to parallel_count format
-// JSON structure matches Excel: connection info + parallel_lines (no duplicate representative values)
-function collapseParallelProcesses(bopData) {
-  if (!bopData || !bopData.processes) return bopData;
-
-  const collapsedProcesses = [];
-  const collapsedGroups = new Set();  // Track which parallel groups have been collapsed
-
-  bopData.processes.forEach(process => {
-    if (process.is_parent) {
-      // Skip parent processes (they're just logical grouping)
-      // Do NOT mark as collapsed here — children handle that
-    } else if (process.parent_id) {
-      // Child process - group with siblings
-      if (!collapsedGroups.has(process.parent_id)) {
-        // Find all siblings
-        const siblings = bopData.processes
-          .filter(p => p.parent_id === process.parent_id)
-          .sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0));
-
-        // Merge into single process with parallel_count
-        // Only connection info at process level, all details in parallel_lines
-        const collapsedProcess = {
-          process_id: process.parent_id,
-          parallel_count: siblings.length,
-          predecessor_ids: siblings[0].predecessor_ids || [],
-          successor_ids: siblings[0].successor_ids || [],
-          // All line details in parallel_lines (no duplicate representative values)
-          parallel_lines: siblings.map(sibling => ({
-            parallel_index: sibling.parallel_index,
-            name: sibling.name,
-            description: sibling.description || '',
-            cycle_time_sec: sibling.cycle_time_sec,
-            location: sibling.location,
-            rotation_y: sibling.rotation_y || 0
-          })),
-          resources: siblings.flatMap((sibling, index) =>
-            (sibling.resources || []).map(r => ({
-              ...r,
-              parallel_line_index: index // Re-add parallel_line_index
-            }))
-          )
-        };
-
-        collapsedProcesses.push(collapsedProcess);
-        collapsedGroups.add(process.parent_id);
-      }
-    } else {
-      // Independent process (no parent) - should not happen in current structure
-      // but handle for safety: wrap in parallel_lines format
-      const { name, description, cycle_time_sec, location, rotation_y, ...rest } = process;
-      collapsedProcesses.push({
-        ...rest,
-        parallel_count: 1,
-        parallel_lines: [{
-          parallel_index: 1,
-          name,
-          description: description || '',
-          cycle_time_sec,
-          location,
-          rotation_y: rotation_y || 0
-        }]
-      });
-    }
-  });
-
-  return {
-    ...bopData,
-    processes: collapsedProcesses
-  };
-}
-
-// ===== ID Generation Helpers =====
+// ===================================================================
+// ID Generation Helpers
+// ===================================================================
 
 function generateNextProcessId(processes) {
   let maxNum = 0;
@@ -413,14 +269,17 @@ function generateNextObstacleId(obstacles) {
 // - equipment: create new master entry with new ID (1:1)
 // - worker: create new master entry with new ID (1:1)
 // - material: share same ID (1:N)
+// Returns cloned resources WITHOUT process_id/parallel_index (caller sets those)
 function cloneResourcesForNewLine(sourceResources, bopData) {
   const newEquipments = [];
   const newWorkers = [];
-  // Track cumulative lists to avoid ID collisions within a single call
   let allEquipments = [...(bopData.equipments || [])];
   let allWorkers = [...(bopData.workers || [])];
 
   const clonedResources = (sourceResources || []).map(r => {
+    // Strip process_id and parallel_index - caller will set these
+    const { process_id, parallel_index, ...rest } = r;
+
     if (r.resource_type === 'equipment') {
       const original = allEquipments.find(e => e.equipment_id === r.resource_id);
       const newId = generateNextEquipmentId(allEquipments);
@@ -433,7 +292,7 @@ function cloneResourcesForNewLine(sourceResources, bopData) {
       };
       newEquipments.push(newEquip);
       allEquipments.push(newEquip);
-      return { ...r, resource_id: newId };
+      return { ...rest, resource_id: newId };
     }
 
     if (r.resource_type === 'worker') {
@@ -448,82 +307,231 @@ function cloneResourcesForNewLine(sourceResources, bopData) {
       };
       newWorkers.push(newWorker);
       allWorkers.push(newWorker);
-      return { ...r, resource_id: newId };
+      return { ...rest, resource_id: newId };
     }
 
     // material: share same ID
-    return { ...r };
+    return { ...rest };
   });
 
   return { clonedResources, newEquipments, newWorkers };
 }
 
-// Helper: get base ID and all member IDs for a process (handles parallel groups)
-function getGroupIds(processes, processId) {
-  const proc = processes.find(p => p.process_id === processId);
-  if (!proc) return { baseId: processId, memberIds: [] };
-  const baseId = proc.parent_id || proc.process_id;
-  const memberIds = [baseId];
-  processes.filter(p => p.parent_id === baseId).forEach(p => memberIds.push(p.process_id));
-  // If baseId is an independent process (no children), memberIds = [baseId] only
-  if (!processes.some(p => p.parent_id === baseId)) {
-    return { baseId, memberIds: [baseId] };
-  }
-  return { baseId, memberIds };
+// ===================================================================
+// Helper: query functions for new flat structure
+// ===================================================================
+
+function getDetailsForProcess(bopData, processId) {
+  return (bopData.process_details || []).filter(d => d.process_id === processId);
 }
 
+function getResourcesForDetail(bopData, processId, parallelIndex) {
+  return (bopData.resource_assignments || []).filter(
+    r => r.process_id === processId && r.parallel_index === parallelIndex
+  );
+}
+
+function getParallelCount(bopData, processId) {
+  return getDetailsForProcess(bopData, processId).length;
+}
+
+// ===================================================================
+// Migration: convert old format (parallel_lines) to new flat format
+// ===================================================================
+
+function migrateOldFormat(data) {
+  // If data already has process_details, it's new format
+  if (data.process_details && data.process_details.length > 0) {
+    return data;
+  }
+
+  // Check if old format (processes with parallel_lines or nested resources)
+  const hasOldFormat = (data.processes || []).some(
+    p => p.parallel_lines || p.resources || p.name || p.parallel_count
+  );
+
+  if (!hasOldFormat) {
+    // Empty or already minimal processes - ensure new fields exist
+    return {
+      ...data,
+      process_details: data.process_details || [],
+      resource_assignments: data.resource_assignments || []
+    };
+  }
+
+  // Migrate old format to new flat format
+  const newProcesses = [];
+  const newDetails = [];
+  const newAssignments = [];
+  const additionalEquipments = [];
+  const additionalWorkers = [];
+
+  const mutableBopData = {
+    equipments: [...(data.equipments || [])],
+    workers: [...(data.workers || [])]
+  };
+
+  (data.processes || []).forEach(process => {
+    // Skip parent/child markers from expanded format
+    if (process.is_parent) return;
+    if (process.parent_id) return;
+
+    const parallelCount = process.parallel_count || 1;
+    const parallelLines = process.parallel_lines || [];
+
+    // Create routing entry (connection info only)
+    newProcesses.push({
+      process_id: process.process_id,
+      predecessor_ids: process.predecessor_ids || [],
+      successor_ids: process.successor_ids || []
+    });
+
+    // Create detail entries
+    for (let i = 0; i < parallelCount; i++) {
+      const lineInfo = parallelLines[i] || {};
+      const baseLocation = (parallelLines[0] || {}).location || process.location || { x: 0, y: 0, z: 0 };
+
+      newDetails.push({
+        process_id: process.process_id,
+        parallel_index: i + 1,
+        name: lineInfo.name || process.name || process.process_id,
+        description: lineInfo.description ?? process.description ?? '',
+        cycle_time_sec: lineInfo.cycle_time_sec ?? process.cycle_time_sec ?? 60,
+        location: lineInfo.location || {
+          x: baseLocation.x,
+          y: baseLocation.y || 0,
+          z: baseLocation.z + i * 5
+        },
+        rotation_y: lineInfo.rotation_y ?? process.rotation_y ?? 0
+      });
+
+      // Create resource assignments for this parallel index
+      const lineResources = (process.resources || []).filter(r => {
+        const isUnindexed = r.parallel_line_index === undefined || r.parallel_line_index === null;
+        if (r.resource_type === 'material' && isUnindexed) return true;
+        if (i === 0) return isUnindexed || r.parallel_line_index === 0;
+        return r.parallel_line_index === i;
+      });
+
+      // If line i>0 has no eq/workers, clone from line 0
+      let resources = lineResources;
+      if (i > 0 && !resources.some(r => r.resource_type === 'equipment' || r.resource_type === 'worker')) {
+        const line0Res = (process.resources || [])
+          .filter(r => {
+            const isUnindexed = r.parallel_line_index === undefined || r.parallel_line_index === null;
+            return isUnindexed || r.parallel_line_index === 0;
+          })
+          .filter(r => r.resource_type !== 'material');
+
+        const { clonedResources, newEquipments, newWorkers } =
+          cloneResourcesForNewLine(line0Res.map(r => ({ ...r })), mutableBopData);
+
+        const materialCopies = !resources.some(r => r.resource_type === 'material')
+          ? (process.resources || [])
+              .filter(r => r.resource_type === 'material' && (r.parallel_line_index === undefined || r.parallel_line_index === null || r.parallel_line_index === 0))
+              .map(r => ({ ...r }))
+          : [];
+
+        resources = [...clonedResources, ...materialCopies, ...resources];
+        additionalEquipments.push(...newEquipments);
+        additionalWorkers.push(...newWorkers);
+        mutableBopData.equipments.push(...newEquipments);
+        mutableBopData.workers.push(...newWorkers);
+      }
+
+      resources.forEach(r => {
+        const { parallel_line_index, ...rest } = r;
+        newAssignments.push({
+          ...rest,
+          process_id: process.process_id,
+          parallel_index: i + 1,
+          relative_location: rest.relative_location || { x: 0, y: 0, z: 0 },
+          rotation_y: rest.rotation_y || 0,
+          scale: rest.scale || { x: 1, y: 1, z: 1 }
+        });
+      });
+    }
+  });
+
+  return {
+    project_title: data.project_title || '새 프로젝트',
+    target_uph: data.target_uph || 60,
+    processes: newProcesses,
+    process_details: newDetails,
+    resource_assignments: newAssignments,
+    equipments: [...(data.equipments || []), ...additionalEquipments],
+    workers: [...(data.workers || []), ...additionalWorkers],
+    materials: data.materials || [],
+    obstacles: data.obstacles || []
+  };
+}
+
+// ===================================================================
+// Store
+// ===================================================================
+
 const useBopStore = create((set) => ({
-  // Hierarchical BOP data - starts with empty structure
+  // BOP data - flat structure
   bopData: {
     project_title: "새 프로젝트",
     target_uph: 60,
     processes: [],
+    process_details: [],
+    resource_assignments: [],
     equipments: [],
     workers: [],
     materials: [],
     obstacles: []
   },
 
-  // Flag to track if initial data load has happened (prevents auto-load after createNewScenario)
+  // Flag to track if initial data load has happened
   initialLoadDone: true,
 
-  // Selection state (processId-parallelIndex format, e.g., "P001-0", "P001-1")
+  // Selection state: "processId:parallelIndex" format (e.g., "P001:1")
   selectedProcessKey: null,
 
-  // Resource selection state (type-id-processId-parallelIndex format, e.g., "equipment-EQ-ROBOT-01-P001-0")
+  // Resource selection: "type:resourceId:processId:parallelIndex" format
   selectedResourceKey: null,
 
   // Active tab state
-  activeTab: 'bop', // 'bop' | 'equipments' | 'workers' | 'materials' | 'obstacles'
+  activeTab: 'bop',
 
   // Obstacle selection state
   selectedObstacleId: null,
 
   // Obstacle creation mode (Two-Click)
   obstacleCreationMode: false,
-  obstacleCreationFirstClick: null, // { x, z }
-  pendingObstacleType: 'fence', // 생성 대기 중인 장애물 유형
+  obstacleCreationFirstClick: null,
+  pendingObstacleType: 'fence',
 
-  // 3D Model toggle (true: GLB/FBX models, false: basic geometry)
+  // 3D Model toggle
   use3DModels: false,
 
+  // Custom 3D models (key: "resource_type:resource_id", value: blob URL)
+  customModels: {},
+
   // Chat messages
-  messages: [], // { role: 'user' | 'assistant', content: string, timestamp: Date }
+  messages: [],
 
   // LLM Model Selection
-  selectedModel: 'gemini-2.5-flash',  // Default model
-  supportedModels: {},  // { modelId: { provider: string, display: string } }
+  selectedModel: 'gemini-2.5-flash',
+  supportedModels: {},
+
+  // Language Selection
+  selectedLanguage: 'ko',
 
   // Actions
   setSelectedModel: (model) => set({ selectedModel: model }),
   setSupportedModels: (models) => set({ supportedModels: models }),
+  setSelectedLanguage: (lang) => set({ selectedLanguage: lang }),
 
   setBopData: (data) => {
-    console.log('[STORE] setBopData called with:', data);
-    // Automatically expand parallel processes
-    const expandedData = expandParallelProcesses(data);
-    console.log('[STORE] Parallel processes expanded');
-    set({ bopData: expandedData });
+    console.log('[STORE] setBopData called');
+    // Migrate old format if needed
+    const migrated = migrateOldFormat(data);
+    // Ensure all resources have computed_size
+    const withSizes = ensureComputedSizes(migrated);
+    set({ bopData: withSizes });
     console.log('[STORE] bopData updated');
   },
 
@@ -551,30 +559,28 @@ const useBopStore = create((set) => ({
     };
   }),
 
-  // Export BOP data (collapse parallel processes back to parallel_count format)
+  // Export BOP data (direct - no collapse needed)
   exportBopData: () => {
     const state = useBopStore.getState();
-    if (!state.bopData) return null;
-    console.log('[STORE] Exporting BOP data (collapsing parallel processes)');
-    return collapseParallelProcesses(state.bopData);
+    return state.bopData || null;
   },
 
-  setSelectedProcess: (processId) => {
-    // Process ID is already unique (e.g., "P001-0", "P001-1")
-    // Switch to BOP tab when process is selected
-    set({ selectedProcessKey: processId, selectedResourceKey: null, activeTab: 'bop' });
+  // ===================================================================
+  // Selection
+  // ===================================================================
+
+  setSelectedProcess: (processKey) => {
+    // processKey format: "processId:parallelIndex" (e.g., "P001:1")
+    set({ selectedProcessKey: processKey, selectedResourceKey: null, activeTab: 'bop' });
   },
 
   clearSelection: () => set({ selectedProcessKey: null, selectedResourceKey: null, selectedObstacleId: null }),
 
-  // Set active tab
   setActiveTab: (tab) => set({ activeTab: tab }),
 
-  // Select a resource (with auto tab switching)
-  setSelectedResource: (resourceType, resourceId, processId) => {
-    // Use ':' as separator to avoid conflicts with hyphens in IDs
-    // Format: type:resourceId:processId (e.g., "equipment:EQ-ROBOT-01:P001-0")
-    const key = `${resourceType}:${resourceId}:${processId}`;
+  setSelectedResource: (resourceType, resourceId, processId, parallelIndex) => {
+    // Format: type:resourceId:processId:parallelIndex
+    const key = `${resourceType}:${resourceId}:${processId}:${parallelIndex}`;
     const tabMap = {
       'equipment': 'equipments',
       'worker': 'workers',
@@ -594,8 +600,13 @@ const useBopStore = create((set) => ({
     const state = useBopStore.getState();
     if (!state.selectedProcessKey) return null;
 
-    // selectedProcessKey is now the process_id itself (e.g., "P001-0")
-    return { processId: state.selectedProcessKey };
+    const parts = state.selectedProcessKey.split(':');
+    if (parts.length < 2) return { processId: state.selectedProcessKey, parallelIndex: 1 };
+
+    return {
+      processId: parts[0],
+      parallelIndex: parseInt(parts[1], 10) || 1
+    };
   },
 
   // Helper to parse selectedResourceKey
@@ -603,13 +614,16 @@ const useBopStore = create((set) => ({
     const state = useBopStore.getState();
     if (!state.selectedResourceKey) return null;
 
-    // Format: type:resourceId:processId (e.g., "equipment:EQ-ROBOT-01:P001-0")
+    // Format: type:resourceId:processId:parallelIndex
     const parts = state.selectedResourceKey.split(':');
-    if (parts.length !== 3) return null;
+    if (parts.length < 4) return null;
 
-    const [resourceType, resourceId, processId] = parts;
-
-    return { resourceType, resourceId, processId };
+    return {
+      resourceType: parts[0],
+      resourceId: parts[1],
+      processId: parts[2],
+      parallelIndex: parseInt(parts[3], 10) || 1
+    };
   },
 
   addMessage: (role, content) => set((state) => ({
@@ -618,7 +632,10 @@ const useBopStore = create((set) => ({
 
   clearMessages: () => set({ messages: [] }),
 
-  // Helper functions
+  // ===================================================================
+  // Lookup helpers
+  // ===================================================================
+
   getEquipmentById: (equipmentId) => {
     const state = useBopStore.getState();
     if (!state.bopData || !state.bopData.equipments) return null;
@@ -643,211 +660,125 @@ const useBopStore = create((set) => ({
     return state.bopData.processes.find(p => p.process_id === processId);
   },
 
-  // Update process location
-  updateProcessLocation: (processId, newLocation) => set((state) => {
+  // ===================================================================
+  // Process Detail Location/Rotation
+  // ===================================================================
+
+  updateProcessLocation: (processId, parallelIndex, newLocation) => set((state) => {
     if (!state.bopData) return state;
 
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (process.process_id === processId) {
-        return {
-          ...process,
-          location: { ...newLocation }
-        };
+    const updatedDetails = state.bopData.process_details.map(d => {
+      if (d.process_id === processId && d.parallel_index === parallelIndex) {
+        return { ...d, location: { ...newLocation } };
       }
-      return process;
+      return d;
     });
 
     return {
-      bopData: {
-        ...state.bopData,
-        processes: updatedProcesses
-      }
+      bopData: { ...state.bopData, process_details: updatedDetails }
     };
   }),
 
-  // Update process rotation (Y-axis only)
-  updateProcessRotation: (processId, rotationY) => set((state) => {
+  updateProcessRotation: (processId, parallelIndex, rotationY) => set((state) => {
     if (!state.bopData) return state;
 
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (process.process_id === processId) {
-        return {
-          ...process,
-          rotation_y: rotationY
-        };
+    const updatedDetails = state.bopData.process_details.map(d => {
+      if (d.process_id === processId && d.parallel_index === parallelIndex) {
+        return { ...d, rotation_y: rotationY };
       }
-      return process;
+      return d;
     });
 
     return {
-      bopData: {
-        ...state.bopData,
-        processes: updatedProcesses
-      }
+      bopData: { ...state.bopData, process_details: updatedDetails }
     };
   }),
 
-  // Update resource relative location
-  updateResourceLocation: (processId, resourceType, resourceId, newRelativeLocation) => set((state) => {
+  // ===================================================================
+  // Resource Location/Rotation/Scale/Quantity
+  // ===================================================================
+
+  updateResourceLocation: (processId, parallelIndex, resourceType, resourceId, newRelativeLocation) => set((state) => {
     if (!state.bopData) return state;
 
-    console.log(`\n[Store] updateResourceLocation`);
-    console.log(`  processId: ${processId}`);
-    console.log(`  resourceType: ${resourceType}, resourceId: ${resourceId}`);
-    console.log(`  newRelativeLocation: (${newRelativeLocation.x.toFixed(2)}, ${newRelativeLocation.z.toFixed(2)})`);
-
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (process.process_id === processId) {
-        console.log(`  ✓ 공정 찾음: ${process.name}`);
-        console.log(`  리소스 개수: ${process.resources.length}`);
-
-        const updatedResources = process.resources.map(resource => {
-          if (resource.resource_type === resourceType && resource.resource_id === resourceId) {
-            console.log(`    → ${resourceId} 업데이트: (${resource.relative_location.x.toFixed(2)}, ${resource.relative_location.z.toFixed(2)}) → (${newRelativeLocation.x.toFixed(2)}, ${newRelativeLocation.z.toFixed(2)})`);
-            return {
-              ...resource,
-              relative_location: { ...newRelativeLocation }
-            };
-          }
-          return resource;
-        });
-
-        const updatedProcess = {
-          ...process,
-          resources: updatedResources
-        };
-        return normalizeProcessCenter(updatedProcess, state.bopData.equipments);
+    const updatedAssignments = state.bopData.resource_assignments.map(r => {
+      if (r.process_id === processId && r.parallel_index === parallelIndex &&
+          r.resource_type === resourceType && r.resource_id === resourceId) {
+        return { ...r, relative_location: { ...newRelativeLocation } };
       }
-      return process;
+      return r;
+    });
+
+    let bopData = { ...state.bopData, resource_assignments: updatedAssignments };
+    bopData = normalizeProcessCenter(bopData, processId, parallelIndex);
+
+    return { bopData };
+  }),
+
+  updateResourceRotation: (processId, parallelIndex, resourceType, resourceId, rotationY) => set((state) => {
+    if (!state.bopData) return state;
+
+    const updatedAssignments = state.bopData.resource_assignments.map(r => {
+      if (r.process_id === processId && r.parallel_index === parallelIndex &&
+          r.resource_type === resourceType && r.resource_id === resourceId) {
+        return { ...r, rotation_y: rotationY };
+      }
+      return r;
+    });
+
+    let bopData = { ...state.bopData, resource_assignments: updatedAssignments };
+    bopData = normalizeProcessCenter(bopData, processId, parallelIndex);
+
+    return { bopData };
+  }),
+
+  updateResourceScale: (processId, parallelIndex, resourceType, resourceId, scale) => set((state) => {
+    if (!state.bopData) return state;
+
+    const updatedAssignments = state.bopData.resource_assignments.map(r => {
+      if (r.process_id === processId && r.parallel_index === parallelIndex &&
+          r.resource_type === resourceType && r.resource_id === resourceId) {
+        return { ...r, scale: { ...scale } };
+      }
+      return r;
+    });
+
+    let bopData = { ...state.bopData, resource_assignments: updatedAssignments };
+    bopData = normalizeProcessCenter(bopData, processId, parallelIndex);
+
+    return { bopData };
+  }),
+
+  updateResourceQuantity: (processId, parallelIndex, resourceType, resourceId, quantity) => set((state) => {
+    if (!state.bopData) return state;
+
+    const updatedAssignments = state.bopData.resource_assignments.map(r => {
+      if (r.process_id === processId && r.parallel_index === parallelIndex &&
+          r.resource_type === resourceType && r.resource_id === resourceId) {
+        return { ...r, quantity };
+      }
+      return r;
     });
 
     return {
-      bopData: {
-        ...state.bopData,
-        processes: updatedProcesses
-      }
+      bopData: { ...state.bopData, resource_assignments: updatedAssignments }
     };
   }),
 
-  // Update resource rotation (Y-axis only)
-  updateResourceRotation: (processId, resourceType, resourceId, rotationY) => set((state) => {
-    if (!state.bopData) return state;
-
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (process.process_id === processId) {
-        const updatedResources = process.resources.map(resource => {
-          if (resource.resource_type === resourceType && resource.resource_id === resourceId) {
-            return {
-              ...resource,
-              rotation_y: rotationY
-            };
-          }
-          return resource;
-        });
-
-        const updatedProcess = {
-          ...process,
-          resources: updatedResources
-        };
-        return normalizeProcessCenter(updatedProcess, state.bopData.equipments);
-      }
-      return process;
-    });
-
-    return {
-      bopData: {
-        ...state.bopData,
-        processes: updatedProcesses
-      }
-    };
-  }),
-
-  // Update resource scale (XYZ)
-  updateResourceScale: (processId, resourceType, resourceId, scale) => set((state) => {
-    if (!state.bopData) return state;
-
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (process.process_id === processId) {
-        const updatedResources = process.resources.map(resource => {
-          if (resource.resource_type === resourceType && resource.resource_id === resourceId) {
-            return {
-              ...resource,
-              scale: { ...scale }
-            };
-          }
-          return resource;
-        });
-
-        const updatedProcess = {
-          ...process,
-          resources: updatedResources
-        };
-        return normalizeProcessCenter(updatedProcess, state.bopData.equipments);
-      }
-      return process;
-    });
-
-    return {
-      bopData: {
-        ...state.bopData,
-        processes: updatedProcesses
-      }
-    };
-  }),
-
-  // Update resource quantity (for materials)
-  updateResourceQuantity: (processId, resourceType, resourceId, quantity) => set((state) => {
-    if (!state.bopData) return state;
-
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (process.process_id === processId) {
-        const updatedResources = process.resources.map(resource => {
-          if (resource.resource_type === resourceType && resource.resource_id === resourceId) {
-            return {
-              ...resource,
-              quantity: quantity
-            };
-          }
-          return resource;
-        });
-
-        return {
-          ...process,
-          resources: updatedResources
-        };
-      }
-      return process;
-    });
-
-    return {
-      bopData: {
-        ...state.bopData,
-        processes: updatedProcesses
-      }
-    };
-  }),
-
-  // Normalize all processes (useful for initial data load)
+  // Normalize all process instances
   normalizeAllProcesses: () => set((state) => {
     if (!state.bopData) return state;
-
-    const updatedProcesses = state.bopData.processes.map(process =>
-      normalizeProcessCenter(process, state.bopData.equipments)
-    );
-
-    return {
-      bopData: {
-        ...state.bopData,
-        processes: updatedProcesses
-      }
-    };
+    let bopData = { ...state.bopData };
+    for (const detail of (bopData.process_details || [])) {
+      bopData = normalizeProcessCenter(bopData, detail.process_id, detail.parallel_index);
+    }
+    return { bopData };
   }),
 
   // ===================================================================
   // Process CRUD
   // ===================================================================
 
-  // Add a new process. If afterProcessId is given, insert into the chain.
   addProcess: (options = {}) => set((state) => {
     if (!state.bopData) return state;
 
@@ -859,42 +790,34 @@ const useBopStore = create((set) => ({
     } = options;
 
     const processes = state.bopData.processes;
+    const processDetails = state.bopData.process_details || [];
     const newId = generateNextProcessId(processes);
-    const childId = `${newId}-01`;
 
-    // Default position: rightmost process x + 5
+    // Default position: rightmost detail x + 5
     let newX = 0;
-    processes.forEach(p => {
-      if (p.location && !p.is_parent) {
-        newX = Math.max(newX, p.location.x);
+    processDetails.forEach(d => {
+      if (d.location) {
+        newX = Math.max(newX, d.location.x);
       }
     });
     newX += 5;
 
-    // Create parent + child pair (all processes are parent+child)
-    const newParent = {
+    // Create routing entry
+    const newProcess = {
       process_id: newId,
-      name,
-      description,
-      cycle_time_sec,
-      is_parent: true,
-      children: [childId],
       predecessor_ids: [],
       successor_ids: []
     };
 
-    const newChild = {
-      process_id: childId,
+    // Create detail entry
+    const newDetail = {
+      process_id: newId,
+      parallel_index: 1,
       name,
       description,
       cycle_time_sec,
-      parent_id: newId,
-      parallel_index: 1,
       location: { x: newX, y: 0, z: 0 },
-      rotation_y: 0,
-      predecessor_ids: [],
-      successor_ids: [],
-      resources: []
+      rotation_y: 0
     };
 
     let updatedProcesses = [...processes];
@@ -902,140 +825,74 @@ const useBopStore = create((set) => ({
     if (afterProcessId) {
       const afterProc = processes.find(p => p.process_id === afterProcessId);
       if (afterProc) {
-        // Resolve to parent for parallel children
-        const baseId = afterProc.parent_id || afterProc.process_id;
-        const baseProc = afterProc.parent_id
-          ? processes.find(p => p.process_id === afterProc.parent_id) || afterProc
-          : afterProc;
-        const oldSuccIds = [...(baseProc.successor_ids || [])];
+        const oldSuccIds = [...(afterProc.successor_ids || [])];
 
-        // Set links on both parent and child
-        newParent.predecessor_ids = [baseId];
-        newParent.successor_ids = oldSuccIds;
-        newChild.predecessor_ids = [baseId];
-        newChild.successor_ids = oldSuccIds;
+        newProcess.predecessor_ids = [afterProcessId];
+        newProcess.successor_ids = oldSuccIds;
 
         // Position after the reference process
-        const refProc = afterProc.is_parent
-          ? processes.find(p => p.parent_id === baseId)
-          : afterProc;
-        if (refProc?.location) {
-          newChild.location.x = refProc.location.x + 5;
+        const refDetails = processDetails.filter(d => d.process_id === afterProcessId);
+        if (refDetails.length > 0 && refDetails[0].location) {
+          newDetail.location.x = refDetails[0].location.x + 5;
         }
 
         // Reconnect links
         updatedProcesses = updatedProcesses.map(p => {
-          const pBaseId = p.parent_id || p.process_id;
-
-          // After-group: successor → newId
-          if (pBaseId === baseId) {
+          if (p.process_id === afterProcessId) {
             return { ...p, successor_ids: [newId] };
           }
-
-          // Old successor groups: predecessor baseId → newId
-          for (const succId of oldSuccIds) {
-            const succProc = processes.find(sp => sp.process_id === succId);
-            const succBaseId = succProc?.parent_id || succId;
-            if (pBaseId === succBaseId) {
-              return {
-                ...p,
-                predecessor_ids: (p.predecessor_ids || []).map(pid =>
-                  pid === baseId ? newId : pid
-                )
-              };
-            }
+          if (oldSuccIds.includes(p.process_id)) {
+            return {
+              ...p,
+              predecessor_ids: (p.predecessor_ids || []).map(pid =>
+                pid === afterProcessId ? newId : pid
+              )
+            };
           }
-
           return p;
         });
       }
     }
 
-    updatedProcesses.push(newParent, newChild);
+    updatedProcesses.push(newProcess);
 
     return {
-      bopData: { ...state.bopData, processes: updatedProcesses },
-      selectedProcessKey: childId,
+      bopData: {
+        ...state.bopData,
+        processes: updatedProcesses,
+        process_details: [...processDetails, newDetail]
+      },
+      selectedProcessKey: `${newId}:1`,
       activeTab: 'bop'
     };
   }),
 
-  // Update process properties (name, description, cycle_time_sec).
-  // For parallel groups, updates all siblings and parent together.
-  updateProcess: (processId, fields) => set((state) => {
+  // Update process detail properties (name, description, cycle_time_sec, location, rotation_y)
+  updateProcess: (processId, parallelIndex, fields) => set((state) => {
     if (!state.bopData) return state;
 
-    // Fields that can be updated individually per child process
-    const individualFields = ['name', 'description', 'cycle_time_sec'];
-    // Fields that update the entire parallel group
-    const groupFields = ['location', 'rotation_y'];
+    const allowedFields = ['name', 'description', 'cycle_time_sec', 'location', 'rotation_y'];
 
-    const individualUpdates = {};
-    const groupUpdates = {};
-
-    for (const key of individualFields) {
-      if (fields[key] !== undefined) individualUpdates[key] = fields[key];
-    }
-    for (const key of groupFields) {
-      if (fields[key] !== undefined) groupUpdates[key] = fields[key];
+    const updates = {};
+    for (const key of allowedFields) {
+      if (fields[key] !== undefined) updates[key] = fields[key];
     }
 
-    if (Object.keys(individualUpdates).length === 0 && Object.keys(groupUpdates).length === 0) {
-      return state;
-    }
+    if (Object.keys(updates).length === 0) return state;
 
-    const target = state.bopData.processes.find(p => p.process_id === processId);
-    if (!target) return state;
-
-    // Determine which processes to update for group fields
-    const groupIds = new Set();
-    if (Object.keys(groupUpdates).length > 0) {
-      groupIds.add(processId);
-      if (target.parent_id) {
-        groupIds.add(target.parent_id);
-        state.bopData.processes
-          .filter(p => p.parent_id === target.parent_id)
-          .forEach(p => groupIds.add(p.process_id));
-      } else if (target.is_parent && target.children) {
-        target.children.forEach(cid => groupIds.add(cid));
+    const updatedDetails = state.bopData.process_details.map(d => {
+      if (d.process_id === processId && d.parallel_index === parallelIndex) {
+        return { ...d, ...updates };
       }
-    }
-
-    let updatedProcesses = state.bopData.processes.map(process => {
-      let updated = process;
-
-      // Apply individual updates only to the specific process
-      if (process.process_id === processId && Object.keys(individualUpdates).length > 0) {
-        updated = { ...updated, ...individualUpdates };
-      }
-
-      // Apply group updates to all processes in the group
-      if (groupIds.has(process.process_id)) {
-        updated = { ...updated, ...groupUpdates };
-      }
-
-      return updated;
+      return d;
     });
 
-    // If we updated cycle_time_sec on a child, update parent to max of all children
-    if (individualUpdates.cycle_time_sec !== undefined && target.parent_id) {
-      const parentId = target.parent_id;
-      const allChildren = updatedProcesses.filter(p => p.parent_id === parentId);
-      if (allChildren.length > 0) {
-        const maxChildCT = Math.max(...allChildren.map(c => c.cycle_time_sec || 0));
-        updatedProcesses = updatedProcesses.map(p =>
-          p.process_id === parentId ? { ...p, cycle_time_sec: maxChildCT } : p
-        );
-      }
-    }
-
     return {
-      bopData: { ...state.bopData, processes: updatedProcesses }
+      bopData: { ...state.bopData, process_details: updatedDetails }
     };
   }),
 
-  // Delete a process. For parallel groups, deletes the entire group.
-  // Reconnects predecessor → successor links automatically.
+  // Delete an entire process (all parallel instances)
   deleteProcess: (processId) => set((state) => {
     if (!state.bopData) return state;
 
@@ -1043,201 +900,170 @@ const useBopStore = create((set) => ({
     const target = processes.find(p => p.process_id === processId);
     if (!target) return state;
 
-    // Collect all IDs to remove (entire parallel group)
-    const idsToRemove = new Set();
-    const baseId = target.parent_id || target.process_id;
+    const predIds = target.predecessor_ids || [];
+    const succIds = target.successor_ids || [];
 
-    if (target.is_parent || target.parent_id) {
-      // Parallel group: remove parent + all children
-      const parentId = target.parent_id || target.process_id;
-      idsToRemove.add(parentId);
-      processes.filter(p => p.parent_id === parentId).forEach(p => idsToRemove.add(p.process_id));
-    } else {
-      idsToRemove.add(processId);
-    }
-
-    // Get links from representative
-    const representative = processes.find(p => p.process_id === baseId) || target;
-    const predIds = representative.predecessor_ids || [];
-    const succIds = representative.successor_ids || [];
-
-    // Remove processes and reconnect links
+    // Remove from processes and reconnect links
     const updatedProcesses = processes
-      .filter(p => !idsToRemove.has(p.process_id))
+      .filter(p => p.process_id !== processId)
       .map(p => {
-        let newSucc = p.successor_ids;
-        let newPred = p.predecessor_ids;
+        let newSucc = p.successor_ids || [];
+        let newPred = p.predecessor_ids || [];
         let changed = false;
 
-        // Predecessors: replace baseId in successor_ids with deleted process's successors
-        if (newSucc?.includes(baseId)) {
-          newSucc = newSucc.flatMap(s => s === baseId ? succIds : [s]);
+        if (newSucc.includes(processId)) {
+          newSucc = newSucc.flatMap(s => s === processId ? succIds : [s]);
           changed = true;
         }
-
-        // Successors: replace baseId in predecessor_ids with deleted process's predecessors
-        if (newPred?.includes(baseId)) {
-          newPred = newPred.flatMap(pid => pid === baseId ? predIds : [pid]);
+        if (newPred.includes(processId)) {
+          newPred = newPred.flatMap(pid => pid === processId ? predIds : [pid]);
           changed = true;
         }
 
         return changed ? { ...p, successor_ids: newSucc, predecessor_ids: newPred } : p;
       });
 
-    return {
-      bopData: { ...state.bopData, processes: updatedProcesses },
-      selectedProcessKey: idsToRemove.has(state.selectedProcessKey) ? null : state.selectedProcessKey,
-      selectedResourceKey: null
-    };
-  }),
+    // Remove from process_details and resource_assignments
+    const updatedDetails = (state.bopData.process_details || []).filter(d => d.process_id !== processId);
+    const updatedAssignments = (state.bopData.resource_assignments || []).filter(r => r.process_id !== processId);
 
-  // Add a parallel line to a process or parallel group.
-  // All processes are parent+child, so resolve parentId and add a new child.
-  addParallelLine: (processId) => set((state) => {
-    if (!state.bopData) return state;
-
-    const processes = state.bopData.processes;
-    const target = processes.find(p => p.process_id === processId);
-    if (!target) return state;
-
-    // Resolve parentId: target is either parent or child
-    const parentId = target.is_parent ? target.process_id : target.parent_id;
-    if (!parentId) return state;
-
-    const siblings = processes
-      .filter(p => p.parent_id === parentId)
-      .sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0));
-    if (siblings.length === 0) return state;
-
-    const nextIndex = Math.max(...siblings.map(s => s.parallel_index ?? 1)) + 1;
-    const newChildId = `${parentId}-${String(nextIndex).padStart(2, '0')}`;
-    const firstSibling = siblings[0];
-
-    const { clonedResources, newEquipments, newWorkers } =
-      cloneResourcesForNewLine(firstSibling.resources || [], state.bopData);
-
-    const newChild = {
-      process_id: newChildId,
-      name: firstSibling.name,
-      description: firstSibling.description,
-      cycle_time_sec: firstSibling.cycle_time_sec,
-      parent_id: parentId,
-      parallel_index: nextIndex,
-      location: {
-        x: firstSibling.location.x,
-        y: firstSibling.location.y || 0,
-        z: firstSibling.location.z + (nextIndex - 1) * 5
-      },
-      rotation_y: firstSibling.rotation_y || 0,
-      predecessor_ids: firstSibling.predecessor_ids || [],
-      successor_ids: firstSibling.successor_ids || [],
-      resources: clonedResources
-    };
-
-    const updatedProcesses = processes.map(p => {
-      if (p.process_id === parentId && p.is_parent) {
-        return { ...p, children: [...(p.children || []), newChildId] };
-      }
-      return p;
-    });
-    updatedProcesses.push(newChild);
+    // Update selection
+    const isDeleted = state.selectedProcessKey?.startsWith(`${processId}:`);
 
     return {
       bopData: {
         ...state.bopData,
         processes: updatedProcesses,
+        process_details: updatedDetails,
+        resource_assignments: updatedAssignments
+      },
+      selectedProcessKey: isDeleted ? null : state.selectedProcessKey,
+      selectedResourceKey: null
+    };
+  }),
+
+  // Add a parallel instance to a process
+  addParallelLine: (processId) => set((state) => {
+    if (!state.bopData) return state;
+
+    const details = getDetailsForProcess(state.bopData, processId);
+    if (details.length === 0) return state;
+
+    const sortedDetails = [...details].sort((a, b) => a.parallel_index - b.parallel_index);
+    const firstDetail = sortedDetails[0];
+    const nextIndex = Math.max(...details.map(d => d.parallel_index)) + 1;
+
+    // Clone resources from first instance
+    const firstResources = getResourcesForDetail(state.bopData, processId, firstDetail.parallel_index);
+    const { clonedResources, newEquipments, newWorkers } =
+      cloneResourcesForNewLine(firstResources, state.bopData);
+
+    // New detail
+    const newDetail = {
+      process_id: processId,
+      parallel_index: nextIndex,
+      name: firstDetail.name,
+      description: firstDetail.description || '',
+      cycle_time_sec: firstDetail.cycle_time_sec,
+      location: {
+        x: firstDetail.location?.x || 0,
+        y: firstDetail.location?.y || 0,
+        z: (firstDetail.location?.z || 0) + (nextIndex - 1) * 5
+      },
+      rotation_y: firstDetail.rotation_y || 0
+    };
+
+    // New resource assignments with correct process_id and parallel_index
+    const newAssignments = clonedResources.map(r => ({
+      ...r,
+      process_id: processId,
+      parallel_index: nextIndex
+    }));
+
+    return {
+      bopData: {
+        ...state.bopData,
+        process_details: [...(state.bopData.process_details || []), newDetail],
+        resource_assignments: [...(state.bopData.resource_assignments || []), ...newAssignments],
         equipments: [...(state.bopData.equipments || []), ...newEquipments],
         workers: [...(state.bopData.workers || []), ...newWorkers]
       },
-      selectedProcessKey: newChildId,
+      selectedProcessKey: `${processId}:${nextIndex}`,
       activeTab: 'bop'
     };
   }),
 
-  // Remove a parallel line from a parallel group.
-  // Always keeps parent+child structure; re-indexes remaining children sequentially.
-  removeParallelLine: (processId) => set((state) => {
+  // Remove a parallel instance from a process
+  removeParallelLine: (processId, parallelIndex) => set((state) => {
     if (!state.bopData) return state;
 
-    const processes = state.bopData.processes;
-    const target = processes.find(p => p.process_id === processId);
-    if (!target) return state;
+    const details = getDetailsForProcess(state.bopData, processId);
+    if (details.length <= 1) return state; // Can't remove last one
 
-    // Only children can be removed (not parent)
-    if (!target.parent_id) return state;
+    // Remove detail and assignments for this index
+    let updatedDetails = (state.bopData.process_details || []).filter(
+      d => !(d.process_id === processId && d.parallel_index === parallelIndex)
+    );
+    let updatedAssignments = (state.bopData.resource_assignments || []).filter(
+      r => !(r.process_id === processId && r.parallel_index === parallelIndex)
+    );
 
-    const parentId = target.parent_id;
-    const siblings = processes.filter(p => p.parent_id === parentId);
+    // Re-index remaining parallel_indexes to be sequential (1-based)
+    const remainingDetails = updatedDetails
+      .filter(d => d.process_id === processId)
+      .sort((a, b) => a.parallel_index - b.parallel_index);
 
-    // Can't remove if only 1 child left
-    if (siblings.length <= 1) return state;
-
-    // Remove the target child
-    let updatedProcesses = processes.filter(p => p.process_id !== processId);
-
-    // Sort remaining siblings for re-indexing
-    const remainingSiblings = updatedProcesses
-      .filter(p => p.parent_id === parentId)
-      .sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0));
-
-    // Build ID mapping: oldId → newId (for re-indexing)
-    const idMap = {};
-    const newChildrenIds = [];
-    remainingSiblings.forEach((s, idx) => {
-      const newIdx = idx + 1;  // 1-based
-      const newId = `${parentId}-${String(newIdx).padStart(2, '0')}`;
-      newChildrenIds.push(newId);
-      if (s.process_id !== newId) {
-        idMap[s.process_id] = newId;
-      }
+    const indexMap = {}; // oldIndex -> newIndex
+    remainingDetails.forEach((d, idx) => {
+      indexMap[d.parallel_index] = idx + 1;
     });
 
-    // Apply re-indexing: update parent's children, rename child IDs and parallel_index
-    updatedProcesses = updatedProcesses.map(p => {
-      // Update parent's children array
-      if (p.process_id === parentId && p.is_parent) {
-        return { ...p, children: newChildrenIds };
+    updatedDetails = updatedDetails.map(d => {
+      if (d.process_id === processId && indexMap[d.parallel_index] !== undefined) {
+        return { ...d, parallel_index: indexMap[d.parallel_index] };
       }
-      // Re-index siblings: update process_id and parallel_index
-      if (p.parent_id === parentId) {
-        const sortedIdx = remainingSiblings.findIndex(s => s.process_id === p.process_id);
-        if (sortedIdx >= 0) {
-          const newIdx = sortedIdx + 1;
-          return {
-            ...p,
-            process_id: `${parentId}-${String(newIdx).padStart(2, '0')}`,
-            parallel_index: newIdx
-          };
-        }
-      }
-      return p;
+      return d;
     });
 
-    // Update selection if it was the deleted or renamed process
+    updatedAssignments = updatedAssignments.map(r => {
+      if (r.process_id === processId && indexMap[r.parallel_index] !== undefined) {
+        return { ...r, parallel_index: indexMap[r.parallel_index] };
+      }
+      return r;
+    });
+
+    // Update selection
     let newSelectedProcess = state.selectedProcessKey;
-    if (newSelectedProcess === processId) {
+    if (newSelectedProcess === `${processId}:${parallelIndex}`) {
       newSelectedProcess = null;
-    } else if (idMap[newSelectedProcess]) {
-      newSelectedProcess = idMap[newSelectedProcess];
+    } else if (newSelectedProcess?.startsWith(`${processId}:`)) {
+      const oldIdx = parseInt(newSelectedProcess.split(':')[1], 10);
+      if (indexMap[oldIdx] !== undefined) {
+        newSelectedProcess = `${processId}:${indexMap[oldIdx]}`;
+      }
     }
 
-    // Update resource selection if it referenced deleted or renamed process
+    // Update resource selection
     let newSelectedResource = state.selectedResourceKey;
     if (newSelectedResource) {
-      if (newSelectedResource.endsWith(`:${processId}`)) {
-        newSelectedResource = null;
-      } else {
-        for (const [oldId, newId] of Object.entries(idMap)) {
-          if (newSelectedResource.endsWith(`:${oldId}`)) {
-            newSelectedResource = newSelectedResource.replace(`:${oldId}`, `:${newId}`);
-            break;
-          }
+      const parts = newSelectedResource.split(':');
+      if (parts.length >= 4 && parts[2] === processId) {
+        const resParIdx = parseInt(parts[3], 10);
+        if (resParIdx === parallelIndex) {
+          newSelectedResource = null;
+        } else if (indexMap[resParIdx] !== undefined) {
+          parts[3] = String(indexMap[resParIdx]);
+          newSelectedResource = parts.join(':');
         }
       }
     }
 
     return {
-      bopData: { ...state.bopData, processes: updatedProcesses },
+      bopData: {
+        ...state.bopData,
+        process_details: updatedDetails,
+        resource_assignments: updatedAssignments
+      },
       selectedProcessKey: newSelectedProcess,
       selectedResourceKey: newSelectedResource
     };
@@ -1248,42 +1074,21 @@ const useBopStore = create((set) => ({
   // ===================================================================
 
   linkProcesses: (fromId, toId) => set((state) => {
-    if (!state.bopData) return state;
+    if (!state.bopData || fromId === toId) return state;
     const processes = state.bopData.processes;
 
-    const fromGroup = getGroupIds(processes, fromId);
-    const toGroup = getGroupIds(processes, toId);
-
-    // Self-link → no-op
-    if (fromGroup.baseId === toGroup.baseId) return state;
-
-    // Already linked → no-op
-    const fromBase = processes.find(p => p.process_id === fromGroup.baseId);
-    if (fromBase && (fromBase.successor_ids || []).includes(toGroup.baseId)) return state;
+    const fromProc = processes.find(p => p.process_id === fromId);
+    if (!fromProc) return state;
+    if ((fromProc.successor_ids || []).includes(toId)) return state;
 
     const updatedProcesses = processes.map(p => {
-      const pId = p.process_id;
-      let changed = false;
-      let newSucc = p.successor_ids || [];
-      let newPred = p.predecessor_ids || [];
-
-      // From group members: add toBaseId to successor_ids
-      if (fromGroup.memberIds.includes(pId)) {
-        if (!newSucc.includes(toGroup.baseId)) {
-          newSucc = [...newSucc, toGroup.baseId];
-          changed = true;
-        }
+      if (p.process_id === fromId) {
+        return { ...p, successor_ids: [...(p.successor_ids || []), toId] };
       }
-
-      // To group members: add fromBaseId to predecessor_ids
-      if (toGroup.memberIds.includes(pId)) {
-        if (!newPred.includes(fromGroup.baseId)) {
-          newPred = [...newPred, fromGroup.baseId];
-          changed = true;
-        }
+      if (p.process_id === toId) {
+        return { ...p, predecessor_ids: [...(p.predecessor_ids || []), fromId] };
       }
-
-      return changed ? { ...p, successor_ids: newSucc, predecessor_ids: newPred } : p;
+      return p;
     });
 
     return { bopData: { ...state.bopData, processes: updatedProcesses } };
@@ -1293,124 +1098,97 @@ const useBopStore = create((set) => ({
     if (!state.bopData) return state;
     const processes = state.bopData.processes;
 
-    const fromGroup = getGroupIds(processes, fromId);
-    const toGroup = getGroupIds(processes, toId);
-
     const updatedProcesses = processes.map(p => {
-      const pId = p.process_id;
-      let changed = false;
-      let newSucc = p.successor_ids || [];
-      let newPred = p.predecessor_ids || [];
-
-      // From group members: remove toBaseId from successor_ids
-      if (fromGroup.memberIds.includes(pId) && newSucc.includes(toGroup.baseId)) {
-        newSucc = newSucc.filter(id => id !== toGroup.baseId);
-        changed = true;
+      if (p.process_id === fromId) {
+        return { ...p, successor_ids: (p.successor_ids || []).filter(id => id !== toId) };
       }
-
-      // To group members: remove fromBaseId from predecessor_ids
-      if (toGroup.memberIds.includes(pId) && newPred.includes(fromGroup.baseId)) {
-        newPred = newPred.filter(id => id !== fromGroup.baseId);
-        changed = true;
+      if (p.process_id === toId) {
+        return { ...p, predecessor_ids: (p.predecessor_ids || []).filter(id => id !== fromId) };
       }
-
-      return changed ? { ...p, successor_ids: newSucc, predecessor_ids: newPred } : p;
+      return p;
     });
 
     return { bopData: { ...state.bopData, processes: updatedProcesses } };
   }),
 
   // ===================================================================
-  // Resource CRUD (resource ↔ process assignment)
+  // Resource CRUD (resource ↔ process instance assignment)
   // ===================================================================
 
-  // Add a resource to a process
-  addResourceToProcess: (processId, resourceData) => set((state) => {
+  addResourceToProcess: (processId, parallelIndex, resourceData) => set((state) => {
     if (!state.bopData) return state;
 
-    const { resource_type, resource_id, quantity = 1, role = '' } = resourceData;
+    const { resource_type, resource_id, quantity = 1 } = resourceData;
     if (!resource_type || !resource_id) return state;
 
-    const newResource = {
+    // Prevent duplicates
+    const exists = (state.bopData.resource_assignments || []).some(
+      r => r.process_id === processId && r.parallel_index === parallelIndex &&
+           r.resource_type === resource_type && r.resource_id === resource_id
+    );
+    if (exists) return state;
+
+    const newAssignment = {
+      process_id: processId,
+      parallel_index: parallelIndex,
       resource_type,
       resource_id,
       quantity,
-      role,
       relative_location: { x: 0, y: 0, z: 0 },
       rotation_y: 0,
-      scale: { x: 1, y: 1, z: 1 }
+      scale: { x: 1, y: 1, z: 1 },
+      computed_size: computeResourceSize({ resource_type, resource_id }, state.bopData.equipments)
     };
 
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (process.process_id === processId) {
-        // Prevent duplicates
-        const exists = (process.resources || []).some(
-          r => r.resource_type === resource_type && r.resource_id === resource_id
-        );
-        if (exists) return process;
-
-        return {
-          ...process,
-          resources: [...(process.resources || []), newResource]
-        };
-      }
-      return process;
-    });
-
     return {
-      bopData: { ...state.bopData, processes: updatedProcesses }
+      bopData: {
+        ...state.bopData,
+        resource_assignments: [...(state.bopData.resource_assignments || []), newAssignment]
+      }
     };
   }),
 
-  // Update resource properties within a process (role, quantity)
-  updateResourceInProcess: (processId, resourceType, resourceId, fields) => set((state) => {
+  updateResourceInProcess: (processId, parallelIndex, resourceType, resourceId, fields) => set((state) => {
     if (!state.bopData) return state;
 
-    const allowedFields = ['role', 'quantity'];
+    const allowedFields = ['quantity'];
 
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (process.process_id === processId) {
-        const updatedResources = (process.resources || []).map(resource => {
-          if (resource.resource_type === resourceType && resource.resource_id === resourceId) {
-            const updates = {};
-            for (const key of allowedFields) {
-              if (fields[key] !== undefined) updates[key] = fields[key];
-            }
-            return { ...resource, ...updates };
-          }
-          return resource;
-        });
-        return { ...process, resources: updatedResources };
+    const updatedAssignments = (state.bopData.resource_assignments || []).map(r => {
+      if (r.process_id === processId && r.parallel_index === parallelIndex &&
+          r.resource_type === resourceType && r.resource_id === resourceId) {
+        const updates = {};
+        for (const key of allowedFields) {
+          if (fields[key] !== undefined) updates[key] = fields[key];
+        }
+        return { ...r, ...updates };
       }
-      return process;
+      return r;
     });
 
     return {
-      bopData: { ...state.bopData, processes: updatedProcesses }
+      bopData: { ...state.bopData, resource_assignments: updatedAssignments }
     };
   }),
 
-  // Remove a resource from a process
-  removeResourceFromProcess: (processId, resourceType, resourceId) => set((state) => {
+  removeResourceFromProcess: (processId, parallelIndex, resourceType, resourceId) => set((state) => {
     if (!state.bopData) return state;
 
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (process.process_id === processId) {
-        const filtered = (process.resources || []).filter(
-          r => !(r.resource_type === resourceType && r.resource_id === resourceId)
-        );
-        if (filtered.length === (process.resources || []).length) return process;
+    const updatedAssignments = (state.bopData.resource_assignments || []).filter(
+      r => !(r.process_id === processId && r.parallel_index === parallelIndex &&
+             r.resource_type === resourceType && r.resource_id === resourceId)
+    );
 
-        const updatedProcess = { ...process, resources: filtered };
-        return normalizeProcessCenter(updatedProcess, state.bopData.equipments);
-      }
-      return process;
-    });
+    if (updatedAssignments.length === (state.bopData.resource_assignments || []).length) {
+      return state; // Nothing removed
+    }
 
-    const resourceKey = `${resourceType}:${resourceId}:${processId}`;
+    let bopData = { ...state.bopData, resource_assignments: updatedAssignments };
+    bopData = normalizeProcessCenter(bopData, processId, parallelIndex);
+
+    const resourceKey = `${resourceType}:${resourceId}:${processId}:${parallelIndex}`;
 
     return {
-      bopData: { ...state.bopData, processes: updatedProcesses },
+      bopData,
       selectedResourceKey: state.selectedResourceKey === resourceKey ? null : state.selectedResourceKey
     };
   }),
@@ -1425,10 +1203,8 @@ const useBopStore = create((set) => ({
     const equipments = state.bopData.equipments || [];
     const newId = data.equipment_id || generateNextEquipmentId(equipments);
 
-    // Prevent duplicate ID
     if (equipments.some(e => e.equipment_id === newId)) return state;
 
-    // Extract number from ID (e.g., "EQ001" -> "001")
     const idNumber = newId.match(/\d+/)?.[0] || '';
     const defaultName = idNumber ? `새 장비 ${idNumber}` : '새 장비';
 
@@ -1458,12 +1234,23 @@ const useBopStore = create((set) => ({
       return eq;
     });
 
+    // If type changed, recalculate computed_size for all resource_assignments referencing this equipment
+    let updatedAssignments = state.bopData.resource_assignments || [];
+    if (fields.type !== undefined) {
+      const newSize = getResourceSize('equipment', fields.type);
+      updatedAssignments = updatedAssignments.map(r => {
+        if (r.resource_type === 'equipment' && r.resource_id === equipmentId) {
+          return { ...r, computed_size: newSize };
+        }
+        return r;
+      });
+    }
+
     return {
-      bopData: { ...state.bopData, equipments: updatedEquipments }
+      bopData: { ...state.bopData, equipments: updatedEquipments, resource_assignments: updatedAssignments }
     };
   }),
 
-  // Delete equipment from master list AND remove from all processes
   deleteEquipment: (equipmentId) => set((state) => {
     if (!state.bopData) return state;
 
@@ -1471,22 +1258,27 @@ const useBopStore = create((set) => ({
       eq => eq.equipment_id !== equipmentId
     );
 
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (!process.resources) return process;
-      const filtered = process.resources.filter(
-        r => !(r.resource_type === 'equipment' && r.resource_id === equipmentId)
-      );
-      if (filtered.length !== process.resources.length) {
-        const updatedProcess = { ...process, resources: filtered };
-        return normalizeProcessCenter(updatedProcess, updatedEquipments);
+    // Find affected instances before removing
+    const affectedInstances = new Set();
+    (state.bopData.resource_assignments || []).forEach(r => {
+      if (r.resource_type === 'equipment' && r.resource_id === equipmentId) {
+        affectedInstances.add(`${r.process_id}:${r.parallel_index}`);
       }
-      return process;
     });
 
-    return {
-      bopData: { ...state.bopData, equipments: updatedEquipments, processes: updatedProcesses },
-      selectedResourceKey: null
-    };
+    const updatedAssignments = (state.bopData.resource_assignments || []).filter(
+      r => !(r.resource_type === 'equipment' && r.resource_id === equipmentId)
+    );
+
+    let bopData = { ...state.bopData, equipments: updatedEquipments, resource_assignments: updatedAssignments };
+
+    // Normalize affected instances
+    for (const key of affectedInstances) {
+      const [pid, pidxStr] = key.split(':');
+      bopData = normalizeProcessCenter(bopData, pid, parseInt(pidxStr, 10));
+    }
+
+    return { bopData, selectedResourceKey: null };
   }),
 
   // ===================================================================
@@ -1501,7 +1293,6 @@ const useBopStore = create((set) => ({
 
     if (workers.some(w => w.worker_id === newId)) return state;
 
-    // Extract number from ID (e.g., "W001" -> "001")
     const idNumber = newId.match(/\d+/)?.[0] || '';
     const defaultName = idNumber ? `새 작업자 ${idNumber}` : '새 작업자';
 
@@ -1536,7 +1327,6 @@ const useBopStore = create((set) => ({
     };
   }),
 
-  // Delete worker from master list AND remove from all processes
   deleteWorker: (workerId) => set((state) => {
     if (!state.bopData) return state;
 
@@ -1544,22 +1334,25 @@ const useBopStore = create((set) => ({
       w => w.worker_id !== workerId
     );
 
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (!process.resources) return process;
-      const filtered = process.resources.filter(
-        r => !(r.resource_type === 'worker' && r.resource_id === workerId)
-      );
-      if (filtered.length !== process.resources.length) {
-        const updatedProcess = { ...process, resources: filtered };
-        return normalizeProcessCenter(updatedProcess, state.bopData.equipments);
+    const affectedInstances = new Set();
+    (state.bopData.resource_assignments || []).forEach(r => {
+      if (r.resource_type === 'worker' && r.resource_id === workerId) {
+        affectedInstances.add(`${r.process_id}:${r.parallel_index}`);
       }
-      return process;
     });
 
-    return {
-      bopData: { ...state.bopData, workers: updatedWorkers, processes: updatedProcesses },
-      selectedResourceKey: null
-    };
+    const updatedAssignments = (state.bopData.resource_assignments || []).filter(
+      r => !(r.resource_type === 'worker' && r.resource_id === workerId)
+    );
+
+    let bopData = { ...state.bopData, workers: updatedWorkers, resource_assignments: updatedAssignments };
+
+    for (const key of affectedInstances) {
+      const [pid, pidxStr] = key.split(':');
+      bopData = normalizeProcessCenter(bopData, pid, parseInt(pidxStr, 10));
+    }
+
+    return { bopData, selectedResourceKey: null };
   }),
 
   // ===================================================================
@@ -1574,7 +1367,6 @@ const useBopStore = create((set) => ({
 
     if (materials.some(m => m.material_id === newId)) return state;
 
-    // Extract number from ID (e.g., "M001" -> "001")
     const idNumber = newId.match(/\d+/)?.[0] || '';
     const defaultName = idNumber ? `새 자재 ${idNumber}` : '새 자재';
 
@@ -1609,7 +1401,6 @@ const useBopStore = create((set) => ({
     };
   }),
 
-  // Delete material from master list AND remove from all processes
   deleteMaterial: (materialId) => set((state) => {
     if (!state.bopData) return state;
 
@@ -1617,29 +1408,31 @@ const useBopStore = create((set) => ({
       m => m.material_id !== materialId
     );
 
-    const updatedProcesses = state.bopData.processes.map(process => {
-      if (!process.resources) return process;
-      const filtered = process.resources.filter(
-        r => !(r.resource_type === 'material' && r.resource_id === materialId)
-      );
-      if (filtered.length !== process.resources.length) {
-        const updatedProcess = { ...process, resources: filtered };
-        return normalizeProcessCenter(updatedProcess, state.bopData.equipments);
+    const affectedInstances = new Set();
+    (state.bopData.resource_assignments || []).forEach(r => {
+      if (r.resource_type === 'material' && r.resource_id === materialId) {
+        affectedInstances.add(`${r.process_id}:${r.parallel_index}`);
       }
-      return process;
     });
 
-    return {
-      bopData: { ...state.bopData, materials: updatedMaterials, processes: updatedProcesses },
-      selectedResourceKey: null
-    };
+    const updatedAssignments = (state.bopData.resource_assignments || []).filter(
+      r => !(r.resource_type === 'material' && r.resource_id === materialId)
+    );
+
+    let bopData = { ...state.bopData, materials: updatedMaterials, resource_assignments: updatedAssignments };
+
+    for (const key of affectedInstances) {
+      const [pid, pidxStr] = key.split(':');
+      bopData = normalizeProcessCenter(bopData, pid, parseInt(pidxStr, 10));
+    }
+
+    return { bopData, selectedResourceKey: null };
   }),
 
   // ===================================================================
   // Obstacle CRUD
   // ===================================================================
 
-  // Select an obstacle (with auto tab switching)
   setSelectedObstacle: (obstacleId) => set({
     selectedObstacleId: obstacleId,
     selectedProcessKey: null,
@@ -1649,26 +1442,22 @@ const useBopStore = create((set) => ({
 
   clearObstacleSelection: () => set({ selectedObstacleId: null }),
 
-  // Get obstacle by ID
   getObstacleById: (obstacleId) => {
     const state = useBopStore.getState();
     if (!state.bopData || !state.bopData.obstacles) return null;
     return state.bopData.obstacles.find(o => o.obstacle_id === obstacleId);
   },
 
-  // Add a new obstacle
   addObstacle: (data = {}) => set((state) => {
     if (!state.bopData) return state;
 
     const obstacles = state.bopData.obstacles || [];
     const newId = data.obstacle_id || generateNextObstacleId(obstacles);
 
-    // Prevent duplicate ID
     if (obstacles.some(o => o.obstacle_id === newId)) return state;
 
     const obstacleType = data.type || state.pendingObstacleType || 'fence';
 
-    // Default size based on obstacle type
     const getDefaultSize = (type) => {
       switch (type) {
         case 'fence': return { width: 3, height: 1.5, depth: 0.1 };
@@ -1679,7 +1468,6 @@ const useBopStore = create((set) => ({
       }
     };
 
-    // Type-specific name
     const getDefaultName = (type) => {
       switch (type) {
         case 'fence': return '안전 펜스';
@@ -1706,7 +1494,6 @@ const useBopStore = create((set) => ({
     };
   }),
 
-  // Update obstacle properties
   updateObstacle: (obstacleId, fields) => set((state) => {
     if (!state.bopData) return state;
 
@@ -1727,7 +1514,6 @@ const useBopStore = create((set) => ({
     };
   }),
 
-  // Delete an obstacle
   deleteObstacle: (obstacleId) => set((state) => {
     if (!state.bopData) return state;
 
@@ -1751,10 +1537,25 @@ const useBopStore = create((set) => ({
     pendingObstacleType: type || state.pendingObstacleType
   })),
 
-  // Toggle 3D models on/off
   toggleUse3DModels: () => set((state) => ({
     use3DModels: !state.use3DModels
   })),
+
+  setCustomModel: (resourceType, resourceId, blobUrl) => set((state) => {
+    const key = `${resourceType}:${resourceId}`;
+    // Revoke old blob URL if replacing
+    const oldUrl = state.customModels[key];
+    if (oldUrl) URL.revokeObjectURL(oldUrl);
+    return { customModels: { ...state.customModels, [key]: blobUrl } };
+  }),
+
+  removeCustomModel: (resourceType, resourceId) => set((state) => {
+    const key = `${resourceType}:${resourceId}`;
+    const oldUrl = state.customModels[key];
+    if (oldUrl) URL.revokeObjectURL(oldUrl);
+    const { [key]: _removed, ...rest } = state.customModels;
+    return { customModels: rest };
+  }),
 
   setPendingObstacleType: (type) => set({ pendingObstacleType: type }),
 
@@ -1762,7 +1563,6 @@ const useBopStore = create((set) => ({
     obstacleCreationFirstClick: point
   }),
 
-  // Create obstacle from two corner points
   createObstacleFromTwoClicks: (corner1, corner2) => set((state) => {
     if (!state.bopData) return state;
 
@@ -1770,13 +1570,11 @@ const useBopStore = create((set) => ({
     const newId = generateNextObstacleId(obstacles);
     const obstacleType = state.pendingObstacleType || 'fence';
 
-    // Calculate center and size from two corners
     const centerX = (corner1.x + corner2.x) / 2;
     const centerZ = (corner1.z + corner2.z) / 2;
     const width = Math.abs(corner2.x - corner1.x);
     const depth = Math.abs(corner2.z - corner1.z);
 
-    // Default height based on obstacle type
     const getDefaultHeight = (type) => {
       switch (type) {
         case 'fence': return 1.5;
@@ -1787,7 +1585,6 @@ const useBopStore = create((set) => ({
       }
     };
 
-    // Type-specific name
     const getDefaultName = (type) => {
       switch (type) {
         case 'fence': return '안전 펜스';
@@ -1820,37 +1617,31 @@ const useBopStore = create((set) => ({
   // Scenario Management (localStorage)
   // ===================================================================
 
-  // Save current BOP as a scenario (collapsed format for consistency with exports)
   saveScenario: (name) => {
     const state = useBopStore.getState();
     if (!state.bopData) {
       throw new Error('저장할 BOP 데이터가 없습니다.');
     }
 
-    // Save in collapsed format for consistency with JSON/Excel exports
-    const collapsedData = collapseParallelProcesses(state.bopData);
-
+    // Save directly (no collapse needed - flat structure)
     const scenarios = JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
     const now = new Date().toISOString();
 
-    // Check if scenario with this name exists
     const existingIndex = scenarios.findIndex(s => s.name === name);
 
     if (existingIndex >= 0) {
-      // Update existing
       scenarios[existingIndex] = {
         ...scenarios[existingIndex],
         updatedAt: now,
-        data: collapsedData
+        data: state.bopData
       };
     } else {
-      // Create new
       const newScenario = {
         id: `scenario-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         name,
         createdAt: now,
         updatedAt: now,
-        data: collapsedData
+        data: state.bopData
       };
       scenarios.push(newScenario);
     }
@@ -1859,7 +1650,6 @@ const useBopStore = create((set) => ({
     return scenarios;
   },
 
-  // Load a scenario (expand parallel processes for UI)
   loadScenario: (id) => set((state) => {
     const scenarios = JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
     const scenario = scenarios.find(s => s.id === id);
@@ -1868,18 +1658,18 @@ const useBopStore = create((set) => ({
       throw new Error('시나리오를 찾을 수 없습니다.');
     }
 
-    // Expand parallel processes for UI rendering
-    const expandedData = expandParallelProcesses(scenario.data);
+    // Migrate old format if needed, then load directly
+    const migrated = migrateOldFormat(scenario.data);
+    const withSizes = ensureComputedSizes(migrated);
 
     return {
-      bopData: expandedData,
+      bopData: withSizes,
       selectedProcessKey: null,
       selectedResourceKey: null,
       selectedObstacleId: null
     };
   }),
 
-  // Delete a scenario
   deleteScenario: (id) => {
     const scenarios = JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
     const filtered = scenarios.filter(s => s.id !== id);
@@ -1887,17 +1677,17 @@ const useBopStore = create((set) => ({
     return filtered;
   },
 
-  // List all scenarios
   listScenarios: () => {
     return JSON.parse(localStorage.getItem('bop_scenarios') || '[]');
   },
 
-  // Create new empty scenario
   createNewScenario: () => set(() => ({
     bopData: {
       project_title: "새 프로젝트",
       target_uph: 60,
       processes: [],
+      process_details: [],
+      resource_assignments: [],
       equipments: [],
       workers: [],
       materials: [],

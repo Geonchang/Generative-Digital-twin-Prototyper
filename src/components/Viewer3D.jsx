@@ -2,7 +2,8 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Grid, Text, Line, TransformControls } from '@react-three/drei';
 import useBopStore from '../store/bopStore';
 import { useState, useMemo, useCallback, useRef, useEffect, Suspense } from 'react';
-import { RobotModel, ConveyorModel, BoxModel, ScannerModel, WorkerModel } from './Models3D';
+import { RobotModel, ConveyorModel, BoxModel, ScannerModel, WorkerModel, CustomModel } from './Models3D';
+import useTranslation from '../i18n/useTranslation';
 
 // Helper function: Normalize angle to [-π, π] range
 function normalizeAngle(angle) {
@@ -39,7 +40,7 @@ export function getResourceSize(resourceType, equipmentType) {
 }
 
 // Process Box Component
-function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformMouseDown, onTransformMouseUp, isDraggingTransformRef }) {
+function ProcessBox({ process, isSelected, onSelect, onTransformMouseDown, onTransformMouseUp, isDraggingTransformRef }) {
   const [hovered, setHovered] = useState(false);
   const [transformMode, setTransformMode] = useState('translate'); // 'translate', 'rotate'
   const [activeAxis, setActiveAxis] = useState(null); // 현재 드래그 중인 축 ('X', 'Y', 'Z', 'XY', etc.)
@@ -71,7 +72,9 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
 
   // 바운딩 박스 계산: 이 공정의 모든 리소스를 포함
   const calculateBoundingBox = () => {
-    const resources = process.resources || [];
+    const resources = (bopData?.resource_assignments || []).filter(
+      r => r.process_id === process.process_id && r.parallel_index === process.parallel_index
+    );
 
     if (resources.length === 0) {
       // 리소스가 없으면 아주 작은 크기
@@ -114,7 +117,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
         }
       }
 
-      const baseSize = getResourceSize(resource.resource_type, equipmentType);
+      const baseSize = resource.computed_size || getResourceSize(resource.resource_type, equipmentType);
 
       // 실제 크기 = 기본 크기 × scale
       const actualWidth = baseSize.width * scale.x;
@@ -211,11 +214,11 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
         y: 0,
         z: groupRef.current.position.z
       };
-      updateProcessLocation(process.process_id, newLocation);
+      updateProcessLocation(process.process_id, process.parallel_index, newLocation);
     } else if (transformMode === 'rotate' && isRotatingRef.current) {
       // 커스텀 회전값 저장
       const finalRotation = normalizeAngle(currentRotationRef.current);
-      updateProcessRotation(process.process_id, finalRotation);
+      updateProcessRotation(process.process_id, process.parallel_index, finalRotation);
       isRotatingRef.current = false;
     }
 
@@ -251,7 +254,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
     const handleMouseUp = () => {
       if (isRotatingRef.current) {
         const finalRotation = normalizeAngle(currentRotationRef.current);
-        updateProcessRotation(process.process_id, finalRotation);
+        updateProcessRotation(process.process_id, process.parallel_index, finalRotation);
         isRotatingRef.current = false;
         setIsRotating(false);
       }
@@ -263,7 +266,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     onTransformMouseDown?.();
-  }, [transformMode, rotationY, process.process_id, updateProcessRotation, onTransformMouseDown, onTransformMouseUp]);
+  }, [transformMode, rotationY, process.process_id, process.parallel_index, updateProcessRotation, onTransformMouseDown, onTransformMouseUp]);
 
   // 커스텀 회전 중 회전값 유지
   useFrame(() => {
@@ -455,7 +458,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
       </Text>
 
       {/* Parallel indicator */}
-      {parallelIndex > 0 && (
+      {process.parallel_index > 1 && (
         <Text
           position={[0, 1.9, 0]}
           fontSize={0.12}
@@ -463,7 +466,7 @@ function ProcessBox({ process, parallelIndex, isSelected, onSelect, onTransformM
           anchorX="center"
           anchorY="middle"
         >
-          (병렬 #{parallelIndex + 1})
+          (병렬 #{process.parallel_index})
         </Text>
       )}
 
@@ -554,7 +557,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   const [hoveredAxis, setHoveredAxis] = useState(null); // 마우스 hover 중인 축
   const [rotationRingHovered, setRotationRingHovered] = useState(false); // 회전 링 hover 상태
   const [isRotating, setIsRotating] = useState(false); // 회전 중 상태 (UI용)
-  const { selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceRotation, updateResourceScale, obstacleCreationMode, use3DModels } = useBopStore();
+  const { selectedResourceKey, setSelectedResource, updateResourceLocation, updateResourceRotation, updateResourceScale, obstacleCreationMode, use3DModels, customModels } = useBopStore();
 
   const groupRef = useRef();
   const transformControlsRef = useRef();
@@ -613,6 +616,14 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   };
 
   const getGeometry = () => {
+    // Custom model check
+    const customKey = `${resource.resource_type}:${resource.resource_id}`;
+    const customUrl = customModels?.[customKey];
+    if (use3DModels && customUrl) {
+      const baseSize = resource.computed_size || getResourceSize(resource.resource_type, equipmentData?.type);
+      return { type: 'glb', model: 'custom', customUrl, args: [baseSize.width, baseSize.height, baseSize.depth], yOffset: 0, actualHeight: baseSize.height };
+    }
+
     // 3D 모델 사용 시 - actualHeight 추가 (라벨 위치 계산용)
     if (use3DModels) {
       if (resource.resource_type === 'equipment' && equipmentData) {
@@ -665,8 +676,8 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   };
 
   // Calculate resource key and check if selected
-  // Use ':' separator (format: type:resourceId:processId)
-  const resourceKey = `${resource.resource_type}:${resource.resource_id}:${processId}`;
+  // Use ':' separator (format: type:resourceId:processId:parallelIndex)
+  const resourceKey = `${resource.resource_type}:${resource.resource_id}:${processId}:${parallelIndex}`;
   const isSelected = selectedResourceKey === resourceKey;
 
   // 디버깅 로그 (선택된 리소스만)
@@ -684,7 +695,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
   const handleClick = (e) => {
     if (obstacleCreationMode) return; // 장애물 생성 모드에서는 선택 불가
     e.stopPropagation();
-    setSelectedResource(resource.resource_type, resource.resource_id, processId);
+    setSelectedResource(resource.resource_type, resource.resource_id, processId, parallelIndex);
   };
 
   const color = isSelected ? '#ffeb3b' : (hovered ? '#ffeb3b' : getColor());
@@ -747,6 +758,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
 
       updateResourceLocation(
         processId,
+        parallelIndex,
         resource.resource_type,
         resource.resource_id,
         newRelativeLocation
@@ -758,6 +770,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
 
       updateResourceRotation(
         processId,
+        parallelIndex,
         resource.resource_type,
         resource.resource_id,
         resourceOwnRotation
@@ -766,6 +779,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
       // Scale 업데이트
       updateResourceScale(
         processId,
+        parallelIndex,
         resource.resource_type,
         resource.resource_id,
         {
@@ -811,6 +825,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
         const resourceOwnRotation = normalizeAngle(currentRotationRef.current - processRotation);
         updateResourceRotation(
           processId,
+          parallelIndex,
           resource.resource_type,
           resource.resource_id,
           resourceOwnRotation
@@ -826,7 +841,7 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
     onTransformMouseDown?.();
-  }, [transformMode, rotationY, processRotation, processId, resource.resource_type, resource.resource_id, updateResourceRotation, onTransformMouseDown, onTransformMouseUp]);
+  }, [transformMode, rotationY, processRotation, processId, parallelIndex, resource.resource_type, resource.resource_id, updateResourceRotation, onTransformMouseDown, onTransformMouseUp]);
 
   // 커스텀 회전 중 회전값 유지
   useFrame(() => {
@@ -1052,6 +1067,13 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
               <meshStandardMaterial color="#888888" />
             </mesh>
           }>
+            {geometry.model === 'custom' && geometry.customUrl && (
+              <CustomModel
+                url={geometry.customUrl}
+                targetSize={{ width: geometry.args[0], height: geometry.args[1], depth: geometry.args[2] }}
+                highlighted={isSelected || hovered}
+              />
+            )}
             {geometry.model === 'robot' && (
               <RobotModel highlighted={isSelected || hovered} />
             )}
@@ -1110,18 +1132,6 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
           >
             {getName()}
           </Text>
-          {resource.role && (
-            <Text
-              position={[0, geometry.actualHeight + 0.25, 0]}
-              fontSize={0.12}
-              color="#666"
-              anchorX="center"
-              anchorY="middle"
-              scale={[1/scale.x, 1/scale.y, 1/scale.z]}
-            >
-              ({resource.role})
-            </Text>
-          )}
         </>
       )}
 
@@ -1211,12 +1221,14 @@ function ResourceMarker({ resource, processLocation, processBoundingCenter, proc
 }
 
 // Process Flow Arrow Component with arrowhead
-function ProcessFlowArrow({ fromProcess, toProcess, parallelIndex }) {
+function ProcessFlowArrow({ fromProcess, toProcess }) {
   const { bopData } = useBopStore();
 
   // 각 공정의 바운딩 박스 계산 (ProcessBox와 동일한 로직)
   const calculateBoundingBox = (process) => {
-    const resources = process.resources || [];
+    const resources = (bopData?.resource_assignments || []).filter(
+      r => r.process_id === process.process_id && r.parallel_index === process.parallel_index
+    );
 
     if (resources.length === 0) {
       return { width: 0.5, depth: 0.5, centerX: 0, centerZ: 0 };
@@ -1238,7 +1250,7 @@ function ProcessFlowArrow({ fromProcess, toProcess, parallelIndex }) {
         const equipmentData = bopData.equipments.find(e => e.equipment_id === resource.resource_id);
         equipmentType = equipmentData?.type;
       }
-      const resourceSize = getResourceSize(resource.resource_type, equipmentType);
+      const resourceSize = resource.computed_size || getResourceSize(resource.resource_type, equipmentType);
 
       // 실제 리소스 크기로 바운더리 계산
       minX = Math.min(minX, x - resourceSize.width / 2);
@@ -1637,7 +1649,6 @@ function Scene() {
     getEquipmentById,
     getWorkerById,
     getMaterialById,
-    getProcessById,
     obstacleCreationMode,
     obstacleCreationFirstClick,
     setObstacleCreationFirstClick,
@@ -1707,7 +1718,8 @@ function Scene() {
     const MARGIN_Z = 3; // Z축 마진 (미터)
     const MIN_SIZE = 30;
 
-    if (!bopData || !bopData.processes || bopData.processes.length === 0) {
+    const processDetails = bopData?.process_details || [];
+    if (!bopData || processDetails.length === 0) {
       return { size: MIN_SIZE, width: MIN_SIZE, depth: MIN_SIZE, centerX: 0, centerZ: 0 };
     }
 
@@ -1717,9 +1729,8 @@ function Scene() {
     let maxZ = -Infinity;
     let minZ = Infinity;
 
-    bopData.processes.forEach(process => {
-      if (process.is_parent) return;
-      const loc = process.location;
+    processDetails.forEach(detail => {
+      const loc = detail.location;
       maxX = Math.max(maxX, loc.x + 2);
       minX = Math.min(minX, loc.x - 2);
       maxZ = Math.max(maxZ, loc.z + 2);
@@ -1761,70 +1772,37 @@ function Scene() {
     const elements = [];
     const arrows = [];
 
-    if (!bopData || !bopData.processes) {
+    if (!bopData || !bopData.process_details) {
       return [];
     }
 
-    bopData.processes.forEach((process) => {
-      // Skip parent processes (logical grouping only)
-      if (process.is_parent) return;
+    const processDetails = bopData.process_details || [];
+    const resourceAssignments = bopData.resource_assignments || [];
+    const routingProcesses = bopData.processes || [];
 
-      const key = `process-${process.process_id}`;
-      const processKey = process.process_id; // Now directly use process_id (e.g., "P001-0")
+    // Render each process detail (each is a renderable instance)
+    processDetails.forEach((detail) => {
+      const key = `process-${detail.process_id}:${detail.parallel_index}`;
+      const processKey = `${detail.process_id}:${detail.parallel_index}`;
       const isSelected = selectedProcessKey === processKey;
 
       // Process box
       elements.push(
         <ProcessBox
           key={key}
-          process={process}
-          parallelIndex={0} // Always 0 since each process is independent now
+          process={detail}
           isSelected={isSelected}
-          onSelect={() => setSelectedProcess(process.process_id)}
+          onSelect={() => setSelectedProcess(processKey)}
           onTransformMouseDown={handleTransformMouseDown}
           onTransformMouseUp={handleTransformMouseUp}
           isDraggingTransformRef={isDraggingTransform}
         />
       );
 
-      // Process flow arrows (successor 기반)
-      if (Array.isArray(process.successor_ids) && process.successor_ids.length > 0) {
-        process.successor_ids.forEach(successorId => {
-          if (successorId) {
-            const successorProcess = getProcessById(successorId);
-            if (!successorProcess) return;
-
-            // If successor is a parent process, draw arrows to ALL children
-            if (successorProcess.is_parent) {
-              (successorProcess.children || []).forEach(childId => {
-                const childProcess = getProcessById(childId);
-                if (childProcess && !childProcess.is_parent) {
-                  arrows.push(
-                    <ProcessFlowArrow
-                      key={`${key}-arrow-${childId}`}
-                      fromProcess={process}
-                      toProcess={childProcess}
-                      parallelIndex={0}
-                    />
-                  );
-                }
-              });
-            } else {
-              arrows.push(
-                <ProcessFlowArrow
-                  key={`${key}-arrow-${successorId}`}
-                  fromProcess={process}
-                  toProcess={successorProcess}
-                  parallelIndex={0}
-                />
-              );
-            }
-          }
-        });
-      }
-
-      // Resources for this process - no filtering needed (already separated)
-      const resources = process.resources || [];
+      // Resources for this process detail from resource_assignments
+      const resources = resourceAssignments.filter(
+        r => r.process_id === detail.process_id && r.parallel_index === detail.parallel_index
+      );
 
       // 공정의 실제 중심 좌표 계산 (ProcessBox와 동일한 로직)
       let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -1838,7 +1816,7 @@ function Scene() {
           const equipmentData = bopData.equipments.find(e => e.equipment_id === resource.resource_id);
           equipmentType = equipmentData?.type;
         }
-        const resourceSize = getResourceSize(resource.resource_type, equipmentType);
+        const resourceSize = resource.computed_size || getResourceSize(resource.resource_type, equipmentType);
 
         minX = Math.min(minX, x - resourceSize.width / 2);
         maxX = Math.max(maxX, x + resourceSize.width / 2);
@@ -1872,11 +1850,11 @@ function Scene() {
           <ResourceMarker
             key={resKey}
             resource={resource}
-            processLocation={process.location}
+            processLocation={detail.location}
             processBoundingCenter={boundingCenter}
-            processRotation={process.rotation_y || 0}
-            parallelIndex={0} // Always 0 now
-            processId={process.process_id}
+            processRotation={detail.rotation_y || 0}
+            parallelIndex={detail.parallel_index}
+            processId={detail.process_id}
             equipmentData={equipmentData}
             workerData={workerData}
             materialData={materialData}
@@ -1888,6 +1866,34 @@ function Scene() {
           />
         );
       });
+    });
+
+    // Process flow arrows: use routing processes for predecessor/successor info,
+    // and process_details for location lookup
+    routingProcesses.forEach((routingProcess) => {
+      if (Array.isArray(routingProcess.successor_ids) && routingProcess.successor_ids.length > 0) {
+        routingProcess.successor_ids.forEach(successorId => {
+          if (!successorId) return;
+
+          // Find all detail instances for the source process
+          const fromDetails = processDetails.filter(d => d.process_id === routingProcess.process_id);
+          // Find all detail instances for the successor process
+          const toDetails = processDetails.filter(d => d.process_id === successorId);
+
+          // Draw arrows between all instances of from and to
+          fromDetails.forEach(fromDetail => {
+            toDetails.forEach(toDetail => {
+              arrows.push(
+                <ProcessFlowArrow
+                  key={`arrow-${fromDetail.process_id}:${fromDetail.parallel_index}-${toDetail.process_id}:${toDetail.parallel_index}`}
+                  fromProcess={fromDetail}
+                  toProcess={toDetail}
+                />
+              );
+            });
+          });
+        });
+      }
     });
 
     // Render obstacles
@@ -1910,10 +1916,10 @@ function Scene() {
     });
 
     return [...elements, ...arrows];
-  }, [bopData, selectedProcessKey, selectedResourceKey, selectedObstacleId, setSelectedProcess, setSelectedObstacle, getEquipmentById, getWorkerById, getMaterialById, getProcessById, handleTransformMouseDown, handleTransformMouseUp]);
+  }, [bopData, selectedProcessKey, selectedResourceKey, selectedObstacleId, setSelectedProcess, setSelectedObstacle, getEquipmentById, getWorkerById, getMaterialById, handleTransformMouseDown, handleTransformMouseUp]);
 
-  // Empty state - no data (only show when both processes AND obstacles are empty AND not in creation mode)
-  const hasProcesses = bopData && bopData.processes && bopData.processes.length > 0;
+  // Empty state - no data (only show when both process_details AND obstacles are empty AND not in creation mode)
+  const hasProcesses = bopData && bopData.process_details && bopData.process_details.length > 0;
   const hasObstacles = bopData && bopData.obstacles && bopData.obstacles.length > 0;
 
   if (!bopData || (!hasProcesses && !hasObstacles && !obstacleCreationMode)) {
@@ -2090,7 +2096,58 @@ function Scene() {
 }
 
 function Viewer3D() {
-  const { use3DModels, toggleUse3DModels } = useBopStore();
+  const { use3DModels, toggleUse3DModels, selectedResourceKey, customModels, setCustomModel, removeCustomModel, getSelectedResourceInfo, bopData } = useBopStore();
+  const { t } = useTranslation();
+  const [showModelPopup, setShowModelPopup] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Get display name for selected resource
+  const getResourceDisplayName = () => {
+    const info = getSelectedResourceInfo();
+    if (!info) return '';
+    const { resourceType, resourceId } = info;
+    if (resourceType === 'equipment') {
+      const eq = bopData?.equipments?.find(e => e.equipment_id === resourceId);
+      return eq ? `${resourceId} (${eq.name})` : resourceId;
+    } else if (resourceType === 'worker') {
+      const wk = bopData?.workers?.find(w => w.worker_id === resourceId);
+      return wk ? `${resourceId} (${wk.name})` : resourceId;
+    } else if (resourceType === 'material') {
+      const mt = bopData?.materials?.find(m => m.material_id === resourceId);
+      return mt ? `${resourceId} (${mt.name})` : resourceId;
+    }
+    return resourceId;
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const info = getSelectedResourceInfo();
+    if (!info) return;
+
+    // Only .glb supported (self-contained binary; .gltf references external files that can't be resolved from blob URLs)
+    if (!file.name.toLowerCase().endsWith('.glb')) {
+      alert(t('v3d.glbOnly'));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const blobUrl = URL.createObjectURL(file);
+    setCustomModel(info.resourceType, info.resourceId, blobUrl);
+    setShowModelPopup(false);
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleResetModel = () => {
+    const info = getSelectedResourceInfo();
+    if (!info) return;
+    removeCustomModel(info.resourceType, info.resourceId);
+    setShowModelPopup(false);
+  };
+
+  const selectedInfo = getSelectedResourceInfo();
+  const hasCustomModel = selectedInfo && customModels?.[`${selectedInfo.resourceType}:${selectedInfo.resourceId}`];
 
   return (
     <div style={{ width: '100%', height: '100%', backgroundColor: '#f5f5f5', position: 'relative' }}>
@@ -2101,24 +2158,129 @@ function Viewer3D() {
       </Canvas>
 
       {/* 3D 모델 토글 버튼 */}
-      <button
-        onClick={toggleUse3DModels}
-        style={{
+      <div style={{ position: 'absolute', top: 10, right: 10, display: 'flex', gap: 6 }}>
+        {use3DModels && selectedResourceKey && (
+          <button
+            onClick={() => setShowModelPopup(true)}
+            style={{
+              padding: '8px 12px',
+              backgroundColor: '#e67e22',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              fontSize: 12,
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            }}
+          >
+            {t('v3d.editModel')}
+          </button>
+        )}
+        <button
+          onClick={toggleUse3DModels}
+          style={{
+            padding: '8px 12px',
+            backgroundColor: use3DModels ? '#4a90e2' : '#666',
+            color: 'white',
+            border: 'none',
+            borderRadius: 4,
+            fontSize: 12,
+            cursor: 'pointer',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+          }}
+        >
+          {use3DModels ? t('v3d.modelOn') : t('v3d.modelOff')}
+        </button>
+      </div>
+
+      {/* 3D 객체 수정 모달 */}
+      {showModelPopup && (
+        <div style={{
           position: 'absolute',
-          top: 10,
-          right: 10,
-          padding: '8px 12px',
-          backgroundColor: use3DModels ? '#4a90e2' : '#666',
-          color: 'white',
-          border: 'none',
-          borderRadius: 4,
-          fontSize: 12,
-          cursor: 'pointer',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-        }}
-      >
-        {use3DModels ? '3D 모델 ON' : '3D 모델 OFF'}
-      </button>
+          top: 0, left: 0, right: 0, bottom: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 100,
+        }}>
+          <div
+            onClick={() => setShowModelPopup(false)}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.3)' }}
+          />
+          <div style={{
+            position: 'relative',
+            backgroundColor: 'white',
+            borderRadius: 8,
+            padding: '20px 24px',
+            minWidth: 300,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+            zIndex: 101,
+          }}>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <span style={{ fontWeight: 'bold', fontSize: 15 }}>{t('v3d.editModelTitle')}</span>
+              <button
+                onClick={() => setShowModelPopup(false)}
+                style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: '#666', padding: '0 4px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Resource label */}
+            <div style={{ fontSize: 13, color: '#555', marginBottom: 16 }}>
+              {t('v3d.resourceLabel', { name: getResourceDisplayName() })}
+            </div>
+
+            {/* Supported formats */}
+            <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
+              {t('v3d.supportedFormats')}
+            </div>
+
+            {/* File upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".glb"
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                backgroundColor: '#4a90e2',
+                color: 'white',
+                border: 'none',
+                borderRadius: 4,
+                fontSize: 13,
+                cursor: 'pointer',
+                marginBottom: 10,
+              }}
+            >
+              {t('v3d.selectFile')}
+            </button>
+
+            {/* Reset button */}
+            {hasCustomModel && (
+              <button
+                onClick={handleResetModel}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px',
+                  backgroundColor: '#e0e0e0',
+                  color: '#333',
+                  border: 'none',
+                  borderRadius: 4,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                {t('v3d.resetModel')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

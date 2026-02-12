@@ -524,6 +524,70 @@ export function WorkerModel({ color = '#50c878', scale = 1, highlighted = false,
   );
 }
 
+// Custom Model Component (user-uploaded .glb/.gltf via blob URL)
+// Uses useLoader (same proven pattern as RobotModel, ConveyorModel, etc.)
+export function CustomModel({ url, targetSize = { width: 1, height: 1, depth: 1 }, highlighted = false }) {
+  const { scene } = useLoader(GLTFLoader, url);
+  const groupRef = useRef();
+
+  const { clonedScene, scaleVec, offset } = useMemo(() => {
+    const clone = SkeletonUtils.clone(scene);
+
+    // Deep clone materials to prevent shared state between instances
+    clone.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.material = Array.isArray(child.material)
+          ? child.material.map(m => m.clone())
+          : child.material.clone();
+      }
+    });
+
+    // Calculate original bounding box
+    const box = new THREE.Box3().setFromObject(clone);
+    const originalSize = new THREE.Vector3();
+    box.getSize(originalSize);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+
+    // Scale each axis independently to match target size exactly
+    const scaleX = targetSize.width / (originalSize.x || 1);
+    const scaleY = targetSize.height / (originalSize.y || 1);
+    const scaleZ = targetSize.depth / (originalSize.z || 1);
+
+    // Calculate offset to center on X/Z and place bottom at y=0
+    const xOffset = -center.x * scaleX;
+    const yOffset = -box.min.y * scaleY;
+    const zOffset = -center.z * scaleZ;
+
+    return { clonedScene: clone, scaleVec: [scaleX, scaleY, scaleZ], offset: [xOffset, yOffset, zOffset] };
+  }, [scene, targetSize.width, targetSize.height, targetSize.depth]);
+
+  // Apply highlight effect
+  useEffect(() => {
+    if (clonedScene) {
+      clonedScene.traverse((child) => {
+        if (child.isMesh && child.material) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach(mat => {
+            mat.emissive = highlighted ? new THREE.Color('#ffeb3b') : new THREE.Color('#000000');
+            mat.emissiveIntensity = highlighted ? 0.5 : 0;
+            mat.needsUpdate = true;
+          });
+        }
+      });
+    }
+  }, [clonedScene, highlighted]);
+
+  return (
+    <primitive
+      ref={groupRef}
+      object={clonedScene}
+      scale={scaleVec}
+      position={offset}
+    />
+  );
+}
+
 export default {
   RobotModel,
   ConveyorModel,
@@ -532,6 +596,7 @@ export default {
   StructureModel,
   GLBModel,
   WorkerModel,
+  CustomModel,
   MODEL_PATHS,
   SKIN_PATHS,
 };
