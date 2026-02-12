@@ -35,6 +35,9 @@ data/tool_registry/
 data/tool_logs/
 uploads/
 
+# Backend logs (API 키 노출 방지)
+logs/
+
 # Temporary files
 nul
 error_capture1.png
