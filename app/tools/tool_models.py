@@ -20,10 +20,10 @@ class SchemaType(str, Enum):
 
 
 class InputSchema(BaseModel):
-    type: SchemaType = Field(..., description="입력 형식 타입")
+    type: SchemaType = Field(default=SchemaType.JSON, description="입력 형식 타입")
     columns: Optional[List[str]] = Field(default=None, description="CSV: 컬럼명 목록")
     fields: Optional[List[str]] = Field(default=None, description="JSON: 필드명 목록")
-    args_format: Optional[Any] = Field(default=None, description="ARGS: 인수 패턴 또는 dict/list 타입의 필드 설명")
+    structure: Optional[Dict[str, Any]] = Field(default=None, description="JSON: 중첩 구조 정의")
     description: str = Field(..., description="입력 형식 설명")
 
 
@@ -31,6 +31,7 @@ class OutputSchema(BaseModel):
     type: SchemaType = Field(..., description="출력 형식 타입")
     columns: Optional[List[str]] = Field(default=None, description="CSV: 컬럼명 목록")
     fields: Optional[List[str]] = Field(default=None, description="JSON: 필드명 목록")
+    structure: Optional[Dict[str, Any]] = Field(default=None, description="JSON: 중첩 구조 정의")
     return_format: Optional[Any] = Field(default=None, description="dict/list 타입의 반환 형식 설명")
     description: str = Field(..., description="출력 형식 설명")
 
@@ -53,6 +54,8 @@ class ToolMetadata(BaseModel):
     input_schema: InputSchema
     output_schema: OutputSchema
     params_schema: Optional[List[ParamDef]] = Field(default=None, description="도구별 추가 파라미터 정의")
+    example_input: Optional[Any] = Field(default=None, description="입력 예시 데이터")
+    example_output: Optional[Any] = Field(default=None, description="출력 예시 데이터")
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
@@ -98,6 +101,8 @@ class RegisterRequest(BaseModel):
     output_schema: OutputSchema
     params_schema: Optional[List[ParamDef]] = None
     sample_input: Optional[str] = None
+    example_input: Optional[Any] = Field(default=None, description="입력 예시 데이터")
+    example_output: Optional[Any] = Field(default=None, description="출력 예시 데이터")
     model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
 
 
@@ -174,6 +179,8 @@ class GenerateScriptRequest(BaseModel):
     model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
     input_schema: Optional[InputSchema] = Field(default=None, description="입력 스키마 (제공 시 이를 기반으로 스크립트 생성)")
     output_schema: Optional[OutputSchema] = Field(default=None, description="출력 스키마 (제공 시 이를 기반으로 스크립트 생성)")
+    example_input: Optional[Any] = Field(default=None, description="입력 예시 데이터")
+    example_output: Optional[Any] = Field(default=None, description="출력 예시 데이터")
 
 
 class GenerateScriptResponse(BaseModel):
@@ -225,6 +232,8 @@ class RegisterSchemaOnlyRequest(BaseModel):
     input_schema: InputSchema = Field(..., description="입력 스키마")
     output_schema: OutputSchema = Field(..., description="출력 스키마")
     params_schema: Optional[List[ParamDef]] = Field(default=None, description="파라미터 스키마")
+    example_input: Optional[Any] = Field(default=None, description="입력 예시 데이터")
+    example_output: Optional[Any] = Field(default=None, description="출력 예시 데이터")
     model: Optional[str] = Field(default=None, description="사용할 LLM 모델")
 
 

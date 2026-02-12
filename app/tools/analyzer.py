@@ -113,6 +113,11 @@ async def analyze_script(
             if "execution_type" not in data:
                 data["execution_type"] = "python"
 
+            # Standardize: force json type, remove args_format
+            if "input_schema" in data:
+                data["input_schema"]["type"] = "json"
+                data["input_schema"].pop("args_format", None)
+
             elapsed = time.time() - start_time
             log.info("[analyze] 분석 성공 — tool_name=%s (소요 시간: %.2f초)", data.get("tool_name"), elapsed)
             log.info("[analyze] === 분석 완료 ===")

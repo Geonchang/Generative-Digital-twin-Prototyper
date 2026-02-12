@@ -14,12 +14,14 @@ Source Code:
 - Always verify the schema matches what the code actually expects/produces
 
 ## BOP Available Fields (GDP System Data)
+**3D Coordinate System (Three.js, Y-up):** X=flow direction(+X=right), Y=height(floor=0), Z=parallel separation. Units=meters, rotation_y=RADIANS.
+
 - project_title: string
 - target_uph: int
-- processes[]: process_id, parallel_count, predecessor_ids[], successor_ids[], parallel_lines[], resources[]
-  * parallel_lines[]: parallel_index, name, description, cycle_time_sec, location{{x,y,z}}, rotation_y
-  * resources[]: resource_type, resource_id, quantity, role, relative_location{{x,y,z}}, rotation_y, scale{{x,y,z}}, parallel_line_index
-  * NOTE: Process has NO "size" field. All details (name, location, etc.) are in parallel_lines, not at process level.
+- processes[]: process_id, predecessor_ids[], successor_ids[] (routing only)
+- process_details[]: process_id, parallel_index, name, description, cycle_time_sec, location{{x,y,z}}, rotation_y, computed_size{{width,height,depth}}
+- resource_assignments[]: process_id, parallel_index, resource_type, resource_id, quantity, role, relative_location{{x,y,z}}, rotation_y, scale{{x,y,z}}, computed_size{{width,height,depth}}
+  * NOTE: Process has NO details - all info (name, location, etc.) is in process_details. Resources are in resource_assignments (top-level).
 - equipments[]: equipment_id, name, type (robot|machine|manual_station)
 - workers[]: worker_id, name, skill_level (Junior|Mid|Senior)
 - materials[]: material_id, name, unit (ea|kg|m)
@@ -32,15 +34,14 @@ Source Code:
   "description": "Brief description",
   "execution_type": "python",
   "input_schema": {{
-    "type": "csv|json|args|stdin",
-    "columns": ["col1"] or null,
+    "type": "json",
+    "columns": null,
     "fields": ["field1"] or null,
     "structure": {{nested structure}} or null,
-    "args_format": "--input {{input_file}} --output {{output_file}}" or null,
     "description": "Input format description"
   }},
   "output_schema": {{
-    "type": "csv|json|stdin",
+    "type": "json",
     "fields": ["field1"] or null,
     "description": "Output format description"
   }},
@@ -50,35 +51,8 @@ Source Code:
 }}
 
 ## Rules
-1. input_schema.type: "csv", "json", "args" (argparse), or "stdin"
-2. args_format: **CRITICAL** - Command-line argument format specification:
-   - **MUST be a STRING or null** - NEVER use dict/object!
-   - If script uses `argparse`, `ArgumentParser`, or `add_argument()`: Set args_format as STRING
-   - Common patterns to detect:
-     * `parser.add_argument('--input', '-i')` → args_format = "--input {{input_file}} --output {{output_file}}"
-     * `parser.add_argument('input')` (positional) → args_format = "{{input_file}}"
-     * No argparse → args_format = null
-   - **ALWAYS check for argparse usage before setting args_format to null**
-   - Use exact flag names from the script (--input, -i, --file, etc.)
-   - Include ALL required arguments (--input, --output, custom params)
-   - **WRONG**: args_format = {{"param": {{"type": "..."}}}}  ❌
-   - **CORRECT**: args_format = "--param {{param_value}}"  ✅
-3. For JSON type, use "structure" field (NOT args_format) showing all sub-fields
-4. For dict/json input types, args_format MUST be null
-
-**argparse Detection Checklist:**
-- [ ] Does script import argparse?
-- [ ] Does script call ArgumentParser()?
-- [ ] Does script use add_argument()?
-- [ ] What are the exact argument names? (--input? -i? positional?)
-- [ ] Are there required arguments besides input/output?
-
-Example args_format values:
-- Script with `--input` and `--output`: "--input {{input_file}} --output {{output_file}}"
-- Script with `-i` and `-o`: "-i {{input_file}} -o {{output_file}}"
-- Script with positional args: "{{input_file}}"
-- Script with custom params: "--input {{input_file}} --output {{output_file}} --threshold {{threshold}}"
-- Script without argparse: null
+1. input_schema.type: ALWAYS "json". All scripts use `--input`/`--output` argparse with JSON files.
+2. For JSON type, use "structure" field showing all sub-fields
 
 ## params_schema Rules (CRITICAL - READ CAREFULLY)
 params_schema defines ALL user-provided input values needed to run the tool.
@@ -132,29 +106,32 @@ The tool will receive input as JSON. The adapter will convert BOP data to tool i
 Available BOP fields:
 - project_title: string
 - target_uph: float (units per hour)
-- processes[]: process_id, parallel_count, predecessor_ids[], successor_ids[], parallel_lines[], resources[]
-  * parallel_lines[]: parallel_index, name, description, cycle_time_sec, location{{x,y,z}}, rotation_y
-  * resources[]: resource_type (equipment|worker|material), resource_id, quantity, role, relative_location{{x,y,z}}, rotation_y, scale{{x,y,z}}, parallel_line_index
+- processes[]: process_id, predecessor_ids[], successor_ids[] (routing only)
+- process_details[]: process_id, parallel_index, name, description, cycle_time_sec, location{{x,y,z}}, rotation_y, computed_size{{width,height,depth}}
+- resource_assignments[]: process_id, parallel_index, resource_type (equipment|worker|material), resource_id, quantity, role, relative_location{{x,y,z}}, rotation_y, scale{{x,y,z}}, computed_size
+  * NOTE: Process has NO details - all info (name, location, etc.) is in process_details. Resources are in resource_assignments (top-level).
 - equipments[]: equipment_id, name, type (robot|machine|manual_station)
 - workers[]: worker_id, name, skill_level (Junior|Mid|Senior)
 - materials[]: material_id, name, unit (ea|kg|m)
 - obstacles[]: obstacle_id, name, type (fence|zone|pillar|wall), position{{x,y,z}}, size{{width,height,depth}}, rotation_y
 
-**IMPORTANT: rotation_y is in RADIANS, not degrees!**
-- 90 degrees = math.pi / 2 (≈ 1.5708)
-- 180 degrees = math.pi (≈ 3.1416)
-- Use `math.radians(degrees)` to convert degrees to radians
+**3D Coordinate System (Three.js, Y-up):**
+- **X axis**: left/right — process flow direction (P001→P002→... are spaced along +X)
+- **Y axis**: up/down — height (floor = 0)
+- **Z axis**: forward/backward — parallel instances are separated along Z
+- location/position units: **meters**
+- rotation_y: **RADIANS** (90° = π/2 ≈ 1.5708, 180° = π ≈ 3.1416). Use `math.radians(deg)` to convert.
 
 ## Script Requirements
-1. Read input from a JSON file path passed as first positional argument (sys.argv[1])
-2. Write output to a JSON file path passed as second positional argument (sys.argv[2])
-3. **ALL data and parameters are in the input JSON** - adapters merge BOP data + user params
-4. **Output results to the output JSON file** - NOT stdout
-5. Include clear docstring explaining input/output format
-6. Include example input JSON in comments
-7. Handle errors gracefully with informative messages
-8. Use only standard library (json, math, sys, os)
-9. **DO NOT use argparse** - Only input/output file paths as arguments
+1. **MUST use argparse with `--input` and `--output` arguments** to receive file paths
+2. Read input JSON from the `--input` file path
+3. Write output JSON to the `--output` file path
+4. **ALL data and parameters are in the input JSON** - adapters merge BOP data + user params
+5. **Output results to the output JSON file** - NOT stdout
+6. Include clear docstring explaining input/output format
+7. Include example input JSON in comments
+8. Handle errors gracefully with informative messages
+9. Use only standard library (json, math, argparse, os)
 10. **DO NOT use os.getenv()** - Everything is in the JSON
 
 ## Script Template
@@ -165,7 +142,7 @@ Available BOP fields:
 Description: [Brief description]
 
 Usage:
-    python script_name.py <input.json> <output.json>
+    python script_name.py --input input.json --output output.json
 
 Input JSON format (from file):
     {{
@@ -182,8 +159,8 @@ Output JSON format (to file):
     }}
 \"\"\"
 
+import argparse
 import json
-import sys
 import os
 import math
 
@@ -194,45 +171,42 @@ def process_data(data):
         data: Input JSON containing both BOP data and user parameters
               Example structure:
               {{
-                  "process_locations": [...],  // from BOP
-                  "wall_offset": 1.0,          // from user params
-                  "wall_thickness": 0.2        // from user params
+                  "process_details": [...],    // from BOP
+                  "target_uph": 100.0,         // from BOP or user params
+                  "threshold": 0.8,            // from user params
+                  "margin": 1.5               // from user params
               }}
     \"\"\"
     # Extract parameters from input JSON
-    offset = data.get('wall_offset', 1.0)
-    thickness = data.get('wall_thickness', 0.2)
+    threshold = data.get('threshold', 0.8)
+    margin = data.get('margin', 1.5)
 
     # Extract BOP data
-    locations = data.get('process_locations', [])
+    details = data.get('process_details', [])
 
     # Implementation here
     result = {{}}
     return result
 
 def main():
-    # Check arguments
-    if len(sys.argv) < 3:
-        error = {{"error": "Usage: python script.py <input.json> <output.json>"}}
-        print(json.dumps(error))
-        sys.exit(1)
-
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', required=True, help='Input JSON file path')
+    parser.add_argument('--output', required=True, help='Output JSON file path')
+    args = parser.parse_args()
 
     # Read input JSON (contains both BOP data and user parameters)
-    if not os.path.exists(input_file):
-        error = {{"error": f"Input file not found: {{input_file}}"}}
+    if not os.path.exists(args.input):
+        error = {{"error": f"Input file not found: {{args.input}}"}}
         print(json.dumps(error))
-        sys.exit(1)
+        import sys; sys.exit(1)
 
     try:
-        with open(input_file, 'r', encoding='utf-8') as f:
+        with open(args.input, 'r', encoding='utf-8') as f:
             input_data = json.load(f)
     except Exception as e:
         error = {{"error": f"Failed to read input: {{str(e)}}"}}
         print(json.dumps(error))
-        sys.exit(1)
+        import sys; sys.exit(1)
 
     # Process
     try:
@@ -240,16 +214,16 @@ def main():
     except Exception as e:
         error = {{"error": f"Processing failed: {{str(e)}}"}}
         print(json.dumps(error))
-        sys.exit(1)
+        import sys; sys.exit(1)
 
     # Write output to file
     try:
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(args.output, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
     except Exception as e:
         error = {{"error": f"Failed to write output: {{str(e)}}"}}
         print(json.dumps(error))
-        sys.exit(1)
+        import sys; sys.exit(1)
 
 if __name__ == "__main__":
     main()
@@ -276,24 +250,27 @@ ADAPTER_SYNTHESIS_PROMPT = """Write two Python adapter functions to bridge GDP B
   "target_uph": float,
   "processes": [{{
     "process_id": "P001",
-    "parallel_count": int,
     "predecessor_ids": ["P000"],
-    "successor_ids": ["P002"],
-    "parallel_lines": [{{
-      "parallel_index": 1,
-      "name": "string",
-      "description": "string",
-      "cycle_time_sec": float,
-      "location": {{"x": float, "y": float, "z": float}},
-      "rotation_y": float
-    }}],
-    "resources": [{{
-      "resource_type": "equipment|worker|material", "resource_id": "string",
-      "quantity": float, "role": "string",
-      "relative_location": {{"x": float, "y": float, "z": float}},
-      "rotation_y": float, "scale": {{"x": float, "y": float, "z": float}},
-      "parallel_line_index": int
-    }}]
+    "successor_ids": ["P002"]
+  }}],
+  "process_details": [{{
+    "process_id": "P001",
+    "parallel_index": 1,
+    "name": "string",
+    "description": "string",
+    "cycle_time_sec": float,
+    "location": {{"x": float, "y": float, "z": float}},
+    "rotation_y": float,
+    "computed_size": {{"width": float, "height": float, "depth": float}}
+  }}],
+  "resource_assignments": [{{
+    "process_id": "P001",
+    "parallel_index": 1,
+    "resource_type": "equipment|worker|material", "resource_id": "string",
+    "quantity": float, "role": "string",
+    "relative_location": {{"x": float, "y": float, "z": float}},
+    "rotation_y": float, "scale": {{"x": float, "y": float, "z": float}},
+    "computed_size": {{"width": float, "height": float, "depth": float}}
   }}],
   "equipments": [{{"equipment_id": "EQ-...", "name": "...", "type": "robot|machine|manual_station"}}],
   "workers": [{{"worker_id": "W001", "name": "...", "skill_level": "Junior|Mid|Senior"}}],
@@ -305,12 +282,20 @@ ADAPTER_SYNTHESIS_PROMPT = """Write two Python adapter functions to bridge GDP B
   }}]
 }}
 
-Key differences (BOP vs common tool formats):
-- Process details (name, location, cycle_time) are in parallel_lines[], not at process level
-- Process has NO "size" field → get size from params
-- Obstacles: "position" (not "pos"), size uses "width/height/depth" (not "x/y/z")
-- **rotation_y is in RADIANS** (90° = math.pi/2 ≈ 1.5708, 180° = math.pi ≈ 3.1416)
+**3D Coordinate System (Three.js, Y-up):**
+- **X axis**: left/right — process flow direction (P001→P002→... spaced along +X)
+- **Y axis**: up/down — height (floor = 0)
+- **Z axis**: forward/backward — parallel instances separated along Z
+- All location/position units: **meters**
+- **rotation_y**: RADIANS (90° = math.pi/2 ≈ 1.5708, 180° = math.pi ≈ 3.1416)
   If tool outputs degrees, convert: `radians = degrees * math.pi / 180`
+
+Key differences (BOP vs common tool formats):
+- processes[] = routing only (process_id, predecessor_ids, successor_ids)
+- process_details[] = instance details (name, location, cycle_time, computed_size per parallel_index)
+- resource_assignments[] = resource mapping (top-level, NOT nested in process)
+- process_details[].computed_size = bounding box auto-calculated from contained resources
+- Obstacles: "position" (not "pos"), size uses "width/height/depth" (not "x/y/z")
 
 ## Tool Information
 Name: {tool_name}
@@ -323,6 +308,8 @@ Output: {output_schema_json}
 
 {params_schema_section}
 
+{example_data_section}
+
 ## Required Functions
 
 1. `convert_bop_to_input(bop_json: dict, params: dict) -> str`
@@ -330,11 +317,11 @@ Output: {output_schema_json}
    - Extract data from BOP, apply field mappings
    - **CRITICAL: Include ALL user parameters in the tool input JSON/CSV**
    - The tool script will read parameters from the input data, NOT from environment variables
-   - Example: If params has {{"wall_offset": 1.0}}, include it in tool input as a field
+   - Example: If params has {{"threshold": 0.8}}, include it in tool input as a field
    - params dict contains all user-configurable parameters from the UI
    - Use params for values not in BOP (e.g., process size, thresholds, offsets)
    - For BOP-fallback params: `value = params.get('key') or bop_json.get('key')`
-   - Return as string (CSV/JSON/args)
+   - Return as JSON string (scripts always receive JSON via --input/--output argparse)
 
 2. `apply_result_to_bop(bop_json: dict, tool_output: dict) -> dict`
    - **CRITICAL**: tool_output is ALREADY PARSED as dict by the executor
@@ -348,21 +335,27 @@ Output: {output_schema_json}
 **Including user parameters in tool input** (CRITICAL):
 ```python
 def convert_bop_to_input(bop_json, params):
-    # Extract BOP data
-    locations = [line.get('location') for p in bop_json.get('processes', [])
-                 for line in p.get('parallel_lines', [])]
+    # Extract BOP data - process_details contains location & size info
+    details = []
+    for d in bop_json.get('process_details', []):
+        details.append({{
+            'process_id': d.get('process_id'),
+            'parallel_index': d.get('parallel_index', 1),
+            'location': d.get('location'),
+            'computed_size': d.get('computed_size'),
+            'cycle_time_sec': d.get('cycle_time_sec')
+        }})
 
     # Build tool input with BOTH BOP data AND user parameters
     tool_input = {{
         # BOP data
-        'process_locations': locations,
-        'obstacles': bop_json.get('obstacles', []),
+        'process_details': details,
+        'target_uph': bop_json.get('target_uph', 60),
 
         # User parameters (ALL params should be included!)
-        'wall_offset': params.get('wall_offset', 1.0),
-        'wall_thickness': params.get('wall_thickness', 0.2),
-        'wall_height': params.get('wall_height', 2.5),
-        'min_segment_length': params.get('min_segment_length', 0.5)
+        'threshold': params.get('threshold', 0.8),
+        'margin': params.get('margin', 1.5),
+        'max_count': params.get('max_count', 10)
     }}
 
     return json.dumps(tool_input, ensure_ascii=False)
@@ -377,28 +370,29 @@ for obs in bop_json.get('obstacles', []):
     }}
 ```
 
-Process with size from params (NEW STRUCTURE: details in parallel_lines):
+Process with size from params (process_details has name/location):
 ```python
 target_id = params.get('target_process_id')
-process = next((p for p in bop_json.get('processes', []) if p['process_id'] == target_id), None) or bop_json['processes'][0]
-# Get first parallel line for location/name
-first_line = process.get('parallel_lines', [{{}}])[0]
+# Find detail for target process (or first one)
+details = bop_json.get('process_details', [])
+detail = next((d for d in details if d['process_id'] == target_id), None) or (details[0] if details else {{}})
 process_data = {{
-    'name': first_line.get('name', ''),
-    'pos': first_line.get('location', {{'x': 0, 'y': 0, 'z': 0}}),
+    'name': detail.get('name', ''),
+    'pos': detail.get('location', {{'x': 0, 'y': 0, 'z': 0}}),
     'size': {{'x': params.get('process_width', 1.0), 'y': params.get('process_height', 2.0), 'z': params.get('process_depth', 1.0)}}
 }}
 ```
 
-Iterate all parallel lines:
+Iterate all process instances:
 ```python
-for process in bop_json.get('processes', []):
-    for line in process.get('parallel_lines', []):
-        line_data = {{
-            'name': line.get('name'),
-            'location': line.get('location'),
-            'cycle_time': line.get('cycle_time_sec')
-        }}
+for detail in bop_json.get('process_details', []):
+    detail_data = {{
+        'process_id': detail.get('process_id'),
+        'parallel_index': detail.get('parallel_index', 1),
+        'name': detail.get('name'),
+        'location': detail.get('location'),
+        'cycle_time': detail.get('cycle_time_sec')
+    }}
 ```
 
 **Post-processor example** (CRITICAL - tool_output is already dict):
@@ -408,20 +402,33 @@ def apply_result_to_bop(bop_json, tool_output):
     # result = json.loads(tool_output)  # ERROR! tool_output is already dict!
 
     # ✅ CORRECT - tool_output is already parsed dict:
-    updated_processes = tool_output.get('processes', [])
+    updated_details = tool_output.get('process_details', [])
 
-    # Update BOP processes with new locations
-    for updated_proc in updated_processes:
-        proc_id = updated_proc.get('process_id')
-        new_location = updated_proc.get('location')
+    # Update process_details with new locations
+    for updated in updated_details:
+        pid = updated.get('process_id')
+        pidx = updated.get('parallel_index', 1)
+        new_location = updated.get('location')
 
-        for proc in bop_json.get('processes', []):
-            if proc.get('process_id') == proc_id:
-                for line in proc.get('parallel_lines', []):
-                    line['location'] = new_location
+        for detail in bop_json.get('process_details', []):
+            if detail.get('process_id') == pid and detail.get('parallel_index', 1) == pidx:
+                detail['location'] = new_location
 
     return bop_json
 ```
+
+## CRITICAL — Parallel Instance Creation Rules (apply_result_to_bop)
+When post-processor creates NEW process_detail instances (e.g., increasing parallel count):
+
+1. **Location Offset (MUST)**: New instances MUST NOT share the same location as the template.
+   - If 2+ existing instances → calculate step from first two instances' locations
+   - If only 1 instance → default offset: z-axis +3.0m per instance
+   - Formula: new_location[axis] = base_location[axis] + step[axis] * (new_index - base_index)
+
+2. **Resource Assignments (MUST NOT clone)**: Do NOT copy resource_assignments for new instances.
+   - Same physical resource (resource_id) cannot exist in multiple locations
+   - New instances should have NO resource_assignments (to be assigned separately)
+   - Only keep existing resource_assignments for original instances
 
 ## Rules
 - **CRITICAL - Forbidden modules**: Do NOT import or use: logging, os, sys, subprocess, pathlib, datetime
@@ -477,9 +484,28 @@ Tool Output (first 2000 chars):
 - Script Code: {modify_script}
 
 ## BOP JSON Schema Reference
-- rotation_y is in RADIANS (90° = π/2 ≈ 1.5708)
+**3D Coordinate System (Three.js, Y-up):**
+- X axis: process flow direction (+X = right), Y axis: height (floor=0), Z axis: parallel separation (+Z = forward)
+- All positions in **meters**, rotation_y in **RADIANS** (90° = π/2 ≈ 1.5708)
+
 - obstacles[]: obstacle_id, name, type, position{{x,y,z}}, size{{width,height,depth}}, rotation_y
-- processes[].parallel_lines[]: location{{x,y,z}}, cycle_time_sec, etc.
+- processes[]: routing only (process_id, predecessor_ids, successor_ids)
+- process_details[]: process_id, parallel_index, name, location{{x,y,z}}, cycle_time_sec, computed_size{{width,height,depth}}, etc.
+- resource_assignments[]: process_id, parallel_index, resource_type, resource_id, relative_location{{x,y,z}}, computed_size{{width,height,depth}}, etc.
+
+## CRITICAL — Common Post-processor Bugs to Check
+When reviewing/improving apply_result_to_bop that creates new parallel instances:
+
+1. **Location Overlap Bug**: Copying template location to new instances → all instances at same position
+   - Fix: Calculate offset between existing instances and apply to new ones
+   - If 2+ instances exist: step = location[1] - location[0]
+   - If 1 instance: default step = {{x:0, y:0, z:3.0}}
+   - new_loc[axis] = base_loc[axis] + step[axis] * (new_index - base_index)
+
+2. **Resource Duplication Bug**: Copying resource_assignments with same resource_id to new instances
+   - Fix: Do NOT clone resource_assignments for new instances
+   - Same physical equipment/worker cannot be in two places simultaneously
+   - New instances should start without resource_assignments
 
 ## Instructions
 1. Analyze the user's feedback and execution context
@@ -493,10 +519,9 @@ Tool Output (first 2000 chars):
 5. **CRITICAL - Parameter Handling:**
    - Pre-processor (convert_bop_to_input) MUST include ALL user parameters in the tool input JSON
    - Scripts read parameters FROM THE INPUT JSON, NOT from environment variables or CLI args
-   - Example pre-processor: `tool_input = {{"locations": [...], "wall_offset": params.get("wall_offset", 1.0)}}`
-   - Example script: `offset = data.get("wall_offset", 1.0)`
+   - Example pre-processor: `tool_input = {{"process_details": [...], "threshold": params.get("threshold", 0.8)}}`
+   - Example script: `threshold = data.get("threshold", 0.8)`
    - DO NOT use os.getenv() in scripts
-   - DO NOT use argparse for parameters
 6. **CRITICAL - Post-processor (apply_result_to_bop):**
    - **tool_output parameter is ALREADY A DICT** (parsed by executor)
    - **DO NOT call json.loads(tool_output)** - this will cause "JSON object must be str" error
@@ -505,18 +530,7 @@ Tool Output (first 2000 chars):
    - The executor automatically parses JSON output before passing to post-processor
 7. For params_schema: add/remove/modify parameters as requested
 8. For script code: improve the core logic as requested
-9. **CRITICAL - Check args_format issues:**
-   - If stderr shows "error: the following arguments are required: --input/-i, --output/-o"
-   - This means the script uses argparse but args_format is missing/incorrect
-   - Since args_format cannot be modified through improvement API, you MUST:
-     * Include clear instructions in your "explanation" field
-     * Tell the user the EXACT args_format string they need to set manually
-     * Example explanation: "스크립트가 --input과 --output 인자를 요구합니다. 도구 설정에서 args_format을 '--input {{input_file}} --output {{output_file}}'로 수정해주세요."
-   - Common args_format patterns:
-     * Script expects `--input` and `--output`: "--input {{input_file}} --output {{output_file}}"
-     * Script expects `-i` and `-o`: "-i {{input_file}} -o {{output_file}}"
-     * Script expects positional args: "{{input_file}}"
-     * With custom parameters: "--input {{input_file}} --threshold {{threshold}}"
+9. All scripts use standardized `--input`/`--output` argparse arguments for file paths. Parameters are passed inside the input JSON, not as CLI args.
 10. Explain what you changed and why
 
 ## Response Format (JSON only, no markdown)
@@ -586,18 +600,29 @@ Traceback:
   "target_uph": float,
   "processes": [{{
     "process_id": "P001",
-    "parallel_count": int,
     "predecessor_ids": [],
-    "successor_ids": [],
-    "parallel_lines": [{{
-      "parallel_index": 1,
-      "name": "string",
-      "description": "string",
-      "cycle_time_sec": float,
-      "location": {{"x": float, "y": float, "z": float}},
-      "rotation_y": float
-    }}],
-    "resources": [...]
+    "successor_ids": []
+  }}],
+  "process_details": [{{
+    "process_id": "P001",
+    "parallel_index": 1,
+    "name": "string",
+    "description": "string",
+    "cycle_time_sec": float,
+    "location": {{"x": float, "y": float, "z": float}},
+    "rotation_y": float,
+    "computed_size": {{"width": float, "height": float, "depth": float}}
+  }}],
+  "resource_assignments": [{{
+    "process_id": "P001",
+    "parallel_index": 1,
+    "resource_type": "equipment|worker|material",
+    "resource_id": "string",
+    "quantity": float,
+    "relative_location": {{"x": float, "y": float, "z": float}},
+    "rotation_y": float,
+    "scale": {{"x": float, "y": float, "z": float}},
+    "computed_size": {{"width": float, "height": float, "depth": float}}
   }}],
   "equipments": [...],
   "workers": [...],
@@ -611,8 +636,11 @@ Traceback:
 }}
 
 IMPORTANT Notes:
-- Process details (name, location, cycle_time) are in `parallel_lines[]`, NOT at process level
-- Access pattern: `process['parallel_lines'][0]['location']` (NOT `process['location']`)
+- **3D Coordinate System (Three.js, Y-up)**: X=flow direction, Y=height(floor=0), Z=parallel separation. Units=meters, rotation_y=RADIANS.
+- processes[] = routing only (process_id, predecessor_ids, successor_ids)
+- process_details[] = instance details (name, location, cycle_time, computed_size per parallel_index)
+- resource_assignments[] = resource mapping (top-level, NOT nested in process)
+- Access pattern: `bop_json['process_details'][0]['location']` (NOT `process['location']`)
 - Obstacles use `position` (not `pos`), size uses `width/height/depth` (not `x/y/z`)
 
 ## Task

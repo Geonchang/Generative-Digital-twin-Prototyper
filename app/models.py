@@ -13,6 +13,13 @@ class Location(BaseModel):
     z: float = 0.0
 
 
+class Size3D(BaseModel):
+    """3D 크기"""
+    width: float = 0.4
+    height: float = 0.4
+    depth: float = 0.4
+
+
 # ============================================
 # 마스터 데이터 모델
 # ============================================
@@ -42,16 +49,21 @@ class Material(BaseModel):
 
 
 # ============================================
-# 공정-리소스 연결 모델
+# 리소스 배치 모델 (top-level)
 # ============================================
 
-class ProcessResource(BaseModel):
-    """공정에서 사용하는 리소스 (중간 테이블)"""
+class ResourceAssignment(BaseModel):
+    """리소스 배치 (process_id + parallel_index로 공정 인스턴스에 매핑)"""
+    process_id: str = Field(..., description="소속 공정 ID")
+    parallel_index: int = Field(default=1, description="병렬 인덱스 (1-based)")
     resource_type: str = Field(..., description="리소스 타입: equipment, worker, material")
     resource_id: str = Field(..., description="리소스 ID (마스터 데이터 참조)")
     quantity: float = Field(default=1.0, description="사용 수량")
-    relative_location: Location = Field(..., description="공정 내 상대 좌표")
+    relative_location: Optional[Location] = Field(default=None, description="공정 내 상대 좌표")
     role: Optional[str] = Field(default=None, description="역할/용도 (예: 주작업자, 검사)")
+    rotation_y: float = Field(default=0.0, description="Y축 회전 (라디안)")
+    scale: Optional[Dict[str, float]] = Field(default=None, description="XYZ 스케일")
+    computed_size: Optional[Size3D] = Field(default=None, description="계산된 기본 크기")
 
     @validator('resource_type')
     def validate_resource_type(cls, v):
@@ -68,37 +80,36 @@ class ProcessResource(BaseModel):
 
 
 # ============================================
+# 공정 상세 모델 (top-level)
+# ============================================
+
+class ProcessDetail(BaseModel):
+    """공정 인스턴스 상세 (process_id + parallel_index로 식별)"""
+    process_id: str = Field(..., description="소속 공정 ID")
+    parallel_index: int = Field(default=1, description="병렬 인덱스 (1-based)")
+    name: str = Field(..., description="공정명")
+    description: Optional[str] = Field(default=None, description="공정 설명")
+    cycle_time_sec: float = Field(default=60.0, description="사이클 타임 (초)")
+    location: Optional[Location] = Field(default=None, description="절대 좌표")
+    rotation_y: float = Field(default=0.0, description="Y축 회전")
+    computed_size: Optional[Size3D] = Field(default=None, description="계산된 공정 바운딩박스 크기")
+
+    @validator('cycle_time_sec')
+    def validate_cycle_time(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError("cycle_time_sec는 양수여야 합니다")
+        return v
+
+
+# ============================================
 # 공정 모델
 # ============================================
 
 class Process(BaseModel):
-    """제조 공정 (단일 작업 단위)"""
+    """공정 라우팅 (연결 정보만)"""
     process_id: str = Field(..., description="공정 고유 ID")
-    name: str = Field(..., description="공정명")
-    description: str = Field(..., description="공정 설명")
-    cycle_time_sec: float = Field(..., description="사이클 타임 (초)")
-    parallel_count: int = Field(default=1, description="병렬 라인 수")
-    location: Location = Field(..., description="절대 좌표 (전체 화면 기준)")
     predecessor_ids: List[str] = Field(default_factory=list, description="선행 공정 ID 리스트")
     successor_ids: List[str] = Field(default_factory=list, description="후속 공정 ID 리스트")
-    resources: List[ProcessResource] = Field(default_factory=list, description="이 공정에서 사용하는 리소스들")
-
-    @validator('cycle_time_sec')
-    def validate_cycle_time(cls, v):
-        if v <= 0:
-            raise ValueError("cycle_time_sec는 양수여야 합니다")
-        return v
-
-    @validator('parallel_count')
-    def validate_parallel_count(cls, v):
-        if v < 1:
-            raise ValueError("parallel_count는 1 이상이어야 합니다")
-        return v
-
-    @property
-    def effective_cycle_time_sec(self) -> float:
-        """병렬 처리를 고려한 실제 사이클 타임"""
-        return self.cycle_time_sec / self.parallel_count
 
 
 # ============================================
@@ -109,7 +120,9 @@ class BOPData(BaseModel):
     """Bill of Process 전체 데이터"""
     project_title: str = Field(..., description="프로젝트 제목")
     target_uph: int = Field(..., description="목표 시간당 생산량")
-    processes: List[Process] = Field(..., description="공정 리스트")
+    processes: List[Process] = Field(..., description="공정 라우팅 리스트")
+    process_details: List[ProcessDetail] = Field(default_factory=list, description="공정 인스턴스 상세 리스트")
+    resource_assignments: List[ResourceAssignment] = Field(default_factory=list, description="리소스 배치 리스트")
     equipments: List[Equipment] = Field(default_factory=list, description="설비 마스터 리스트")
     workers: List[Worker] = Field(default_factory=list, description="작업자 마스터 리스트")
     materials: List[Material] = Field(default_factory=list, description="자재 마스터 리스트")
@@ -143,20 +156,27 @@ class BOPData(BaseModel):
             duplicates = [pid for pid in process_id_list if process_id_list.count(pid) > 1]
             return False, f"중복된 process_id가 있습니다: {set(duplicates)}"
 
-        # 각 공정의 리소스 참조 검증
-        for process in self.processes:
-            for resource in process.resources:
-                if resource.resource_type == 'equipment':
-                    if resource.resource_id not in equipment_ids:
-                        return False, f"Process {process.process_id}의 equipment_id '{resource.resource_id}'가 equipments 목록에 없습니다"
-                elif resource.resource_type == 'worker':
-                    if resource.resource_id not in worker_ids:
-                        return False, f"Process {process.process_id}의 worker_id '{resource.resource_id}'가 workers 목록에 없습니다"
-                elif resource.resource_type == 'material':
-                    if resource.resource_id not in material_ids:
-                        return False, f"Process {process.process_id}의 material_id '{resource.resource_id}'가 materials 목록에 없습니다"
+        # resource_assignments 참조 검증
+        for ra in self.resource_assignments:
+            if ra.process_id not in process_ids:
+                return False, f"ResourceAssignment의 process_id '{ra.process_id}'가 processes 목록에 없습니다"
+            if ra.resource_type == 'equipment':
+                if ra.resource_id not in equipment_ids:
+                    return False, f"Process {ra.process_id}의 equipment_id '{ra.resource_id}'가 equipments 목록에 없습니다"
+            elif ra.resource_type == 'worker':
+                if ra.resource_id not in worker_ids:
+                    return False, f"Process {ra.process_id}의 worker_id '{ra.resource_id}'가 workers 목록에 없습니다"
+            elif ra.resource_type == 'material':
+                if ra.resource_id not in material_ids:
+                    return False, f"Process {ra.process_id}의 material_id '{ra.resource_id}'가 materials 목록에 없습니다"
 
-            # 선행/후속 공정 ID 검증
+        # process_details 참조 검증
+        for pd in self.process_details:
+            if pd.process_id not in process_ids:
+                return False, f"ProcessDetail의 process_id '{pd.process_id}'가 processes 목록에 없습니다"
+
+        # 선행/후속 공정 ID 검증
+        for process in self.processes:
             for pred_id in process.predecessor_ids:
                 if pred_id not in process_ids:
                     return False, f"Process {process.process_id}의 predecessor_id '{pred_id}'가 processes 목록에 없습니다"
@@ -225,6 +245,7 @@ class UnifiedChatRequest(BaseModel):
     message: str
     current_bop: Optional[BOPData] = None
     model: Optional[str] = None  # LLM 모델 선택 (None이면 기본 모델 사용)
+    language: Optional[str] = "ko"  # 응답 언어 ("ko" 또는 "en")
 
 
 class UnifiedChatResponse(BaseModel):

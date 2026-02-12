@@ -5,7 +5,6 @@ import sys
 import time
 import shutil
 import builtins
-import re
 import copy
 import inspect
 import traceback
@@ -64,34 +63,6 @@ def _sanitize_json_floats(obj):
     else:
         return obj, False
 
-
-def _detect_args_format_error(stderr: str) -> Optional[Dict[str, Any]]:
-    """
-    argparse 오류 패턴을 감지하고 분석합니다.
-    Returns: {"type": "invalid_placeholder", "placeholder": "wall_thickness"} 또는 None
-    """
-    if not stderr:
-        return None
-
-    # Pattern: invalid float value: '{placeholder}'
-    import re
-    match = re.search(r"invalid (\w+) value: '\{(\w+)\}'", stderr)
-    if match:
-        return {
-            "type": "unsubstituted_placeholder",
-            "value_type": match.group(1),
-            "placeholder": match.group(2),
-        }
-
-    # Pattern: argument --xxx: expected one argument
-    match = re.search(r"argument (--\w+): expected", stderr)
-    if match:
-        return {
-            "type": "missing_argument",
-            "argument": match.group(1),
-        }
-
-    return None
 
 
 def _capture_error_info(e: Exception) -> Dict[str, Any]:
@@ -208,54 +179,14 @@ def _build_command(
     input_file: Path,
     output_file: Path,
     execution_type: str,
-    args_format: Optional[str],
-    bop_data: dict,
-    params: Optional[Dict[str, Any]] = None,
 ) -> list:
-    """Build the subprocess command, substituting args_format placeholders."""
+    """Build the subprocess command with standardized --input/--output args."""
     if execution_type == "python":
         cmd = [sys.executable, str(script_path)]
     else:
         cmd = [str(script_path)]
 
-    if args_format:
-        # Substitute known placeholders
-        substitutions = {
-            "input_file": str(input_file),
-            "output_file": str(output_file),
-        }
-        # Extract top-level BOP scalars (e.g. target_uph)
-        for key, val in bop_data.items():
-            if isinstance(val, (int, float, str, bool)):
-                substitutions[key] = str(val)
-
-        # === 핵심 수정: params도 치환 대상에 추가 ===
-        if params:
-            for key, val in params.items():
-                if val is not None:
-                    substitutions[key] = str(val)
-
-        # Replace {placeholder} in args_format
-        args_str = args_format
-        for key, val in substitutions.items():
-            args_str = args_str.replace(f"{{{key}}}", val)
-
-        log.debug("[build_command] args_format: %s -> %s", args_format, args_str)
-
-        # 치환되지 않은 placeholder 검출 (자가 진단)
-        import re
-        remaining_placeholders = re.findall(r'\{(\w+)\}', args_str)
-        if remaining_placeholders:
-            log.warning("[build_command] 치환되지 않은 placeholder 발견: %s", remaining_placeholders)
-
-        # Split into individual arguments
-        # Use shlex-like splitting but handle -- flags properly
-        parts = args_str.split()
-        cmd.extend(parts)
-    else:
-        # Fallback: pass input and output files as positional args
-        cmd.append(str(input_file))
-        cmd.append(str(output_file))
+    cmd.extend(["--input", str(input_file), "--output", str(output_file)])
 
     log.info("[build_command] 최종 명령어: %s", ' '.join(cmd[:5]) + ('...' if len(cmd) > 5 else ''))
     return cmd
@@ -267,11 +198,8 @@ def _execute_subprocess(
     input_file: Path,
     output_file: Path,
     execution_type: str,
-    args_format: Optional[str],
-    bop_data: dict,
-    params: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, str, int]:
-    cmd = _build_command(script_path, input_file, output_file, execution_type, args_format, bop_data, params)
+    cmd = _build_command(script_path, input_file, output_file, execution_type)
 
     env = {
         "PATH": os.environ.get("PATH", ""),
@@ -333,7 +261,6 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
     log.info("[execute] === 도구 실행 시작 ===")
     log.info("[execute] tool_id=%s, tool_name=%s", tool_id, metadata.tool_name)
     log.info("[execute] params=%s", json.dumps(params, ensure_ascii=False) if params else "None")
-    log.info("[execute] args_format=%s", metadata.input_schema.args_format if metadata.input_schema else "None")
 
     # 로그 수집용 변수
     exec_log = {
@@ -351,7 +278,6 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
         "execution_time_sec": None,
         "auto_repair_attempts": 0,
         "auto_repair_success": False,
-        "script_repair_info": None,
     }
 
     # 현재 사용할 어댑터 코드 (복구 시 업데이트됨)
@@ -404,10 +330,8 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
 
         exec_log["input"] = tool_input
 
-        # 5. 입력/출력 파일 경로 결정
-        input_suffix_map = {"csv": ".csv", "json": ".json", "args": ".csv", "stdin": ".txt"}
-        input_suffix = input_suffix_map.get(metadata.input_schema.type, ".txt")
-        input_file = work_dir / f"input_data{input_suffix}"
+        # 5. 입력/출력 파일 경로 결정 (항상 .json)
+        input_file = work_dir / "input_data.json"
         with open(input_file, "w", encoding="utf-8") as f:
             f.write(tool_input)
 
@@ -420,23 +344,14 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
         else:
             log.info("[execute] 입력 파일 미리보기: %s...", tool_input[:200])
 
-        output_suffix_map = {"csv": ".csv", "json": ".json"}
-        output_suffix = output_suffix_map.get(
-            metadata.output_schema.type if metadata.output_schema else None, ".csv"
-        )
-        output_file = work_dir / f"output_data{output_suffix}"
-
-        # args_format 추출 (args 타입인 경우)
-        args_format = None
-        if metadata.input_schema and metadata.input_schema.args_format:
-            args_format = metadata.input_schema.args_format
+        output_file = work_dir / "output_data.json"
 
         # 6. 외부 스크립트 실행
-        log.info("[execute] 스크립트 실행 시작: %s (args_format=%s)", metadata.file_name, args_format)
+        log.info("[execute] 스크립트 실행 시작: %s", metadata.file_name)
         try:
             stdout, stderr, return_code = _execute_subprocess(
                 script_path, work_dir, input_file, output_file,
-                metadata.execution_type, args_format, bop_data, params,
+                metadata.execution_type,
             )
             log.info("[execute] 스크립트 실행 완료: return_code=%d", return_code)
         except TimeoutError as e:
@@ -453,39 +368,9 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
             log.warning("[execute] stderr: %s", stderr[:500] if stderr else "None")
             log.warning("[execute] stdout: %s", stdout[:1000] if stdout else "None")
 
-            # === 스크립트 오류 자가 진단 ===
-            args_error = _detect_args_format_error(stderr)
-            if args_error:
-                log.info("[execute] argparse 오류 감지: %s", args_error)
-                exec_log["script_repair_info"] = args_error
-
-                if args_error["type"] == "unsubstituted_placeholder":
-                    placeholder = args_error["placeholder"]
-                    # params에 해당 값이 있는지 확인
-                    if params and placeholder in params:
-                        log.error(
-                            "[execute] 치환 실패: params에 '%s'=%s 가 있지만 args_format에서 치환되지 않음",
-                            placeholder, params[placeholder]
-                        )
-                        exec_log["message"] = (
-                            f"스크립트 인자 오류: '{placeholder}' 파라미터가 전달되지 않았습니다. "
-                            f"(값: {params[placeholder]}). 시스템 버그일 수 있습니다."
-                        )
-                    else:
-                        log.error(
-                            "[execute] params에 '%s' 키가 없음. params_schema 또는 args_format 확인 필요",
-                            placeholder
-                        )
-                        exec_log["message"] = (
-                            f"스크립트 인자 오류: '{placeholder}' 파라미터가 정의되지 않았습니다. "
-                            f"도구를 다시 등록하거나 params_schema를 확인해 주세요."
-                        )
-            else:
-                exec_log["message"] = f"스크립트가 오류 코드 {return_code}로 종료되었습니다."
-
+            exec_log["message"] = f"스크립트가 오류 코드 {return_code}로 종료되었습니다."
             exec_log["execution_time_sec"] = time.time() - start_time
 
-            # 최종 실패 메시지 로깅
             log.error("[execute] 최종 실패: %s", exec_log["message"])
 
             return {
@@ -494,7 +379,6 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
                 "stdout": stdout[:2000] if stdout else None,
                 "stderr": stderr[:2000] if stderr else None,
                 "execution_time_sec": exec_log["execution_time_sec"],
-                "error_diagnosis": args_error,
             }
 
         # 7. 도구 출력 수집 (output file에서 읽기)

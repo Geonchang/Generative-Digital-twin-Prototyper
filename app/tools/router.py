@@ -20,7 +20,7 @@ from app.tools.tool_models import (
 )
 from app.tools.analyzer import analyze_script
 from app.tools.synthesizer import synthesize_adapter, generate_schema_from_description, improve_schema_from_feedback, generate_tool_script, improve_tool
-from app.tools.registry import list_tools, get_tool, delete_tool, save_tool, generate_tool_id, get_script_content, update_tool_script
+from app.tools.registry import list_tools, get_tool, delete_tool, save_tool, generate_tool_id, find_existing_tool_id, get_script_content, update_tool_script
 from app.tools.executor import execute_tool
 
 router = APIRouter(prefix="/api/tools", tags=["tools"])
@@ -51,10 +51,22 @@ async def analyze_tool(req: AnalyzeRequest):
 
 @router.post("/register", response_model=RegisterResponse)
 async def register_tool(req: RegisterRequest):
-    """FR-2 + FR-3: 어댑터 코드를 생성하고 도구를 등록합니다."""
+    """FR-2 + FR-3: 어댑터 코드를 생성하고 도구를 등록합니다.
+
+    같은 이름의 도구가 이미 존재하면 업데이트합니다.
+    """
     try:
         log.info("[register] 시작 - tool_name=%s", req.tool_name)
-        tool_id = generate_tool_id(req.tool_name)
+
+        # 기존 도구 확인 (같은 이름이면 업데이트)
+        existing_id = find_existing_tool_id(req.tool_name)
+        is_update = existing_id is not None
+        tool_id = existing_id if is_update else generate_tool_id(req.tool_name)
+
+        if is_update:
+            log.info("[register] 기존 도구 발견 - 업데이트 모드: %s", tool_id)
+        else:
+            log.info("[register] 새 도구 등록: %s", tool_id)
 
         metadata = ToolMetadata(
             tool_id=tool_id,
@@ -65,6 +77,8 @@ async def register_tool(req: RegisterRequest):
             input_schema=req.input_schema,
             output_schema=req.output_schema,
             params_schema=req.params_schema,
+            example_input=req.example_input,
+            example_output=req.example_output,
         )
         log.info("[register] metadata 생성 완료")
 
@@ -73,14 +87,15 @@ async def register_tool(req: RegisterRequest):
         adapter = await synthesize_adapter(metadata, source_code=req.source_code, model=req.model)
         log.info("[register] adapter 생성 완료")
 
-        # 레지스트리에 저장
+        # 레지스트리에 저장 (기존 도구가 있으면 덮어씀)
         save_tool(metadata, adapter, req.source_code)
         log.info("[register] 저장 완료")
 
+        action = "업데이트" if is_update else "등록"
         return RegisterResponse(
             tool_id=tool_id,
             tool_name=req.tool_name,
-            message=f"도구 '{req.tool_name}'이(가) 등록되었습니다.",
+            message=f"도구 '{req.tool_name}'이(가) {action}되었습니다.",
             adapter_preview={
                 "pre_process_code": adapter.pre_process_code[:500],
                 "post_process_code": adapter.post_process_code[:500],
@@ -93,7 +108,10 @@ async def register_tool(req: RegisterRequest):
 
 @router.post("/register-schema-only", response_model=RegisterSchemaOnlyResponse)
 async def register_schema_only(req: RegisterSchemaOnlyRequest):
-    """스키마만으로 도구를 등록합니다 (스크립트는 나중에 업로드)."""
+    """스키마만으로 도구를 등록합니다 (스크립트는 나중에 업로드).
+
+    같은 이름의 도구가 이미 존재하면 업데이트합니다.
+    """
     try:
         log.info("=" * 60)
         log.info("[register-schema-only] === 스키마 우선 등록 시작 ===")
@@ -101,7 +119,15 @@ async def register_schema_only(req: RegisterSchemaOnlyRequest):
         log.info("[register-schema-only] input_type=%s, output_type=%s",
                  req.input_schema.type, req.output_schema.type)
 
-        tool_id = generate_tool_id(req.tool_name)
+        # 기존 도구 확인 (같은 이름이면 업데이트)
+        existing_id = find_existing_tool_id(req.tool_name)
+        is_update = existing_id is not None
+        tool_id = existing_id if is_update else generate_tool_id(req.tool_name)
+
+        if is_update:
+            log.info("[register-schema-only] 기존 도구 발견 - 업데이트 모드: %s", tool_id)
+        else:
+            log.info("[register-schema-only] 새 도구 등록: %s", tool_id)
 
         # 임시 파일명 생성 (나중에 실제 스크립트 업로드 시 변경 가능)
         temp_file_name = f"{tool_id}_placeholder.py"
@@ -115,6 +141,8 @@ async def register_schema_only(req: RegisterSchemaOnlyRequest):
             input_schema=req.input_schema,
             output_schema=req.output_schema,
             params_schema=req.params_schema,
+            example_input=req.example_input,
+            example_output=req.example_output,
         )
         log.info("[register-schema-only] metadata 생성 완료")
 
@@ -134,9 +162,10 @@ if __name__ == "__main__":
     main()
 """
 
-        # 레지스트리에 저장
+        # 레지스트리에 저장 (기존 도구가 있으면 덮어씀)
         save_tool(metadata, adapter, placeholder_script)
-        log.info("[register-schema-only] 저장 완료: %s", tool_id)
+        action = "업데이트" if is_update else "등록"
+        log.info("[register-schema-only] 저장 완료: %s (%s)", tool_id, action)
         log.info("[register-schema-only] === 등록 완료 ===")
         log.info("=" * 60)
 
@@ -144,7 +173,7 @@ if __name__ == "__main__":
             success=True,
             tool_id=tool_id,
             tool_name=req.tool_name,
-            message=f"도구 '{req.tool_name}'의 스키마와 어댑터가 등록되었습니다. 스크립트는 나중에 업로드하세요.",
+            message=f"도구 '{req.tool_name}'의 스키마와 어댑터가 {action}되었습니다. 스크립트는 나중에 업로드하세요.",
             adapter_preview={
                 "pre_process_code": adapter.pre_process_code[:500],
                 "post_process_code": adapter.post_process_code[:500],
@@ -325,7 +354,9 @@ async def generate_script_endpoint(req: GenerateScriptRequest):
             req.description,
             model=req.model,
             input_schema=input_schema_dict,
-            output_schema=output_schema_dict
+            output_schema=output_schema_dict,
+            example_input=req.example_input,
+            example_output=req.example_output,
         )
         if result is None:
             return GenerateScriptResponse(

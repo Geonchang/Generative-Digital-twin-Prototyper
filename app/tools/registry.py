@@ -20,17 +20,57 @@ def _ensure_dirs():
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def generate_tool_id(tool_name: str) -> str:
+def generate_tool_id(tool_name: str, allow_existing: bool = True) -> str:
+    """
+    도구 이름으로부터 ID를 생성합니다.
+
+    Args:
+        tool_name: 도구 이름
+        allow_existing: True면 기존 ID가 있어도 그대로 반환 (업데이트용)
+                       False면 기존 ID가 있으면 카운터를 붙여 새 ID 생성
+
+    Returns:
+        tool_id 문자열
+    """
     slug = re.sub(r'[^a-zA-Z0-9_]', '_', tool_name.lower()).strip('_')
     slug = re.sub(r'_+', '_', slug)
     if not slug:
         slug = "tool"
+
+    # allow_existing=True면 기존 ID가 있어도 그대로 반환 (덮어쓰기/업데이트 용도)
+    if allow_existing:
+        return slug
+
+    # allow_existing=False면 충돌 시 카운터 추가
     base_slug = slug
     counter = 1
     while (REGISTRY_DIR / slug).exists():
         slug = f"{base_slug}_{counter}"
         counter += 1
     return slug
+
+
+def find_existing_tool_id(tool_name: str) -> Optional[str]:
+    """
+    도구 이름과 일치하는 기존 tool_id를 찾습니다.
+
+    Args:
+        tool_name: 검색할 도구 이름
+
+    Returns:
+        기존 tool_id 또는 None
+    """
+    _ensure_dirs()
+    slug = re.sub(r'[^a-zA-Z0-9_]', '_', tool_name.lower()).strip('_')
+    slug = re.sub(r'_+', '_', slug)
+    if not slug:
+        slug = "tool"
+
+    # 정확히 일치하는 ID가 있는지 확인
+    if (REGISTRY_DIR / slug).exists():
+        return slug
+
+    return None
 
 
 def save_tool(metadata: ToolMetadata, adapter: AdapterCode, source_code: str) -> str:

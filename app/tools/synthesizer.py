@@ -24,6 +24,110 @@ def _strip_markdown_block(text: str) -> str:
     return text.strip()
 
 
+def _unescape_json_string(s: str) -> str:
+    """JSON 문자열 값의 이스케이프를 올바르게 복원합니다.
+
+    json.loads를 사용하여 \\n, \\t, \\uXXXX, \\" 등 모든 JSON 이스케이프 시퀀스를 처리합니다.
+    json.loads 실패 시 수동 대체를 수행합니다.
+    """
+    try:
+        return json.loads('"' + s + '"')
+    except (json.JSONDecodeError, ValueError):
+        # Fallback: 일반적인 이스케이프 시퀀스 수동 처리
+        result = s
+        # \\\\ 를 먼저 처리해야 이중 처리 방지
+        result = result.replace('\\\\', '\x00BKSL\x00')
+        result = result.replace('\\n', '\n')
+        result = result.replace('\\t', '\t')
+        result = result.replace('\\r', '\r')
+        result = result.replace('\\b', '\b')
+        result = result.replace('\\f', '\f')
+        result = result.replace('\\"', '"')
+        result = result.replace('\\/', '/')
+        result = result.replace('\x00BKSL\x00', '\\')
+        return result
+
+
+def _extract_code_fields_from_json_text(text: str) -> dict:
+    """JSON 텍스트에서 코드 필드를 추출하고, 플레이스홀더로 대체한 파싱 가능한 JSON을 반환합니다.
+
+    LLM 응답에서 코드 필드(pre_process_code, post_process_code, script_code)에
+    이스케이프되지 않은 따옴표(예: Python docstring의 \"\"\")가 포함되어
+    표준 JSON 파싱이 실패할 때 사용합니다.
+
+    Returns:
+        dict with 'parsed_data' (parsed JSON) and 'code_fields' (extracted code values)
+    Raises:
+        ValueError if extraction fails
+    """
+    import re
+
+    # 개선 응답에서 알려진 JSON 필드명 목록
+    known_fields = [
+        'explanation', 'pre_process_code', 'post_process_code',
+        'script_code', 'changes_summary', 'params_schema',
+        'input_schema', 'output_schema'
+    ]
+
+    code_field_names = ['pre_process_code', 'post_process_code', 'script_code']
+    code_fields = {}
+    modified_text = text
+
+    for field_name in code_field_names:
+        # 필드 시작 패턴: "field_name" : "
+        field_pattern = rf'"{field_name}"\s*:\s*"'
+        field_match = re.search(field_pattern, modified_text)
+        if not field_match:
+            continue
+
+        value_start = field_match.end()
+
+        # 다음 알려진 필드의 시작 위치를 찾아 경계 결정
+        # 패턴: , "next_field" :
+        best_boundary = len(modified_text)
+        for next_field in known_fields:
+            if next_field == field_name:
+                continue
+            next_pattern = rf',\s*"{next_field}"\s*:'
+            next_match = re.search(next_pattern, modified_text[value_start:])
+            if next_match:
+                absolute_pos = value_start + next_match.start()
+                if absolute_pos < best_boundary:
+                    best_boundary = absolute_pos
+
+        # 마지막 필드인 경우: 닫는 } 찾기
+        last_brace = modified_text.rfind('}')
+        if last_brace > value_start and last_brace < best_boundary:
+            best_boundary = last_brace
+
+        # value_start ~ best_boundary 사이의 텍스트에서 마지막 " 가 닫는 따옴표
+        segment = modified_text[value_start:best_boundary]
+        last_quote = segment.rfind('"')
+        if last_quote < 0:
+            log.warning(f"[extract] {field_name}: 닫는 따옴표를 찾을 수 없음")
+            continue
+
+        code_value = segment[:last_quote]
+        code_fields[field_name] = code_value
+
+        # 플레이스홀더로 대체
+        replace_start = field_match.start()
+        replace_end = value_start + last_quote + 1  # 닫는 따옴표 포함
+        before = modified_text[:replace_start]
+        after = modified_text[replace_end:]
+        modified_text = before + f'"{field_name}": "PLACEHOLDER_{field_name}"' + after
+
+    # 플레이스홀더로 대체된 JSON 파싱
+    data = json.loads(modified_text)
+
+    # 코드 필드 복원 (올바른 이스케이프 해제)
+    for field_name, code_value in code_fields.items():
+        if field_name in data:
+            data[field_name] = _unescape_json_string(code_value)
+
+    return data
+
+
 async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None, model: str = None) -> AdapterCode:
     """LLM을 사용하여 BOP ↔ Tool 어댑터 코드를 생성합니다."""
     import time
@@ -65,6 +169,22 @@ async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None, mo
     else:
         params_schema_section = ""
 
+    # example data section — concrete I/O examples for accurate adapter generation
+    example_parts = []
+    if metadata.example_input or metadata.example_output:
+        example_parts.append("## Concrete I/O Examples (IMPORTANT — match these structures exactly)")
+        if metadata.example_input:
+            example_parts.append(
+                "**Tool Input Example** (what convert_bop_to_input should produce):\n"
+                f"```json\n{json.dumps(metadata.example_input, indent=2, ensure_ascii=False)}\n```"
+            )
+        if metadata.example_output:
+            example_parts.append(
+                "**Tool Output Example** (what apply_result_to_bop will receive):\n"
+                f"```json\n{json.dumps(metadata.example_output, indent=2, ensure_ascii=False)}\n```"
+            )
+    example_data_section = "\n\n".join(example_parts) if example_parts else ""
+
     prompt = ADAPTER_SYNTHESIS_PROMPT.format(
         tool_name=metadata.tool_name,
         tool_description=metadata.description,
@@ -72,6 +192,7 @@ async def synthesize_adapter(metadata: ToolMetadata, source_code: str = None, mo
         output_schema_json=json.dumps(metadata.output_schema.model_dump(), indent=2, ensure_ascii=False),
         source_code_section=source_code_section,
         params_schema_section=params_schema_section,
+        example_data_section=example_data_section,
     )
 
     log.info("[synthesize] 프롬프트 준비 완료: %d bytes", len(prompt))
@@ -188,8 +309,8 @@ async def repair_adapter(
                 code_match = re.search(r'"fixed_code":\s*"((?:[^"\\]|\\.)*)"', response_text, re.DOTALL)
                 if code_match:
                     fixed_code = code_match.group(1)
-                    # 이스케이프 시퀀스 처리
-                    fixed_code = fixed_code.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"').replace('\\\\', '\\')
+                    # 이스케이프 시퀀스 처리 (json.loads 사용으로 모든 시퀀스 올바르게 복원)
+                    fixed_code = _unescape_json_string(fixed_code)
                     log.info("[repair] 정규식으로 코드 추출 성공 (길이: %d)", len(fixed_code))
                     return fixed_code
                 else:
@@ -275,11 +396,16 @@ DO NOT generate actual script code yet.
 
 ## Available BOP Data Sources (Reference Only - Use What's Needed)
 
-**Processes:**
-- process_id, cycle_time_sec, parallel_count
+**Processes (routing):**
+- process_id, predecessor_ids[], successor_ids[]
+
+**Process Details (instances):**
+- process_id, parallel_index, name, description, cycle_time_sec
 - location {{x, y, z}} (3D position), rotation_y
-- predecessor_ids[], successor_ids[]
-- resources[] (equipment/worker/material assignments)
+
+**Resource Assignments (top-level):**
+- process_id, parallel_index, resource_type (equipment|worker|material)
+- resource_id, quantity, role, relative_location {{x,y,z}}, rotation_y, scale, computed_size
 
 **Equipment:**
 - equipment_id, name, type (robot|machine|manual_station)
@@ -330,19 +456,23 @@ Purpose: Analyze, calculate statistics, find bottlenecks
 // ✅ GOOD - Cycle time bottleneck analysis
 {{
   "example_input": {{
-    "processes": [
-      {{"process_id": "P001", "cycle_time_sec": 45.0, "parallel_count": 2}},
-      {{"process_id": "P002", "cycle_time_sec": 120.0, "parallel_count": 1}},
-      {{"process_id": "P003", "cycle_time_sec": 30.0, "parallel_count": 3}}
+    "process_details": [
+      {{"process_id": "P001", "parallel_index": 1, "cycle_time_sec": 45.0}},
+      {{"process_id": "P001", "parallel_index": 2, "cycle_time_sec": 45.0}},
+      {{"process_id": "P002", "parallel_index": 1, "cycle_time_sec": 120.0}},
+      {{"process_id": "P003", "parallel_index": 1, "cycle_time_sec": 30.0}},
+      {{"process_id": "P003", "parallel_index": 2, "cycle_time_sec": 30.0}},
+      {{"process_id": "P003", "parallel_index": 3, "cycle_time_sec": 30.0}}
     ],
     "target_uph": 100.0
   }},
   "example_output": {{
     "bottleneck_process_id": "P002",
     "bottleneck_cycle_time": 120.0,
+    "parallel_count": 1,
     "required_parallel_count": 4,
     "current_uph": 60.0,
-    "improvement_suggestions": ["P002 공정 병렬라인 추가 필요"]
+    "improvement_suggestions": ["P002 공정 병렬 인스턴스 추가 필요"]
   }}
 }}
 
@@ -466,7 +596,8 @@ Purpose: Detect errors, conflicts, invalid configurations
 - Understand the tool's PURPOSE first
 - Select ONLY the BOP fields needed
 - Provide CONCRETE, REALISTIC examples
-- NEVER use "args_format" field
+- NEVER use "args_format" field — it has been removed from the system
+- All scripts use standardized `--input`/`--output` argparse for JSON file I/O
 
 Return ONLY the JSON object, no markdown code blocks.
 """
@@ -525,7 +656,9 @@ async def generate_tool_script(
     user_description: str,
     model: str = None,
     input_schema: Optional[Dict[str, Any]] = None,
-    output_schema: Optional[Dict[str, Any]] = None
+    output_schema: Optional[Dict[str, Any]] = None,
+    example_input: Optional[Any] = None,
+    example_output: Optional[Any] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     사용자 설명을 기반으로 Python 도구 스크립트를 생성합니다.
@@ -579,7 +712,23 @@ async def generate_tool_script(
 ```json
 {json_lib.dumps(output_schema, indent=2, ensure_ascii=False)}
 ```
-
+"""
+        # 예제 데이터가 있으면 추가
+        if example_input:
+            schema_section += f"""
+**Concrete Input Example:**
+```json
+{json_lib.dumps(example_input, indent=2, ensure_ascii=False)}
+```
+"""
+        if example_output:
+            schema_section += f"""
+**Concrete Output Example:**
+```json
+{json_lib.dumps(example_output, indent=2, ensure_ascii=False)}
+```
+"""
+        schema_section += """
 **CRITICAL:** Your script MUST accept input matching the Input Schema exactly and produce output matching the Output Schema exactly.
 The adapter will convert BOP data to this input format, and convert your output back to BOP format.
 DO NOT expect BOP structure directly - work ONLY with the schemas above.
@@ -737,63 +886,12 @@ async def improve_tool(
             try:
                 data = json.loads(text)
             except json.JSONDecodeError as json_err:
-                # 코드 필드의 이스케이프 문제 해결 시도
-                log.warning("[improve] 표준 JSON 파싱 실패, 코드 필드 추출 시도")
-                import re
-
-                # 모든 코드 필드를 추출하고 플레이스홀더로 대체
-                code_fields = {}
-                modified_text = text
-
-                for field_name in ['pre_process_code', 'post_process_code', 'script_code']:
-                    # 필드 값을 추출 (간단한 방식)
-                    try:
-                        # "field_name": " 로 시작하는 부분 찾기
-                        field_start = modified_text.find(f'"{field_name}": "')
-                        if field_start == -1:
-                            continue
-
-                        # 시작 위치 이동 (": " 다음)
-                        value_start = field_start + len(f'"{field_name}": "')
-
-                        # 닫는 따옴표 찾기 (이스케이프된 따옴표는 무시)
-                        i = value_start
-                        code_value = ""
-                        while i < len(modified_text):
-                            if modified_text[i] == '\\' and i + 1 < len(modified_text):
-                                # 이스케이프 시퀀스
-                                code_value += modified_text[i:i+2]
-                                i += 2
-                            elif modified_text[i] == '"':
-                                # 닫는 따옴표 발견
-                                break
-                            else:
-                                code_value += modified_text[i]
-                                i += 1
-
-                        if i < len(modified_text):
-                            code_fields[field_name] = code_value
-                            # 플레이스홀더로 대체
-                            before = modified_text[:field_start]
-                            after = modified_text[i+1:]
-                            modified_text = before + f'"{field_name}": "PLACEHOLDER_{field_name}"' + after
-                    except Exception as e:
-                        log.warning(f"[improve] {field_name} 추출 실패: {e}")
-                        continue
-
+                # 코드 필드에 이스케이프되지 않은 따옴표(예: Python docstring """)가 있으면
+                # 표준 JSON 파싱이 실패함 → 필드 경계 기반 추출 사용
+                log.warning("[improve] 표준 JSON 파싱 실패, 필드 경계 기반 코드 추출 시도")
                 try:
-                    # 플레이스홀더로 대체된 JSON 파싱
-                    data = json.loads(modified_text)
-                    # 코드 필드 복원 (이스케이프 해제)
-                    for field_name, code_value in code_fields.items():
-                        if field_name in data:
-                            # 이스케이프 시퀀스 처리
-                            try:
-                                data[field_name] = code_value.encode('utf-8').decode('unicode_escape')
-                            except:
-                                # 이스케이프 실패 시 원본 사용
-                                data[field_name] = code_value.replace('\\n', '\n').replace('\\t', '\t').replace('\\"', '"')
-                    log.info("[improve] 코드 필드 수동 추출 및 복원 성공")
+                    data = _extract_code_fields_from_json_text(text)
+                    log.info("[improve] 코드 필드 경계 기반 추출 및 복원 성공")
                 except Exception as e2:
                     log.error("[improve] 코드 필드 추출 방법도 실패: %s", str(e2))
                     raise json_err
@@ -940,7 +1038,7 @@ Improve the schemas based on the user's feedback. Return the improved schemas in
 }}
 
 ## CRITICAL Rules:
-- **NEVER use "args_format" field** - it's only for command-line tools
+- **NEVER use "args_format" field** - it has been removed from the system
 - For json/dict types: use "structure" (nested dict) or "fields" (flat string array)
 - **IMPORTANT**: "fields" must be an array of STRINGS, NOT objects/dicts
   - WRONG: "fields": [{{"name": "x", "type": "number"}}] ❌

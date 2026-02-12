@@ -32,11 +32,12 @@ class GeminiProvider(BaseLLMProvider):
 
         for attempt in range(max_retries):
             try:
-                # Gemini API REST endpoint
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+                # Gemini API REST endpoint (API 키는 헤더로 전달 - URL 노출 방지)
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
 
                 headers = {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'x-goog-api-key': self.api_key
                 }
 
                 payload = {

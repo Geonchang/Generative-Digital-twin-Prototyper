@@ -10,24 +10,121 @@ from app.llm import get_provider
 load_dotenv()
 
 
+def get_resource_size(resource_type: str, equipment_type: str = None) -> dict:
+    """
+    리소스 타입에 따른 기본 크기를 반환합니다.
+    Viewer3D.jsx의 getResourceSize()와 동일한 값.
+    """
+    if resource_type == "equipment":
+        if equipment_type == "robot":
+            return {"width": 1.4, "height": 1.7, "depth": 0.6}
+        elif equipment_type == "machine":
+            return {"width": 2.1, "height": 1.9, "depth": 1.0}
+        elif equipment_type == "manual_station":
+            return {"width": 1.6, "height": 1.0, "depth": 0.8}
+        else:
+            return {"width": 0.4, "height": 0.4, "depth": 0.4}
+    elif resource_type == "worker":
+        return {"width": 0.5, "height": 1.7, "depth": 0.3}
+    elif resource_type == "material":
+        return {"width": 0.4, "height": 0.25, "depth": 0.4}
+    return {"width": 0.4, "height": 0.4, "depth": 0.4}
+
+
+def compute_resource_sizes(bop_data: dict) -> dict:
+    """
+    모든 resource_assignments에 computed_size를 부여합니다.
+    """
+    print("[COMPUTE-SIZES] 리소스 크기 계산 시작")
+
+    equipments = bop_data.get("equipments", [])
+    equipment_type_map = {eq["equipment_id"]: eq["type"] for eq in equipments}
+
+    computed_count = 0
+    for ra in bop_data.get("resource_assignments", []):
+        eq_type = None
+        if ra["resource_type"] == "equipment":
+            eq_type = equipment_type_map.get(ra["resource_id"])
+        size = get_resource_size(ra["resource_type"], eq_type)
+        ra["computed_size"] = size
+        computed_count += 1
+
+    print(f"[COMPUTE-SIZES] 완료: {computed_count}개 리소스 크기 계산")
+    return bop_data
+
+
+def compute_process_sizes(bop_data: dict) -> dict:
+    """
+    모든 process_details에 computed_size (바운딩박스)를 계산합니다.
+    리소스들의 relative_location + computed_size + scale로부터 공정 전체 크기를 구합니다.
+    반드시 compute_resource_sizes() 이후에 호출해야 합니다.
+    """
+    resource_assignments = bop_data.get("resource_assignments", [])
+    computed_count = 0
+
+    for pd in bop_data.get("process_details", []):
+        pid = pd.get("process_id")
+        pidx = pd.get("parallel_index", 1)
+
+        resources = [
+            ra for ra in resource_assignments
+            if ra.get("process_id") == pid and ra.get("parallel_index", 1) == pidx
+        ]
+
+        if not resources:
+            pd["computed_size"] = {"width": 0.5, "height": 0.5, "depth": 0.5}
+            computed_count += 1
+            continue
+
+        min_x = float("inf")
+        max_x = float("-inf")
+        min_z = float("inf")
+        max_z = float("-inf")
+        max_height = 0.0
+
+        for idx, r in enumerate(resources):
+            rel_loc = r.get("relative_location") or {"x": 0, "y": 0, "z": 0}
+            x = rel_loc.get("x", 0)
+            z = rel_loc.get("z", 0)
+
+            # auto-layout 폴백 (프론트엔드 bopStore.js와 동일)
+            if x == 0 and z == 0 and len(resources) > 1:
+                step = 0.9
+                z = idx * step - (len(resources) - 1) * step / 2
+
+            size = r.get("computed_size") or {"width": 0.4, "height": 0.4, "depth": 0.4}
+            scale = r.get("scale") or {"x": 1, "y": 1, "z": 1}
+
+            actual_w = size.get("width", 0.4) * scale.get("x", 1)
+            actual_d = size.get("depth", 0.4) * scale.get("z", 1)
+            actual_h = size.get("height", 0.4) * scale.get("y", 1)
+
+            min_x = min(min_x, x - actual_w / 2)
+            max_x = max(max_x, x + actual_w / 2)
+            min_z = min(min_z, z - actual_d / 2)
+            max_z = max(max_z, z + actual_d / 2)
+            max_height = max(max_height, actual_h)
+
+        pd["computed_size"] = {
+            "width": round(max_x - min_x, 2),
+            "height": round(max_height, 2),
+            "depth": round(max_z - min_z, 2),
+        }
+        computed_count += 1
+
+    print(f"[COMPUTE-SIZES] 공정 크기 계산 완료: {computed_count}개")
+    return bop_data
+
+
 def ensure_manual_stations(bop_data: dict) -> dict:
     """
-    작업자나 로봇이 있는 공정에 수작업대(manual_station)가 없으면 자동으로 추가합니다.
-
-    규칙:
-    - 공정에 worker가 있으면 manual_station 1개 이상 필수
-    - 공정에 robot이 있으면 manual_station 1개 권장 (감독용)
-
-    Args:
-        bop_data: BOP 데이터
-
-    Returns:
-        dict: manual_station이 보장된 BOP 데이터
+    작업자나 로봇이 있는 공정 인스턴스에 수작업대(manual_station)가 없으면 자동으로 추가합니다.
     """
     print("[ENSURE-MANUAL-STATIONS] 수작업대 검증 시작")
 
     equipments = bop_data.get("equipments", [])
-    processes = bop_data.get("processes", [])
+    process_details = bop_data.get("process_details", [])
+    resource_assignments = bop_data.get("resource_assignments", [])
 
     # Equipment ID별 타입 매핑
     equipment_type_map = {eq["equipment_id"]: eq["type"] for eq in equipments}
@@ -41,31 +138,35 @@ def ensure_manual_stations(bop_data: dict) -> dict:
 
     added_count = 0
 
-    for process in processes:
-        resources = process.get("resources", [])
+    # 각 공정 인스턴스별로 검사
+    for detail in process_details:
+        pid = detail["process_id"]
+        pidx = detail.get("parallel_index", 1)
 
-        # 현재 공정의 리소스 분석
+        # 이 인스턴스의 리소스들
+        instance_resources = [
+            ra for ra in resource_assignments
+            if ra["process_id"] == pid and ra.get("parallel_index", 1) == pidx
+        ]
+
         has_worker = False
         has_robot = False
         has_manual_station = False
 
-        for resource in resources:
-            if resource["resource_type"] == "worker":
+        for ra in instance_resources:
+            if ra["resource_type"] == "worker":
                 has_worker = True
-            elif resource["resource_type"] == "equipment":
-                eq_type = equipment_type_map.get(resource["resource_id"])
+            elif ra["resource_type"] == "equipment":
+                eq_type = equipment_type_map.get(ra["resource_id"])
                 if eq_type == "robot":
                     has_robot = True
                 elif eq_type == "manual_station":
                     has_manual_station = True
 
-        # 작업자나 로봇이 있는데 수작업대가 없으면 추가
         if (has_worker or has_robot) and not has_manual_station:
-            # 새 manual_station 생성
             max_eq_num += 1
             new_eq_id = f"EQ{max_eq_num:03d}"
 
-            # Equipment 마스터에 추가
             new_equipment = {
                 "equipment_id": new_eq_id,
                 "name": f"작업대 {max_eq_num}",
@@ -74,17 +175,17 @@ def ensure_manual_stations(bop_data: dict) -> dict:
             equipments.append(new_equipment)
             equipment_type_map[new_eq_id] = "manual_station"
 
-            # 공정 리소스에 추가
-            new_resource = {
+            new_ra = {
+                "process_id": pid,
+                "parallel_index": pidx,
                 "resource_type": "equipment",
                 "resource_id": new_eq_id,
-                "quantity": 1,
-                "role": "작업대"
+                "quantity": 1
             }
-            resources.append(new_resource)
+            resource_assignments.append(new_ra)
 
             added_count += 1
-            print(f"  - Process {process['process_id']}: manual_station 추가 ({new_eq_id})")
+            print(f"  - Process {pid}#{pidx}: manual_station 추가 ({new_eq_id})")
 
     if added_count > 0:
         print(f"[ENSURE-MANUAL-STATIONS] 완료: {added_count}개 수작업대 자동 추가")
@@ -92,193 +193,191 @@ def ensure_manual_stations(bop_data: dict) -> dict:
         print(f"[ENSURE-MANUAL-STATIONS] 완료: 모든 공정에 수작업대 존재")
 
     bop_data["equipments"] = equipments
+    bop_data["resource_assignments"] = resource_assignments
     return bop_data
 
 
 def sort_resources_order(bop_data: dict) -> dict:
     """
-    공정 내 리소스를 정렬합니다.
-
-    정렬 순서:
-    1. Equipment - robot
-    2. Equipment - machine
-    3. Equipment - manual_station
-    4. Worker
-    5. Material
-
-    Args:
-        bop_data: BOP 데이터
-
-    Returns:
-        dict: 리소스가 정렬된 BOP 데이터
+    resource_assignments를 정렬합니다.
+    정렬 순서: Equipment-robot → machine → manual_station → Worker → Material
     """
     print("[SORT-RESOURCES] 리소스 정렬 시작")
 
     equipments = bop_data.get("equipments", [])
-    processes = bop_data.get("processes", [])
-
-    # Equipment ID별 타입 매핑
     equipment_type_map = {eq["equipment_id"]: eq["type"] for eq in equipments}
 
-    def get_sort_key(resource):
-        """리소스의 정렬 키를 반환합니다."""
-        resource_type = resource["resource_type"]
-
+    def get_sort_key(ra):
+        resource_type = ra["resource_type"]
         if resource_type == "equipment":
-            eq_type = equipment_type_map.get(resource["resource_id"], "unknown")
+            eq_type = equipment_type_map.get(ra["resource_id"], "unknown")
             if eq_type == "robot":
-                return (1, resource["resource_id"])  # 1순위: robot
+                return (0, ra["process_id"], ra.get("parallel_index", 1), 1, ra["resource_id"])
             elif eq_type == "machine":
-                return (2, resource["resource_id"])  # 2순위: machine
+                return (0, ra["process_id"], ra.get("parallel_index", 1), 2, ra["resource_id"])
             elif eq_type == "manual_station":
-                return (3, resource["resource_id"])  # 3순위: manual_station
+                return (0, ra["process_id"], ra.get("parallel_index", 1), 3, ra["resource_id"])
             else:
-                return (4, resource["resource_id"])  # 4순위: 기타 equipment
+                return (0, ra["process_id"], ra.get("parallel_index", 1), 4, ra["resource_id"])
         elif resource_type == "worker":
-            return (5, resource["resource_id"])  # 5순위: worker
+            return (0, ra["process_id"], ra.get("parallel_index", 1), 5, ra["resource_id"])
         elif resource_type == "material":
-            return (6, resource["resource_id"])  # 6순위: material
-        else:
-            return (7, resource.get("resource_id", ""))  # 7순위: 기타
+            return (0, ra["process_id"], ra.get("parallel_index", 1), 6, ra["resource_id"])
+        return (0, ra["process_id"], ra.get("parallel_index", 1), 7, ra.get("resource_id", ""))
 
-    # 각 공정의 리소스 정렬
-    sorted_count = 0
-    for process in processes:
-        resources = process.get("resources", [])
-        if len(resources) > 1:
-            original_order = [r["resource_id"] for r in resources]
-            resources.sort(key=get_sort_key)
-            new_order = [r["resource_id"] for r in resources]
+    resource_assignments = bop_data.get("resource_assignments", [])
+    resource_assignments.sort(key=get_sort_key)
+    bop_data["resource_assignments"] = resource_assignments
 
-            if original_order != new_order:
-                sorted_count += 1
-                print(f"  - Process {process['process_id']}: {' → '.join(original_order)} → {' → '.join(new_order)}")
-
-    if sorted_count > 0:
-        print(f"[SORT-RESOURCES] 완료: {sorted_count}개 공정 리소스 정렬")
-    else:
-        print(f"[SORT-RESOURCES] 완료: 정렬 필요 없음")
-
+    print(f"[SORT-RESOURCES] 완료: {len(resource_assignments)}개 리소스 정렬")
     return bop_data
 
 
 def apply_automatic_layout(bop_data: dict) -> dict:
     """
-    BOP 데이터에 자동 좌표 배치를 적용합니다.
-
-    좌표 체계:
-    - 공정(Process): X축 방향으로 순차 배치 (0, 5, 10, 15, ...)
-    - 리소스(Resource): 공정 내부에서 Z축 방향으로 순차 배치 (상대 좌표)
-
-    Args:
-        bop_data: 좌표가 없는 BOP 데이터
-
-    Returns:
-        dict: 좌표가 적용된 BOP 데이터
+    BOP 데이터에 자동 좌표 배치를 적용합니다 (DAG 구조 지원).
+    process_details에 location, resource_assignments에 relative_location 할당.
     """
-    print("[AUTO-LAYOUT] 자동 좌표 배치 시작")
+    print("[AUTO-LAYOUT] 자동 좌표 배치 시작 (DAG 모드)")
 
     processes = bop_data.get("processes", [])
+    process_details = bop_data.get("process_details", [])
+    resource_assignments = bop_data.get("resource_assignments", [])
 
-    # 공정 좌표 배치 (X축 순차)
-    for i, process in enumerate(processes):
-        # 공정 위치: X축으로 3m 간격
-        process["location"] = {
-            "x": i * 3,
-            "y": 0,
-            "z": 0
-        }
+    if not processes:
+        return bop_data
 
-        # 리소스 좌표 배치 (Z축 순차)
-        resources = process.get("resources", [])
-        total_resources = len(resources)
+    # 1. DAG 레벨 계산
+    levels = _calculate_dag_levels(processes)
+    print(f"[AUTO-LAYOUT] DAG 레벨 계산 완료: {levels}")
 
-        if total_resources > 0:
-            # Auto-layout: Z축 수직 배치 (공정 중심 기준 상대 좌표)
-            step = 0.9  # depth(0.6) + spacing(0.3)
+    # 2. 레벨별로 공정 그룹화
+    level_groups = {}
+    for process_id, level in levels.items():
+        if level not in level_groups:
+            level_groups[level] = []
+        level_groups[level].append(process_id)
 
-            for j, resource in enumerate(resources):
-                # 중심을 기준으로 위아래로 분산 배치
-                z = j * step - (total_resources - 1) * step / 2
+    # 3. 좌표 배치
+    x_spacing = 3.0
+    z_spacing = 3.0
 
-                resource["relative_location"] = {
-                    "x": 0,
+    for level in sorted(level_groups.keys()):
+        group = level_groups[level]
+        group_size = len(group)
+
+        for idx, process_id in enumerate(group):
+            x = level * x_spacing
+            z = (idx - (group_size - 1) / 2) * z_spacing
+
+            # 이 공정의 모든 process_details에 location 할당
+            details_for_process = [
+                d for d in process_details if d["process_id"] == process_id
+            ]
+
+            for detail_idx, detail in enumerate(details_for_process):
+                detail["location"] = {
+                    "x": x,
                     "y": 0,
-                    "z": z
+                    "z": z + detail_idx * 5  # 병렬 인스턴스는 Z축 5m 간격
                 }
 
-        print(f"  - Process {process['process_id']}: location={process['location']}, resources={total_resources}개")
+                # 이 인스턴스의 리소스에 relative_location 할당
+                pidx = detail.get("parallel_index", 1)
+                instance_resources = [
+                    ra for ra in resource_assignments
+                    if ra["process_id"] == process_id and ra.get("parallel_index", 1) == pidx
+                ]
 
-    print(f"[AUTO-LAYOUT] 완료: {len(processes)}개 공정 배치")
+                total_resources = len(instance_resources)
+                if total_resources > 0:
+                    step = 0.9
+                    for j, ra in enumerate(instance_resources):
+                        rz = j * step - (total_resources - 1) * step / 2
+                        ra["relative_location"] = {"x": 0, "y": 0, "z": rz}
+
+            print(f"  - Process {process_id}: level={level}, details={len(details_for_process)}개")
+
+    print(f"[AUTO-LAYOUT] 완료: {len(processes)}개 공정 배치 ({len(level_groups)}개 레벨)")
     return bop_data
+
+
+def _calculate_dag_levels(processes: list) -> dict:
+    """
+    DAG 구조에서 각 공정의 레벨(깊이)을 계산합니다.
+    """
+    all_ids = {p["process_id"] for p in processes}
+
+    predecessors = {}
+    for p in processes:
+        pid = p["process_id"]
+        preds = p.get("predecessor_ids", [])
+        predecessors[pid] = [pred for pred in preds if pred in all_ids]
+
+    levels = {}
+
+    def get_level(pid):
+        if pid in levels:
+            return levels[pid]
+
+        preds = predecessors.get(pid, [])
+        if not preds:
+            levels[pid] = 0
+            return 0
+
+        max_pred_level = max(get_level(pred) for pred in preds)
+        levels[pid] = max_pred_level + 1
+        return levels[pid]
+
+    for p in processes:
+        get_level(p["process_id"])
+
+    return levels
 
 
 def preserve_existing_layout(new_bop: dict, current_bop: dict) -> dict:
     """
     기존 BOP의 좌표를 새 BOP에 보존합니다.
-
-    Args:
-        new_bop: 새로 생성된 BOP (좌표 없음)
-        current_bop: 기존 BOP (좌표 있음)
-
-    Returns:
-        dict: 기존 좌표가 보존된 새 BOP
     """
-    # 기존 공정 좌표를 process_id로 매핑
-    existing_process_locations = {}
-    for process in current_bop.get("processes", []):
-        if "location" in process:
-            existing_process_locations[process["process_id"]] = process["location"]
+    # 기존 process_details 좌표를 (process_id, parallel_index)로 매핑
+    existing_detail_locations = {}
+    for detail in current_bop.get("process_details", []):
+        key = (detail["process_id"], detail.get("parallel_index", 1))
+        if "location" in detail:
+            existing_detail_locations[key] = detail["location"]
 
-    # 기존 리소스 좌표를 (process_id, resource_id)로 매핑
+    # 기존 resource_assignments 좌표를 (process_id, parallel_index, resource_id)로 매핑
     existing_resource_locations = {}
-    for process in current_bop.get("processes", []):
-        for resource in process.get("resources", []):
-            if "relative_location" in resource:
-                key = (process["process_id"], resource["resource_id"])
-                existing_resource_locations[key] = resource["relative_location"]
+    for ra in current_bop.get("resource_assignments", []):
+        if "relative_location" in ra:
+            key = (ra["process_id"], ra.get("parallel_index", 1), ra["resource_id"])
+            existing_resource_locations[key] = ra["relative_location"]
 
     # 새 BOP에 기존 좌표 적용
-    new_processes = []
-    for process in new_bop.get("processes", []):
-        process_id = process["process_id"]
+    for detail in new_bop.get("process_details", []):
+        key = (detail["process_id"], detail.get("parallel_index", 1))
+        if key in existing_detail_locations:
+            detail["location"] = existing_detail_locations[key]
 
-        # 기존 공정 좌표가 있으면 보존
-        if process_id in existing_process_locations:
-            process["location"] = existing_process_locations[process_id]
+    for ra in new_bop.get("resource_assignments", []):
+        key = (ra["process_id"], ra.get("parallel_index", 1), ra["resource_id"])
+        if key in existing_resource_locations:
+            ra["relative_location"] = existing_resource_locations[key]
 
-        # 리소스 좌표 보존
-        for resource in process.get("resources", []):
-            key = (process_id, resource["resource_id"])
-            if key in existing_resource_locations:
-                resource["relative_location"] = existing_resource_locations[key]
-
-        new_processes.append(process)
-
-    new_bop["processes"] = new_processes
     return new_bop
 
 
 def validate_bop_data(bop_data: dict) -> Tuple[bool, str]:
     """
     BOP 데이터의 유효성을 검증합니다.
-
-    Args:
-        bop_data: 검증할 BOP 데이터
-
-    Returns:
-        Tuple[bool, str]: (검증 성공 여부, 에러 메시지)
     """
     try:
-        # Pydantic 모델로 파싱 (기본 필드 검증)
         bop = BOPData(**bop_data)
 
-        # 참조 무결성 검증
         is_valid, error_msg = bop.validate_references()
         if not is_valid:
             return False, error_msg
 
-        # 순환 참조 검증
         is_valid, error_msg = bop.detect_cycles()
         if not is_valid:
             return False, error_msg
@@ -292,43 +391,28 @@ def validate_bop_data(bop_data: dict) -> Tuple[bool, str]:
 async def generate_bop_from_text(user_input: str, model: str = None) -> dict:
     """
     사용자 입력을 받아 LLM을 통해 BOP JSON을 생성합니다.
-
-    Args:
-        user_input: 사용자의 생산 라인 요청 텍스트
-        model: 사용할 모델 (None이면 기본 모델 사용)
-
-    Returns:
-        dict: 파싱된 BOP JSON 데이터
-
-    Raises:
-        Exception: API 호출 실패 또는 JSON 파싱 실패 시
     """
-    # Get default model if not specified
     if not model:
         model = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash")
 
-    # Get provider for the specified model
     provider = get_provider(model)
-
-    # System prompt + user input 결합
     full_prompt = f"{SYSTEM_PROMPT}\n\nUser request: {user_input}"
 
-    # JSON 파싱 재시도 (최대 3번)
     max_retries = 3
     last_error = None
 
     for attempt in range(max_retries):
         try:
-            # LLM API 호출 (provider abstraction 사용)
             bop_data = await provider.generate_json(full_prompt, max_retries=1)
 
             # 수작업대 보장
             bop_data = ensure_manual_stations(bop_data)
-
-            # 리소스 정렬 (robot → machine → manual_station → worker → material)
+            # 리소스 정렬
             bop_data = sort_resources_order(bop_data)
-
-            # 자동 좌표 배치 적용
+            # 리소스 크기 계산
+            bop_data = compute_resource_sizes(bop_data)
+            bop_data = compute_process_sizes(bop_data)
+            # 자동 좌표 배치
             bop_data = apply_automatic_layout(bop_data)
 
             # BOP 검증
@@ -336,7 +420,6 @@ async def generate_bop_from_text(user_input: str, model: str = None) -> dict:
             if not is_valid:
                 raise ValueError(f"BOP 검증 실패: {error_msg}")
 
-            # processes가 비어있지 않은지 확인
             if len(bop_data["processes"]) == 0:
                 raise ValueError("processes는 비어있지 않아야 합니다.")
 
@@ -348,67 +431,48 @@ async def generate_bop_from_text(user_input: str, model: str = None) -> dict:
             if attempt < max_retries - 1:
                 continue
 
-    # 모든 재시도 실패
     raise Exception(f"BOP 생성 실패: {last_error}")
 
 
 async def modify_bop(current_bop: dict, user_message: str, model: str = None) -> dict:
     """
     현재 BOP와 사용자 수정 요청을 받아 업데이트된 BOP를 생성합니다.
-
-    Args:
-        current_bop: 현재 BOP 데이터 (dict)
-        user_message: 사용자의 수정 요청 메시지
-        model: 사용할 모델 (None이면 기본 모델 사용)
-
-    Returns:
-        dict: 업데이트된 BOP JSON 데이터
-
-    Raises:
-        Exception: API 호출 실패 또는 JSON 파싱 실패 시
     """
-    # Get default model if not specified
     if not model:
         model = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash")
 
-    # Get provider for the specified model
     provider = get_provider(model)
-
-    # 현재 BOP를 JSON 문자열로 변환 (들여쓰기 포함)
     current_bop_json = json.dumps(current_bop, indent=2, ensure_ascii=False)
 
-    # 수정 프롬프트 구성
     full_prompt = MODIFY_PROMPT_TEMPLATE.format(
         current_bop_json=current_bop_json,
         user_message=user_message
     )
 
-    # JSON 파싱 재시도 (최대 3번)
     max_retries = 3
     last_error = None
 
     for attempt in range(max_retries):
         try:
-            # LLM API 호출 (provider abstraction 사용)
             updated_bop = await provider.generate_json(full_prompt, max_retries=1)
 
-            # 수작업대 보장
             updated_bop = ensure_manual_stations(updated_bop)
-
-            # 리소스 정렬 (robot → machine → manual_station → worker → material)
             updated_bop = sort_resources_order(updated_bop)
+            updated_bop = compute_resource_sizes(updated_bop)
+            updated_bop = compute_process_sizes(updated_bop)
 
-            # 기존 좌표 보존하면서 새로운 요소에만 자동 배치 적용
+            # 기존 좌표 보존
             updated_bop = preserve_existing_layout(updated_bop, current_bop)
 
-            # 좌표가 없는 새 공정/리소스가 있으면 자동 배치
+            # 좌표가 없는 새 요소가 있으면 자동 배치
             needs_layout = False
-            for process in updated_bop.get("processes", []):
-                if "location" not in process:
+            for detail in updated_bop.get("process_details", []):
+                if "location" not in detail:
                     needs_layout = True
                     break
-                for resource in process.get("resources", []):
-                    if "relative_location" not in resource:
+            if not needs_layout:
+                for ra in updated_bop.get("resource_assignments", []):
+                    if "relative_location" not in ra:
                         needs_layout = True
                         break
 
@@ -416,7 +480,6 @@ async def modify_bop(current_bop: dict, user_message: str, model: str = None) ->
                 print("[MODIFY] 새 요소 발견, 자동 좌표 배치 적용")
                 updated_bop = apply_automatic_layout(updated_bop)
 
-            # BOP 검증
             is_valid, error_msg = validate_bop_data(updated_bop)
             if not is_valid:
                 raise ValueError(f"BOP 검증 실패: {error_msg}")
@@ -429,87 +492,66 @@ async def modify_bop(current_bop: dict, user_message: str, model: str = None) ->
             if attempt < max_retries - 1:
                 continue
 
-    # 모든 재시도 실패
     raise Exception(f"BOP 수정 실패: {last_error}")
 
 
-async def unified_chat(user_message: str, current_bop: dict = None, model: str = None) -> dict:
+async def unified_chat(user_message: str, current_bop: dict = None, model: str = None, language: str = "ko") -> dict:
     """
     통합 채팅 엔드포인트: BOP 생성, 수정, QA를 모두 처리합니다.
-
-    Args:
-        user_message: 사용자 메시지
-        current_bop: 현재 BOP 데이터 (없으면 None)
-        model: 사용할 모델 (None이면 기본 모델 사용)
-
-    Returns:
-        dict: {
-            "message": str,  # 사용자에게 보여줄 응답 메시지
-            "bop_data": dict  # (선택) BOP가 생성/수정된 경우
-        }
-
-    Raises:
-        Exception: API 호출 실패 또는 JSON 파싱 실패 시
     """
-    # Get default model if not specified
     if not model:
         model = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash")
 
-    # Get provider for the specified model
     provider = get_provider(model)
 
-    # 컨텍스트 구성
     if current_bop:
         current_bop_json = json.dumps(current_bop, indent=2, ensure_ascii=False)
         context = f"Current BOP:\n{current_bop_json}"
     else:
         context = "No current BOP exists yet."
 
-    # 프롬프트 구성
+    # 언어 지시사항 추가
+    if language == "en":
+        language_instruction = "\n\nIMPORTANT: You MUST respond in English. The \"message\" field must be in English."
+    else:
+        language_instruction = "\n\nIMPORTANT: You MUST respond in Korean (한국어). The \"message\" field must be in Korean."
+
     full_prompt = UNIFIED_CHAT_PROMPT_TEMPLATE.format(
         context=context,
         user_message=user_message
-    )
+    ) + language_instruction
 
-    # JSON 파싱 재시도 (최대 3번)
     max_retries = 3
     last_error = None
 
     for attempt in range(max_retries):
         try:
-            # LLM API 호출 (provider abstraction 사용)
             response_data = await provider.generate_json(full_prompt, max_retries=1)
 
-            # 디버깅: 응답 내용 출력
             print(f"[DEBUG] LLM Response: {json.dumps(response_data, indent=2, ensure_ascii=False)[:500]}...")
 
-            # 필수 필드 검증
             if "message" not in response_data:
                 raise ValueError("응답에 'message' 필드가 없습니다.")
 
-            # bop_data가 있으면 검증
             if "bop_data" in response_data:
                 bop_data = response_data["bop_data"]
 
-                # 수작업대 보장
                 bop_data = ensure_manual_stations(bop_data)
-
-                # 리소스 정렬 (robot → machine → manual_station → worker → material)
                 bop_data = sort_resources_order(bop_data)
+                bop_data = compute_resource_sizes(bop_data)
+                bop_data = compute_process_sizes(bop_data)
 
-                # 기존 BOP가 있으면 좌표 보존, 없으면 자동 배치
                 if current_bop:
-                    # 기존 좌표 보존
                     bop_data = preserve_existing_layout(bop_data, current_bop)
 
-                    # 좌표가 없는 새 요소가 있으면 자동 배치
                     needs_layout = False
-                    for process in bop_data.get("processes", []):
-                        if "location" not in process:
+                    for detail in bop_data.get("process_details", []):
+                        if "location" not in detail:
                             needs_layout = True
                             break
-                        for resource in process.get("resources", []):
-                            if "relative_location" not in resource:
+                    if not needs_layout:
+                        for ra in bop_data.get("resource_assignments", []):
+                            if "relative_location" not in ra:
                                 needs_layout = True
                                 break
 
@@ -517,13 +559,10 @@ async def unified_chat(user_message: str, current_bop: dict = None, model: str =
                         print("[UNIFIED] 새 요소 발견, 자동 좌표 배치 적용")
                         bop_data = apply_automatic_layout(bop_data)
                 else:
-                    # 신규 생성: 자동 좌표 배치
                     bop_data = apply_automatic_layout(bop_data)
 
-                # 업데이트된 bop_data를 response_data에 다시 할당
                 response_data["bop_data"] = bop_data
 
-                # BOP 검증
                 is_valid, error_msg = validate_bop_data(bop_data)
                 if not is_valid:
                     print(f"[ERROR] BOP 검증 실패: {error_msg}")
@@ -540,5 +579,4 @@ async def unified_chat(user_message: str, current_bop: dict = None, model: str =
             if attempt < max_retries - 1:
                 continue
 
-    # 모든 재시도 실패
     raise Exception(f"Unified chat 실패: {last_error}")
