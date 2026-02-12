@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import useBopStore from '../store/bopStore';
 import { api } from '../services/api';
+import useTranslation from '../i18n/useTranslation';
 
 function BopTable() {
   const {
@@ -22,17 +23,27 @@ function BopTable() {
     unlinkProcesses,
     updateProjectSettings
   } = useBopStore();
+  const { t } = useTranslation();
 
   const [editingSettings, setEditingSettings] = useState(false);
   const [editProjectTitle, setEditProjectTitle] = useState('');
   const [editTargetUph, setEditTargetUph] = useState('');
 
+  // Parse selection key: "P001:1" → { processId, parallelIndex }
+  const parseSelectedKey = (key) => {
+    if (!key) return null;
+    const parts = key.split(':');
+    return { processId: parts[0], parallelIndex: parseInt(parts[1], 10) || 1 };
+  };
+
+  const selectedInfo = parseSelectedKey(selectedProcessKey);
+
   if (!bopData) {
     return (
       <div style={styles.container}>
         <div style={styles.emptyState}>
-          <p>BOP 데이터가 없습니다.</p>
-          <p style={styles.hint}>오른쪽 패널에서 BOP를 생성해보세요.</p>
+          <p>{t('bop.noData')}</p>
+          <p style={styles.hint}>{t('bop.createHint')}</p>
         </div>
       </div>
     );
@@ -63,58 +74,57 @@ function BopTable() {
         <div style={styles.header}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
             <h2 style={styles.title}>{bopData.project_title}</h2>
-            <div style={styles.uph}>Target: {bopData.target_uph} UPH</div>
+            <div style={styles.uph}>{t('bop.target')}: {bopData.target_uph} UPH</div>
             <button
               style={styles.settingsButton}
               onClick={handleEditSettings}
-              title="프로젝트 설정 편집"
+              title={t('bop.editSettings')}
             >
               ⚙️
             </button>
           </div>
         </div>
         <div style={styles.emptyState}>
-          <p>공정이 없습니다.</p>
+          <p>{t('bop.noProcess')}</p>
           <button
             style={styles.actionButton}
             onClick={() => addProcess()}
           >
-            + 공정 추가
+            {t('bop.addProcess')}
           </button>
         </div>
 
-        {/* Settings Edit Modal */}
         {editingSettings && (
           <div style={styles.modalOverlay} onClick={handleCancelSettings}>
             <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <h3 style={styles.modalTitle}>프로젝트 설정</h3>
+              <h3 style={styles.modalTitle}>{t('bop.projectSettings')}</h3>
               <div style={styles.formGroup}>
-                <label style={styles.label}>프로젝트명</label>
+                <label style={styles.label}>{t('bop.projectName')}</label>
                 <input
                   type="text"
                   value={editProjectTitle}
                   onChange={(e) => setEditProjectTitle(e.target.value)}
                   style={styles.input}
-                  placeholder="예: 전기 자전거 조립 라인"
+                  placeholder={t('bop.projectNamePlaceholder')}
                 />
               </div>
               <div style={styles.formGroup}>
-                <label style={styles.label}>목표 UPH (시간당 생산량)</label>
+                <label style={styles.label}>{t('bop.targetUph')}</label>
                 <input
                   type="number"
                   value={editTargetUph}
                   onChange={(e) => setEditTargetUph(e.target.value)}
                   style={styles.input}
                   min="1"
-                  placeholder="예: 120"
+                  placeholder={t('bop.targetUphPlaceholder')}
                 />
               </div>
               <div style={styles.modalActions}>
                 <button style={styles.modalButtonCancel} onClick={handleCancelSettings}>
-                  취소
+                  {t('bop.cancel')}
                 </button>
                 <button style={styles.modalButtonSave} onClick={handleSaveSettings}>
-                  저장
+                  {t('bop.save')}
                 </button>
               </div>
             </div>
@@ -124,34 +134,58 @@ function BopTable() {
     );
   }
 
-  // Helper functions - 리소스 타입별 분류
-  const getResourcesByType = (process) => {
+  // Helper: get resources for a process instance from resource_assignments
+  const getResourcesByType = (processId, parallelIndex) => {
     const equipments = [];
     const workers = [];
     const materials = [];
 
-    if (!process.resources) return { equipments, workers, materials };
+    const assignments = (bopData.resource_assignments || []).filter(
+      r => r.process_id === processId && r.parallel_index === parallelIndex
+    );
 
-    process.resources.forEach(resource => {
+    assignments.forEach(resource => {
       if (resource.resource_type === 'equipment') {
         const eq = getEquipmentById(resource.resource_id);
-        if (eq) {
-          equipments.push({ ...eq, quantity: resource.quantity, role: resource.role });
-        }
+        if (eq) equipments.push({ ...eq, quantity: resource.quantity });
       } else if (resource.resource_type === 'worker') {
         const worker = getWorkerById(resource.resource_id);
-        if (worker) {
-          workers.push({ ...worker, quantity: resource.quantity, role: resource.role });
-        }
+        if (worker) workers.push({ ...worker, quantity: resource.quantity });
       } else if (resource.resource_type === 'material') {
         const material = getMaterialById(resource.resource_id);
-        if (material) {
-          materials.push({ ...material, quantity: resource.quantity, role: resource.role });
-        }
+        if (material) materials.push({ ...material, quantity: resource.quantity });
       }
     });
 
     return { equipments, workers, materials };
+  };
+
+  // Calculate process bounding box size from resource_assignments
+  const getProcessBBox = (processId, parallelIndex) => {
+    const resources = (bopData.resource_assignments || []).filter(
+      r => r.process_id === processId && r.parallel_index === parallelIndex
+    );
+    if (resources.length === 0) return null;
+
+    let minX = Infinity, maxX = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+
+    resources.forEach((resource) => {
+      const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
+      const x = relLoc.x;
+      const z = relLoc.z;
+      const size = resource.computed_size || { width: 0.4, height: 0.4, depth: 0.4 };
+
+      minX = Math.min(minX, x - size.width / 2);
+      maxX = Math.max(maxX, x + size.width / 2);
+      minZ = Math.min(minZ, z - size.depth / 2);
+      maxZ = Math.max(maxZ, z + size.depth / 2);
+    });
+
+    return {
+      width: +(maxX - minX).toFixed(1),
+      depth: +(maxZ - minZ).toFixed(1)
+    };
   };
 
   const formatResources = (resources, formatter) => {
@@ -159,14 +193,14 @@ function BopTable() {
     return resources.map(formatter).join(', ');
   };
 
-  const renderResourceCell = (process, isSelected, resourceType, assignedResources, allResources, idField) => {
+  const renderResourceCell = (processId, parallelIndex, isSelected, resourceType, assignedResources, allResources, idField) => {
     if (!isSelected) {
       return (
         <div style={styles.resourcesCell}>
           {formatResources(assignedResources, r =>
             resourceType === 'material'
               ? `${r.name} (${r.quantity}${r.unit})`
-              : `${r.name} (x${r.quantity})`
+              : r.name
           )}
         </div>
       );
@@ -184,7 +218,7 @@ function BopTable() {
               style={styles.resourceTagRemove}
               onClick={(e) => {
                 e.stopPropagation();
-                removeResourceFromProcess(process.process_id, resourceType, resource[idField]);
+                removeResourceFromProcess(processId, parallelIndex, resourceType, resource[idField]);
               }}
             >
               ×
@@ -197,12 +231,12 @@ function BopTable() {
             value=""
             onChange={(e) => {
               if (e.target.value) {
-                addResourceToProcess(process.process_id, { resource_type: resourceType, resource_id: e.target.value });
+                addResourceToProcess(processId, parallelIndex, { resource_type: resourceType, resource_id: e.target.value });
               }
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <option value="">+ 추가...</option>
+            <option value="">{t('bop.add')}</option>
             {available.map(r => (
               <option key={r[idField]} value={r[idField]}>{r.name}</option>
             ))}
@@ -213,19 +247,17 @@ function BopTable() {
   };
 
   // Render predecessor/successor link cell
-  const renderLinkCell = (process, isSelected, direction) => {
-    const baseId = process.parent_id || process.process_id;
-    const baseProc = process.parent_id
-      ? bopData.processes.find(p => p.process_id === process.parent_id) || process
-      : process;
+  const renderLinkCell = (routingProcess, isSelected, direction) => {
+    const processId = routingProcess.process_id;
     const linkIds = direction === 'predecessor'
-      ? (baseProc.predecessor_ids || [])
-      : (baseProc.successor_ids || []);
+      ? (routingProcess.predecessor_ids || [])
+      : (routingProcess.successor_ids || []);
 
-    // Resolve link IDs to process names
+    // Resolve link IDs to process detail names
     const linkedProcesses = linkIds.map(id => {
-      const p = bopData.processes.find(pr => pr.process_id === id);
-      return p ? { id: p.process_id, name: p.name } : { id, name: id };
+      const details = (bopData.process_details || []).filter(d => d.process_id === id);
+      const name = details.length > 0 ? details[0].name : id;
+      return { id, name };
     });
 
     if (!isSelected) {
@@ -236,11 +268,14 @@ function BopTable() {
       );
     }
 
-    // All base processes (independent + parents) excluding self group
-    const baseProcesses = bopData.processes.filter(p => !p.parent_id);
-    const available = baseProcesses.filter(p =>
-      p.process_id !== baseId && !linkIds.includes(p.process_id)
+    // All processes excluding self
+    const available = bopData.processes.filter(p =>
+      p.process_id !== processId && !linkIds.includes(p.process_id)
     );
+    const availableWithNames = available.map(p => {
+      const details = (bopData.process_details || []).filter(d => d.process_id === p.process_id);
+      return { process_id: p.process_id, name: details.length > 0 ? details[0].name : p.process_id };
+    });
 
     return (
       <div>
@@ -252,9 +287,9 @@ function BopTable() {
               onClick={(e) => {
                 e.stopPropagation();
                 if (direction === 'predecessor') {
-                  unlinkProcesses(lp.id, baseId);
+                  unlinkProcesses(lp.id, processId);
                 } else {
-                  unlinkProcesses(baseId, lp.id);
+                  unlinkProcesses(processId, lp.id);
                 }
               }}
             >
@@ -262,23 +297,23 @@ function BopTable() {
             </button>
           </div>
         ))}
-        {available.length > 0 && (
+        {availableWithNames.length > 0 && (
           <select
             style={styles.resourceSelect}
             value=""
             onChange={(e) => {
               if (e.target.value) {
                 if (direction === 'predecessor') {
-                  linkProcesses(e.target.value, baseId);
+                  linkProcesses(e.target.value, processId);
                 } else {
-                  linkProcesses(baseId, e.target.value);
+                  linkProcesses(processId, e.target.value);
                 }
               }
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <option value="">+ 추가...</option>
-            {available.map(p => (
+            <option value="">{t('bop.add')}</option>
+            {availableWithNames.map(p => (
               <option key={p.process_id} value={p.process_id}>{p.name}</option>
             ))}
           </select>
@@ -287,116 +322,60 @@ function BopTable() {
     );
   };
 
-  // Calculate bottleneck based on effective cycle time (CT / parallel_count)
+  // Calculate bottleneck based on effective cycle time using process_details
   const getBottleneck = () => {
     let maxEffectiveTime = 0;
-    let bottleneckProcess = null;
+    let bottleneckInfo = null;
 
-    // Group processes by base ID (parent or independent)
-    const baseProcesses = new Map();
+    bopData.processes.forEach(routing => {
+      const details = (bopData.process_details || []).filter(d => d.process_id === routing.process_id);
+      if (details.length === 0) return;
 
-    bopData.processes.forEach(process => {
-      if (process.is_parent) {
-        // Parent process - find all children and calculate effective CT
-        const baseId = process.process_id;
-        const children = bopData.processes.filter(p => p.parent_id === baseId);
-        const parallelCount = children.length || 1;
+      const childCTs = details.map(d => d.cycle_time_sec || 0);
+      const parallelCount = details.length;
 
-        // Effective CT using harmonic mean (throughput sum)
-        // Effective CT = 1 / Σ(1/CT_i)
-        // This correctly reflects that parallel lines add throughput
-        const childCTs = children.map(c => c.cycle_time_sec || 0);
-        const maxChildCT = children.length > 0
-          ? Math.max(...childCTs)
-          : process.cycle_time_sec;
+      // Effective CT using harmonic mean: 1 / Σ(1/CT_i)
+      const invSum = childCTs.reduce((sum, ct) => sum + (ct > 0 ? 1 / ct : 0), 0);
+      const effectiveCT = invSum > 0 ? 1 / invSum : 0;
+      const maxChildCT = Math.max(...childCTs);
 
-        // Calculate effective CT using harmonic mean
-        // Example: Line1=240s, Line2=140s
-        // → Rate1=1/240, Rate2=1/140
-        // → Total Rate = 1/240 + 1/140
-        // → Effective CT = 1 / (1/240 + 1/140) = 88.5s
-        const effectiveCT = children.length > 0
-          ? 1 / childCTs.reduce((sum, ct) => sum + (ct > 0 ? 1 / ct : 0), 0)
-          : process.cycle_time_sec;
-
-        // Debug log
-        if (baseId === 'P003') {
-          console.log(`[Bottleneck Debug] ${process.name}:`, {
-            baseId,
-            childCTs,
-            parallelCount,
-            effectiveCT,
-            throughputSum: childCTs.reduce((sum, ct) => sum + (ct > 0 ? 1 / ct : 0), 0),
-            formula: `1 / (${childCTs.map(ct => `1/${ct}`).join(' + ')})`
-          });
-        }
-
-        baseProcesses.set(baseId, {
-          process,
+      if (effectiveCT > maxEffectiveTime) {
+        maxEffectiveTime = effectiveCT;
+        bottleneckInfo = {
+          processId: routing.process_id,
+          name: details[0].name,
           effectiveCT,
           parallelCount,
           baseCT: maxChildCT
-        });
-      } else if (!process.parent_id) {
-        // Independent process (no parent)
-        const baseId = process.process_id;
-        const parallelCount = 1; // Independent processes have parallel_count = 1
-        const effectiveCT = process.cycle_time_sec;
-
-        baseProcesses.set(baseId, {
-          process,
-          effectiveCT,
-          parallelCount,
-          baseCT: process.cycle_time_sec
-        });
-      }
-      // Skip child processes - they're already represented by their parent
-    });
-
-    // Find bottleneck (max effective CT)
-    baseProcesses.forEach(({ process, effectiveCT, parallelCount, baseCT }) => {
-      if (effectiveCT > maxEffectiveTime) {
-        maxEffectiveTime = effectiveCT;
-        bottleneckProcess = { process, effectiveCT, parallelCount, baseCT };
+        };
       }
     });
 
     return {
-      process: bottleneckProcess?.process || null,
+      processId: bottleneckInfo?.processId || null,
+      name: bottleneckInfo?.name || null,
       effectiveTime: maxEffectiveTime,
-      parallelCount: bottleneckProcess?.parallelCount || 1,
-      baseCT: bottleneckProcess?.baseCT || 0
+      parallelCount: bottleneckInfo?.parallelCount || 1,
+      baseCT: bottleneckInfo?.baseCT || 0
     };
   };
 
   const bottleneck = getBottleneck();
   const expectedUPH = bottleneck.effectiveTime > 0 ? 3600 / bottleneck.effectiveTime : 0;
 
-  // Group processes by parent (for hierarchical display)
-  const processGroups = [];
-  const processedIds = new Set();
+  // Group processes: each routing entry → its process_details
+  const processGroups = bopData.processes.map(routing => {
+    const details = (bopData.process_details || [])
+      .filter(d => d.process_id === routing.process_id)
+      .sort((a, b) => a.parallel_index - b.parallel_index);
+    return { routing, details };
+  }).filter(g => g.details.length > 0);
 
-  bopData.processes.forEach(process => {
-    if (processedIds.has(process.process_id)) return;
-
-    if (process.is_parent) {
-      // Parent process - find all children
-      const children = bopData.processes.filter(p => p.parent_id === process.process_id);
-      if (children.length > 0) {
-        processGroups.push({
-          parent: process,
-          children: children.sort((a, b) => (a.parallel_index || 0) - (b.parallel_index || 0))
-        });
-        processedIds.add(process.process_id);
-        children.forEach(c => processedIds.add(c.process_id));
-      }
-    }
-  });
-
-  const selectedProcess = bopData?.processes?.find(p => p.process_id === selectedProcessKey);
-  // "병렬 삭제" is only enabled when the selected child has 2+ siblings
-  const canRemoveParallel = selectedProcess?.parent_id != null &&
-    bopData.processes.filter(p => p.parent_id === selectedProcess.parent_id).length > 1;
+  // Check if selected parallel line can be removed
+  const canRemoveParallel = selectedInfo != null && (() => {
+    const details = (bopData.process_details || []).filter(d => d.process_id === selectedInfo.processId);
+    return details.length > 1;
+  })();
 
   return (
     <div style={styles.container}>
@@ -404,11 +383,11 @@ function BopTable() {
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
           <h2 style={styles.title}>{bopData.project_title}</h2>
-          <div style={styles.uph}>Target: {bopData.target_uph} UPH</div>
+          <div style={styles.uph}>{t('bop.target')}: {bopData.target_uph} UPH</div>
           <button
             style={styles.settingsButton}
             onClick={handleEditSettings}
-            title="프로젝트 설정 편집"
+            title={t('bop.editSettings')}
           >
             ⚙️
           </button>
@@ -419,34 +398,34 @@ function BopTable() {
       {editingSettings && (
         <div style={styles.modalOverlay} onClick={handleCancelSettings}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>프로젝트 설정</h3>
+            <h3 style={styles.modalTitle}>{t('bop.projectSettings')}</h3>
             <div style={styles.formGroup}>
-              <label style={styles.label}>프로젝트명</label>
+              <label style={styles.label}>{t('bop.projectName')}</label>
               <input
                 type="text"
                 value={editProjectTitle}
                 onChange={(e) => setEditProjectTitle(e.target.value)}
                 style={styles.input}
-                placeholder="예: 전기 자전거 조립 라인"
+                placeholder={t('bop.projectNamePlaceholder')}
               />
             </div>
             <div style={styles.formGroup}>
-              <label style={styles.label}>목표 UPH (시간당 생산량)</label>
+              <label style={styles.label}>{t('bop.targetUph')}</label>
               <input
                 type="number"
                 value={editTargetUph}
                 onChange={(e) => setEditTargetUph(e.target.value)}
                 style={styles.input}
                 min="1"
-                placeholder="예: 120"
+                placeholder={t('bop.targetUphPlaceholder')}
               />
             </div>
             <div style={styles.modalActions}>
               <button style={styles.modalButtonCancel} onClick={handleCancelSettings}>
-                취소
+                {t('bop.cancel')}
               </button>
               <button style={styles.modalButtonSave} onClick={handleSaveSettings}>
-                저장
+                {t('bop.save')}
               </button>
             </div>
           </div>
@@ -459,55 +438,55 @@ function BopTable() {
           style={styles.actionButton}
           onClick={() => addProcess()}
         >
-          + 공정 추가
+          {t('bop.addProcess')}
         </button>
         <button
           style={{
             ...styles.actionButton,
-            ...(selectedProcessKey ? {} : styles.actionButtonDisabled)
+            ...(selectedInfo ? {} : styles.actionButtonDisabled)
           }}
-          disabled={!selectedProcessKey}
-          onClick={() => addProcess({ afterProcessId: selectedProcessKey })}
+          disabled={!selectedInfo}
+          onClick={() => addProcess({ afterProcessId: selectedInfo?.processId })}
         >
-          + 뒤에 추가
+          {t('bop.addAfter')}
         </button>
         <button
           style={{
             ...styles.actionButtonDanger,
-            ...(selectedProcessKey ? {} : styles.actionButtonDisabled)
+            ...(selectedInfo ? {} : styles.actionButtonDisabled)
           }}
-          disabled={!selectedProcessKey}
+          disabled={!selectedInfo}
           onClick={() => {
-            if (window.confirm('선택한 공정을 삭제하시겠습니까?')) {
-              deleteProcess(selectedProcessKey);
+            if (window.confirm(t('bop.confirmDeleteProcess'))) {
+              deleteProcess(selectedInfo?.processId);
             }
           }}
         >
-          선택 공정 삭제
+          {t('bop.deleteProcess')}
         </button>
         <button
           style={{
             ...styles.actionButton,
-            ...(selectedProcessKey ? {} : styles.actionButtonDisabled)
+            ...(selectedInfo ? {} : styles.actionButtonDisabled)
           }}
-          disabled={!selectedProcessKey}
-          onClick={() => addParallelLine(selectedProcessKey)}
+          disabled={!selectedInfo}
+          onClick={() => addParallelLine(selectedInfo?.processId)}
         >
-          + 병렬 추가
+          {t('bop.addParallel')}
         </button>
         <button
           style={{
             ...styles.actionButtonDanger,
-            ...((selectedProcessKey && canRemoveParallel) ? {} : styles.actionButtonDisabled)
+            ...((selectedInfo && canRemoveParallel) ? {} : styles.actionButtonDisabled)
           }}
-          disabled={!selectedProcessKey || !canRemoveParallel}
+          disabled={!selectedInfo || !canRemoveParallel}
           onClick={() => {
-            if (window.confirm('선택한 병렬 라인을 삭제하시겠습니까?')) {
-              removeParallelLine(selectedProcessKey);
+            if (window.confirm(t('bop.confirmDeleteParallel'))) {
+              removeParallelLine(selectedInfo?.processId, selectedInfo?.parallelIndex);
             }
           }}
         >
-          병렬 삭제
+          {t('bop.deleteParallel')}
         </button>
       </div>
 
@@ -517,357 +496,215 @@ function BopTable() {
           <thead>
             <tr>
               <th style={{ ...styles.th, width: '80px' }}>ID</th>
-              <th style={{ ...styles.th, minWidth: '150px' }}>Name</th>
-              <th style={{ ...styles.th, minWidth: '100px' }}>Cycle Time</th>
-              <th style={{ ...styles.th, minWidth: '80px' }}>Parallel</th>
-              <th style={{ ...styles.th, minWidth: '150px' }}>Equipments</th>
-              <th style={{ ...styles.th, minWidth: '120px' }}>Workers</th>
-              <th style={{ ...styles.th, minWidth: '200px' }}>Materials</th>
-              <th style={{ ...styles.th, minWidth: '120px' }}>전공정 (Pred.)</th>
-              <th style={{ ...styles.th, minWidth: '120px' }}>후공정 (Succ.)</th>
-              <th style={{ ...styles.th, minWidth: '120px' }}>Location (x,z)</th>
-              <th style={{ ...styles.th, width: '80px' }}>Rotation (Y)</th>
+              <th style={{ ...styles.th, minWidth: '150px' }}>{t('bop.colName')}</th>
+              <th style={{ ...styles.th, minWidth: '100px' }}>{t('bop.colCycleTime')}</th>
+              <th style={{ ...styles.th, minWidth: '80px' }}>{t('bop.colParallel')}</th>
+              <th style={{ ...styles.th, minWidth: '150px' }}>{t('bop.colEquipments')}</th>
+              <th style={{ ...styles.th, minWidth: '120px' }}>{t('bop.colWorkers')}</th>
+              <th style={{ ...styles.th, minWidth: '200px' }}>{t('bop.colMaterials')}</th>
+              <th style={{ ...styles.th, minWidth: '120px' }}>{t('bop.predecessor')}</th>
+              <th style={{ ...styles.th, minWidth: '120px' }}>{t('bop.successor')}</th>
+              <th style={{ ...styles.th, minWidth: '120px' }}>{t('bop.location')}</th>
+              <th style={{ ...styles.th, minWidth: '80px' }}>{t('bop.size')}</th>
+              <th style={{ ...styles.th, width: '80px' }}>{t('bop.rotation')}</th>
             </tr>
           </thead>
           <tbody>
-            {processGroups.map((group, groupIdx) => {
+            {processGroups.map((group) => {
               const rows = [];
-              const isParallelGroup = group.parent && group.children.length > 1;
+              const isParallelGroup = group.details.length > 1;
+              const isBottleneck = bottleneck.processId === group.routing.process_id;
 
-              group.children.forEach((process, childIdx) => {
-                const isFirstChild = childIdx === 0;
-                const isThisRowSelected = selectedProcessKey === process.process_id;
-                // Check if this process group is the bottleneck (compare parent or independent process)
-                const baseProcessId = group.parent?.process_id || process.process_id;
-                const isBottleneck = bottleneck.process?.process_id === baseProcessId;
+              group.details.forEach((detail, detailIdx) => {
+                const isFirstDetail = detailIdx === 0;
+                const rowKey = `${detail.process_id}:${detail.parallel_index}`;
+                const isThisRowSelected = selectedProcessKey === rowKey;
 
-                const { equipments, workers, materials } = getResourcesByType(process);
+                const { equipments, workers, materials } = getResourcesByType(detail.process_id, detail.parallel_index);
 
                 rows.push(
                   <tr
-                    key={process.process_id}
+                    key={rowKey}
                     style={{
                       ...styles.processRow,
                       ...(isThisRowSelected ? styles.processRowSelected : {}),
                       ...(isBottleneck ? styles.bottleneckRow : {}),
-                      ...(isFirstChild ? {} : styles.parallelRow)
+                      ...(isFirstDetail ? {} : styles.parallelRow)
                     }}
-                    onClick={() => setSelectedProcess(process.process_id)}
+                    onClick={() => setSelectedProcess(rowKey)}
                   >
-                    {isFirstChild && isParallelGroup ? (
-                      // Parent group header (first child of parallel group)
-                      <>
-                        <td style={styles.td}>
-                          <strong>{group.parent.process_id}</strong>
-                        </td>
-                        <td style={styles.td}>
-                          {isThisRowSelected ? (
-                            <>
-                              <div style={styles.processName}>
-                                <input
-                                  type="text"
-                                  style={{ ...styles.editInput, ...styles.editInputName }}
-                                  value={process.name}
-                                  onChange={(e) => updateProcess(process.process_id, { name: e.target.value })}
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                                <span style={styles.parallelBadge}>
-                                  {group.children.length}x
+                    {/* ID */}
+                    <td style={styles.td}>
+                      {isFirstDetail ? (
+                        <strong>{detail.process_id}</strong>
+                      ) : (
+                        <span style={styles.parallelLabel}>{detail.process_id}</span>
+                      )}
+                    </td>
+
+                    {/* Name */}
+                    <td style={styles.td}>
+                      {isThisRowSelected ? (
+                        <>
+                          <div style={styles.processName}>
+                            <input
+                              type="text"
+                              style={{ ...styles.editInput, ...styles.editInputName }}
+                              value={detail.name}
+                              onChange={(e) => updateProcess(detail.process_id, detail.parallel_index, { name: e.target.value })}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            {isFirstDetail && isParallelGroup && (
+                              <span style={styles.parallelBadge}>
+                                {group.details.length}x
+                              </span>
+                            )}
+                          </div>
+                          <input
+                            type="text"
+                            style={styles.editInput}
+                            value={detail.description || ''}
+                            onChange={(e) => updateProcess(detail.process_id, detail.parallel_index, { description: e.target.value })}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder={t('bop.description')}
+                          />
+                        </>
+                      ) : isFirstDetail ? (
+                        <>
+                          <div style={styles.processName}>
+                            <strong>{detail.name}</strong>
+                            {isParallelGroup && (
+                              <span style={styles.parallelBadge}>
+                                {group.details.length}x
+                              </span>
+                            )}
+                            {isBottleneck && (
+                              <span
+                                style={styles.bottleneckBadge}
+                                title={`Effective CT: ${bottleneck.effectiveTime.toFixed(1)}s`}
+                              >
+                                Bottleneck ({bottleneck.effectiveTime.toFixed(1)}s)
+                              </span>
+                            )}
+                          </div>
+                          <div style={styles.processDescription}>{detail.description}</div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={styles.processName}>
+                            <span style={styles.parallelLineText}>└ #{detail.parallel_index}</span>
+                            {detail.name !== group.details[0]?.name && (
+                              <span style={{ fontSize: '12px', color: '#666' }}> - {detail.name}</span>
+                            )}
+                          </div>
+                          {detail.description && (
+                            <div style={styles.processDescription}>{detail.description}</div>
+                          )}
+                        </>
+                      )}
+                    </td>
+
+                    {/* Cycle Time */}
+                    <td style={styles.td}>
+                      {isThisRowSelected ? (
+                        <input
+                          type="text"
+                          style={styles.editInput}
+                          value={detail.cycle_time_sec ?? ''}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val)) {
+                              updateProcess(detail.process_id, detail.parallel_index, { cycle_time_sec: val });
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <div style={styles.cycleTimeInfo}>
+                          <div><strong>{detail.cycle_time_sec?.toFixed(1) || 0}s</strong></div>
+                          {isFirstDetail && isParallelGroup && (() => {
+                            const childCTs = group.details.map(d => d.cycle_time_sec || 0);
+                            const invSum = childCTs.reduce((sum, ct) => sum + (ct > 0 ? 1 / ct : 0), 0);
+                            const effectiveCT = invSum > 0 ? 1 / invSum : 0;
+                            const allSame = childCTs.every(ct => ct === childCTs[0]);
+                            const detailText = allSame
+                              ? `(${childCTs[0].toFixed(0)}s ÷ ${group.details.length} ${t('bop.lines')} = ${(childCTs[0] / group.details.length).toFixed(1)}s)`
+                              : `(${t('bop.throughput')}: ${childCTs.map(ct => ct.toFixed(0)).join('s, ')}s)`;
+
+                            return (
+                              <div style={styles.effectiveTime}>
+                                → Effective CT: {effectiveCT.toFixed(1)}s
+                                <span style={{ fontSize: '9px', color: '#999', marginLeft: '4px' }}>
+                                  {detailText}
                                 </span>
                               </div>
-                              <input
-                                type="text"
-                                style={styles.editInput}
-                                value={process.description || ''}
-                                onChange={(e) => updateProcess(process.process_id, { description: e.target.value })}
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder="설명"
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <div style={styles.processName}>
-                                <strong>{group.parent.name}</strong>
-                                <span style={styles.parallelBadge}>
-                                  {group.children.length}x
-                                </span>
-                                {isBottleneck && (
-                                  <span
-                                    style={styles.bottleneckBadge}
-                                    title={`Effective CT: ${bottleneck.effectiveTime.toFixed(1)}s${bottleneck.parallelCount > 1 ? ` (${bottleneck.parallelCount}라인 중 최대)` : ''}`}
-                                  >
-                                    Bottleneck ({bottleneck.effectiveTime.toFixed(1)}s)
-                                  </span>
-                                )}
-                              </div>
-                              <div style={styles.processDescription}>{group.parent.description}</div>
-                            </>
-                          )}
-                        </td>
-                        <td style={styles.td}>
-                          {isThisRowSelected ? (
-                            <input
-                              type="text"
-                              style={styles.editInput}
-                              value={process.cycle_time_sec ?? ''}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                if (!isNaN(val)) {
-                                  updateProcess(process.process_id, { cycle_time_sec: val });
-                                }
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          ) : (
-                            <div style={styles.cycleTimeInfo}>
-                              <div><strong>{process.cycle_time_sec?.toFixed(1) || 0}s</strong></div>
-                              {isParallelGroup && group.children.length > 1 && (() => {
-                                const childCTs = group.children.map(c => c.cycle_time_sec || 0);
-                                // Use harmonic mean: 1 / Σ(1/CT_i)
-                                const effectiveCT = 1 / childCTs.reduce((sum, ct) => sum + (ct > 0 ? 1 / ct : 0), 0);
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </td>
 
-                                // Debug log for P003
-                                if (group.parent?.process_id === 'P003') {
-                                  console.log(`[Table Display] ${group.parent.name}:`, {
-                                    childCTs,
-                                    parallelCount: group.children.length,
-                                    effectiveCT,
-                                    formula: `1 / (${childCTs.map(ct => `1/${ct}`).join(' + ')})`
-                                  });
-                                }
+                    {/* Parallel */}
+                    <td style={styles.td}>
+                      <span style={styles.parallelCount}>#{detail.parallel_index}</span>
+                    </td>
 
-                                // Check if all CTs are the same
-                                const allSame = childCTs.every(ct => ct === childCTs[0]);
-                                const detailText = allSame
-                                  ? `(${childCTs[0].toFixed(0)}s ÷ ${group.children.length}라인 = ${(childCTs[0] / group.children.length).toFixed(1)}s)`
-                                  : `(처리율: ${childCTs.map(ct => ct.toFixed(0)).join('s, ')}s)`;
+                    {/* Equipments */}
+                    <td style={styles.td}>
+                      {renderResourceCell(detail.process_id, detail.parallel_index, isThisRowSelected, 'equipment', equipments, bopData.equipments, 'equipment_id')}
+                    </td>
 
-                                return (
-                                  <div style={styles.effectiveTime}>
-                                    → Effective CT: {effectiveCT.toFixed(1)}s
-                                    <span style={{ fontSize: '9px', color: '#999', marginLeft: '4px' }}>
-                                      {detailText}
-                                    </span>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          )}
-                        </td>
-                        <td style={styles.td}>
-                          <span style={styles.parallelCount}>#{process.parallel_index}</span>
-                        </td>
-                        <td style={styles.td}>
-                          {renderResourceCell(process, isThisRowSelected, 'equipment', equipments, bopData.equipments, 'equipment_id')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderResourceCell(process, isThisRowSelected, 'worker', workers, bopData.workers, 'worker_id')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderResourceCell(process, isThisRowSelected, 'material', materials, bopData.materials, 'material_id')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderLinkCell(process, isThisRowSelected, 'predecessor')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderLinkCell(process, isThisRowSelected, 'successor')}
-                        </td>
-                        <td style={styles.td}>
+                    {/* Workers */}
+                    <td style={styles.td}>
+                      {renderResourceCell(detail.process_id, detail.parallel_index, isThisRowSelected, 'worker', workers, bopData.workers, 'worker_id')}
+                    </td>
+
+                    {/* Materials */}
+                    <td style={styles.td}>
+                      {renderResourceCell(detail.process_id, detail.parallel_index, isThisRowSelected, 'material', materials, bopData.materials, 'material_id')}
+                    </td>
+
+                    {/* Predecessors */}
+                    <td style={styles.td}>
+                      {isFirstDetail
+                        ? renderLinkCell(group.routing, isThisRowSelected, 'predecessor')
+                        : <div style={styles.resourcesCell}>-</div>
+                      }
+                    </td>
+
+                    {/* Successors */}
+                    <td style={styles.td}>
+                      {isFirstDetail
+                        ? renderLinkCell(group.routing, isThisRowSelected, 'successor')
+                        : <div style={styles.resourcesCell}>-</div>
+                      }
+                    </td>
+
+                    {/* Location */}
+                    <td style={styles.td}>
+                      <div style={styles.locationCell}>
+                        ({(detail.location?.x || 0).toFixed(1)}, {(detail.location?.z || 0).toFixed(1)})
+                      </div>
+                    </td>
+
+                    {/* Size */}
+                    <td style={styles.td}>
+                      {(() => {
+                        const bbox = getProcessBBox(detail.process_id, detail.parallel_index);
+                        return bbox ? (
                           <div style={styles.locationCell}>
-                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
+                            ({bbox.width.toFixed(1)}, {bbox.depth.toFixed(1)})
                           </div>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
-                          </div>
-                        </td>
-                      </>
-                    ) : isParallelGroup ? (
-                      // Child rows of parallel group (2nd and beyond)
-                      <>
-                        <td style={styles.td}>
-                          <span style={styles.parallelLabel}>{process.process_id}</span>
-                        </td>
-                        <td style={styles.td}>
-                          {isThisRowSelected ? (
-                            <>
-                              <input
-                                type="text"
-                                style={{ ...styles.editInput, ...styles.editInputName }}
-                                value={process.name}
-                                onChange={(e) => updateProcess(process.process_id, { name: e.target.value })}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <input
-                                type="text"
-                                style={styles.editInput}
-                                value={process.description || ''}
-                                onChange={(e) => updateProcess(process.process_id, { description: e.target.value })}
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder="설명"
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <div style={styles.processName}>
-                                <span style={styles.parallelLineText}>└ #{process.parallel_index}</span>
-                                {process.name !== group.parent?.name && (
-                                  <span style={{ fontSize: '12px', color: '#666' }}> - {process.name}</span>
-                                )}
-                              </div>
-                              {process.description && (
-                                <div style={styles.processDescription}>{process.description}</div>
-                              )}
-                            </>
-                          )}
-                        </td>
-                        <td style={styles.td}>
-                          {isThisRowSelected ? (
-                            <input
-                              type="text"
-                              style={styles.editInput}
-                              value={process.cycle_time_sec ?? ''}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                if (!isNaN(val)) {
-                                  updateProcess(process.process_id, { cycle_time_sec: val });
-                                }
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          ) : (
-                            <div style={styles.cycleTimeInfo}>
-                              <div>{process.cycle_time_sec?.toFixed(1) || 0}s</div>
-                              {process.cycle_time_sec !== group.parent?.cycle_time_sec && (
-                                <div style={{ fontSize: '10px', color: '#ff9800', marginTop: '2px' }}>
-                                  (수정됨)
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td style={styles.td}>
-                          <span style={styles.parallelCount}>#{process.parallel_index}</span>
-                        </td>
-                        <td style={styles.td}>
-                          {renderResourceCell(process, isThisRowSelected, 'equipment', equipments, bopData.equipments, 'equipment_id')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderResourceCell(process, isThisRowSelected, 'worker', workers, bopData.workers, 'worker_id')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderResourceCell(process, isThisRowSelected, 'material', materials, bopData.materials, 'material_id')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderLinkCell(process, isThisRowSelected, 'predecessor')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderLinkCell(process, isThisRowSelected, 'successor')}
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
-                          </div>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      // Independent process (no parent)
-                      <>
-                        <td style={styles.td}>
-                          <strong>{process.process_id}</strong>
-                        </td>
-                        <td style={styles.td}>
-                          {isThisRowSelected ? (
-                            <>
-                              <input
-                                type="text"
-                                style={{ ...styles.editInput, ...styles.editInputName }}
-                                value={process.name}
-                                onChange={(e) => updateProcess(process.process_id, { name: e.target.value })}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              <input
-                                type="text"
-                                style={styles.editInput}
-                                value={process.description || ''}
-                                onChange={(e) => updateProcess(process.process_id, { description: e.target.value })}
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder="설명"
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <div style={styles.processName}>
-                                <strong>{process.name}</strong>
-                                {isBottleneck && (
-                                  <span
-                                    style={styles.bottleneckBadge}
-                                    title={`Effective CT: ${bottleneck.effectiveTime.toFixed(1)}s${bottleneck.parallelCount > 1 ? ` (${bottleneck.parallelCount}라인 중 최대)` : ''}`}
-                                  >
-                                    Bottleneck ({bottleneck.effectiveTime.toFixed(1)}s)
-                                  </span>
-                                )}
-                              </div>
-                              <div style={styles.processDescription}>{process.description}</div>
-                            </>
-                          )}
-                        </td>
-                        <td style={styles.td}>
-                          {isThisRowSelected ? (
-                            <input
-                              type="text"
-                              style={styles.editInput}
-                              value={process.cycle_time_sec ?? ''}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value);
-                                if (!isNaN(val)) {
-                                  updateProcess(process.process_id, { cycle_time_sec: val });
-                                }
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                          ) : (
-                            <div style={styles.cycleTimeInfo}>
-                              <div><strong>{process.cycle_time_sec.toFixed(1)}s</strong></div>
-                            </div>
-                          )}
-                        </td>
-                        <td style={styles.td}>
-                          <span style={styles.parallelCount}>#1</span>
-                        </td>
-                        <td style={styles.td}>
-                          {renderResourceCell(process, isThisRowSelected, 'equipment', equipments, bopData.equipments, 'equipment_id')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderResourceCell(process, isThisRowSelected, 'worker', workers, bopData.workers, 'worker_id')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderResourceCell(process, isThisRowSelected, 'material', materials, bopData.materials, 'material_id')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderLinkCell(process, isThisRowSelected, 'predecessor')}
-                        </td>
-                        <td style={styles.td}>
-                          {renderLinkCell(process, isThisRowSelected, 'successor')}
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            ({process.location.x.toFixed(1)}, {process.location.z.toFixed(1)})
-                          </div>
-                        </td>
-                        <td style={styles.td}>
-                          <div style={styles.locationCell}>
-                            {((process.rotation_y || 0) * 180 / Math.PI).toFixed(0)}°
-                          </div>
-                        </td>
-                      </>
-                    )}
+                        ) : <div style={styles.locationCell}>-</div>;
+                      })()}
+                    </td>
+
+                    {/* Rotation */}
+                    <td style={styles.td}>
+                      <div style={styles.locationCell}>
+                        {((detail.rotation_y || 0) * 180 / Math.PI).toFixed(1)}°
+                      </div>
+                    </td>
                   </tr>
                 );
               });
@@ -881,32 +718,32 @@ function BopTable() {
       {/* Summary */}
       <div style={styles.summary}>
         <div style={styles.summaryItem}>
-          <span style={styles.summaryLabel}>Total Processes:</span>
+          <span style={styles.summaryLabel}>{t('bop.summaryInstances')}</span>
           <span style={styles.summaryValue}>
-            {bopData.processes.filter(p => !p.is_parent).length}
+            {(bopData.process_details || []).length}
           </span>
         </div>
         <div style={styles.summaryItem}>
-          <span style={styles.summaryLabel}>Equipments:</span>
+          <span style={styles.summaryLabel}>{t('bop.summaryEquipments')}</span>
           <span style={styles.summaryValue}>{bopData.equipments?.length || 0}</span>
         </div>
         <div style={styles.summaryItem}>
-          <span style={styles.summaryLabel}>Workers:</span>
+          <span style={styles.summaryLabel}>{t('bop.summaryWorkers')}</span>
           <span style={styles.summaryValue}>{bopData.workers?.length || 0}</span>
         </div>
         <div style={styles.summaryItem}>
-          <span style={styles.summaryLabel}>Materials:</span>
+          <span style={styles.summaryLabel}>{t('bop.summaryMaterials')}</span>
           <span style={styles.summaryValue}>{bopData.materials?.length || 0}</span>
         </div>
         <div style={styles.summaryItem}>
-          <span style={styles.summaryLabel}>Bottleneck (Effective CT):</span>
+          <span style={styles.summaryLabel}>{t('bop.summaryBottleneck')}</span>
           <span style={styles.summaryValue}>
-            {bottleneck.process ? (
+            {bottleneck.processId ? (
               <>
                 {bottleneck.effectiveTime.toFixed(1)}s
                 {bottleneck.parallelCount > 1 && (
                   <span style={styles.summaryDetail}>
-                    {' '}({bottleneck.parallelCount} 라인 중 최대)
+                    {' '}({bottleneck.parallelCount} {t('bop.lines')})
                   </span>
                 )}
               </>
@@ -914,13 +751,13 @@ function BopTable() {
           </span>
         </div>
         <div style={styles.summaryItem}>
-          <span style={styles.summaryLabel}>예상 UPH:</span>
+          <span style={styles.summaryLabel}>{t('bop.expectedUph')}</span>
           <span style={styles.summaryValue}>
             {expectedUPH > 0 ? (
               <>
                 {Math.round(expectedUPH)}
                 <span style={styles.summaryDetail}>
-                  {' '}(Target: {bopData.target_uph})
+                  {' '}({t('bop.target')}: {bopData.target_uph})
                 </span>
               </>
             ) : '-'}

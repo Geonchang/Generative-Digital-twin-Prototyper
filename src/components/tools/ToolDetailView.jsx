@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { useToolExecution } from './hooks/useToolExecution';
 import useBopStore from '../../store/bopStore';
+import useTranslation from '../../i18n/useTranslation';
 
 function ToolDetailView({ tool, onNavigate, onDelete }) {
   const { addMessage } = useBopStore();
+  const { t } = useTranslation();
   const [toolDetail, setToolDetail] = useState(null);
   const [error, setError] = useState('');
 
@@ -70,7 +72,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`"${tool.tool_name}" 도구를 삭제하시겠습니까?`)) return;
+    if (!confirm(t('tool.confirmDelete', { name: tool.tool_name }))) return;
     const success = await onDelete(tool.tool_id);
     if (success) {
       onNavigate('main');
@@ -116,7 +118,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
       if (result.success) {
         setImproveResult(result);
       } else {
-        setError(result.message || '개선 생성에 실패했습니다.');
+        setError(result.message || t('tool.improveFailed'));
       }
     } catch (err) {
       setError(err.message);
@@ -140,7 +142,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
       });
 
       if (result.success) {
-        addMessage('assistant', `"${tool.tool_name}" 도구가 ${createNewVersion ? '새 버전(' + result.tool_name + ')으로' : ''} 개선되었습니다.`);
+        addMessage('assistant', t('tool.improvedMsg', { name: tool.tool_name, detail: createNewVersion ? `${result.tool_name} ` : '' }));
         setImproveResult(null);
         setImproveFeedback('');
         setShowImprove(false);
@@ -184,7 +186,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
   return (
     <div style={styles.content}>
       <div style={styles.header}>
-        <button style={styles.backBtn} onClick={() => onNavigate('main')}>← 목록</button>
+        <button style={styles.backBtn} onClick={() => onNavigate('main')}>← {t('tool.backToList')}</button>
         <h3 style={styles.title}>{tool.tool_name}</h3>
       </div>
 
@@ -196,11 +198,11 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
             <span style={styles.resultValue}>{tool.tool_id}</span>
           </div>
           <div style={styles.resultRow}>
-            <span style={styles.resultLabel}>설명:</span>
+            <span style={styles.resultLabel}>{t('tool.description')}</span>
             <span style={styles.resultValue}>{tool.description}</span>
           </div>
           <div style={styles.resultRow}>
-            <span style={styles.resultLabel}>타입:</span>
+            <span style={styles.resultLabel}>{t('tool.type')}</span>
             <span style={styles.badge}>{tool.execution_type}</span>
           </div>
         </div>
@@ -209,7 +211,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
       {/* 파라미터 입력 */}
       {tool.params_schema?.length > 0 && (
         <div style={styles.section}>
-          <label style={styles.label}>파라미터 설정</label>
+          <label style={styles.label}>{t('tool.paramSettings')}</label>
           <div style={styles.resultCard}>
             {tool.params_schema.map(p => (
               <div key={p.key} style={{ marginBottom: 10 }}>
@@ -223,7 +225,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
                 <input
                   style={styles.paramInput}
                   type={p.type === 'number' ? 'number' : 'text'}
-                  placeholder={p.default != null ? `기본값: ${p.default}` : (p.required ? '' : '(선택)')}
+                  placeholder={p.default != null ? t('tool.defaultValue', { value: p.default }) : (p.required ? '' : t('tool.optional'))}
                   value={toolParams[p.key] ?? ''}
                   onChange={e => setToolParams(prev => ({ ...prev, [p.key]: e.target.value }))}
                 />
@@ -236,32 +238,32 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
       {/* 실행 버튼 */}
       <div style={styles.section}>
         <button style={styles.primaryBtn} onClick={handleExecute} disabled={executing}>
-          {executing ? '실행 중...' : '실행하기'}
+          {executing ? t('tool.executing') : t('tool.execute')}
         </button>
       </div>
 
       {/* 실행 결과 */}
       {execResult && (
         <div style={styles.section}>
-          <label style={styles.label}>실행 결과</label>
+          <label style={styles.label}>{t('tool.execResult')}</label>
           <div style={{
             ...styles.resultCard,
             borderLeft: `4px solid ${execResult.success ? '#50c878' : '#ff6b6b'}`,
           }}>
             <div style={{ fontWeight: 'bold', marginBottom: 6, color: execResult.success ? '#2d7a3a' : '#c0392b' }}>
-              {execResult.success ? '성공' : '실패'}
+              {execResult.success ? t('tool.success') : t('tool.failure')}
             </div>
             <div style={{ fontSize: 13, marginBottom: 6 }}>{execResult.message}</div>
             {execResult.execution_time_sec != null && (
               <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>
-                실행 시간: {execResult.execution_time_sec.toFixed(1)}초
+                {t('tool.execTime', { time: execResult.execution_time_sec.toFixed(1) })}
               </div>
             )}
 
             {toolDetail?.adapter?.pre_process_code && (
               <details style={{ marginTop: 8 }}>
                 <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
-                  🔧 Pre-process 코드 (BOP → 도구 입력)
+                  🔧 {t('tool.preProcess')}
                 </summary>
                 <pre style={{ ...styles.codePreview, maxHeight: '300px', overflow: 'auto', fontSize: 11 }}>
                   {toolDetail.adapter.pre_process_code}
@@ -272,7 +274,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
             {execResult.tool_input && (
               <details style={{ marginTop: 8 }}>
                 <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
-                  📥 도구 입력 데이터
+                  📥 {t('tool.toolInput')}
                 </summary>
                 {renderToolOutput(execResult.tool_input)}
               </details>
@@ -281,7 +283,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
             {toolDetail?.source_code && (
               <details style={{ marginTop: 8 }}>
                 <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
-                  📜 실행된 스크립트 코드
+                  📜 {t('tool.scriptCode')}
                 </summary>
                 <pre style={{ ...styles.codePreview, maxHeight: '400px', overflow: 'auto', fontSize: 11 }}>
                   {toolDetail.source_code}
@@ -292,7 +294,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
             {execResult.tool_output && (
               <details style={{ marginTop: 8 }}>
                 <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
-                  📤 도구 출력 결과
+                  📤 {t('tool.toolOutput')}
                 </summary>
                 {renderToolOutput(execResult.tool_output)}
               </details>
@@ -301,7 +303,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
             {toolDetail?.adapter?.post_process_code && (
               <details style={{ marginTop: 8 }}>
                 <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666', fontWeight: 600 }}>
-                  🔧 Post-process 코드 (도구 출력 → BOP)
+                  🔧 {t('tool.postProcess')}
                 </summary>
                 <pre style={{ ...styles.codePreview, maxHeight: '300px', overflow: 'auto', fontSize: 11 }}>
                   {toolDetail.adapter.post_process_code}
@@ -317,7 +319,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
             )}
             {execResult.stderr && (
               <details style={{ marginTop: 4 }}>
-                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>실행 로그</summary>
+                <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>{t('tool.execLog')}</summary>
                 <pre style={styles.codePreview}>{execResult.stderr}</pre>
               </details>
             )}
@@ -328,7 +330,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
       {/* BOP 변경사항 */}
       {pendingResult && bopChanges && (
         <div style={styles.section}>
-          <label style={styles.label}>BOP 변경 사항</label>
+          <label style={styles.label}>{t('tool.bopChanges')}</label>
           <div style={{ ...styles.resultCard, borderLeft: '4px solid #f39c12', marginBottom: 12 }}>
             {bopChanges.map((change, idx) => (
               <div key={idx} style={{ fontSize: 13, marginBottom: 6 }}>
@@ -342,7 +344,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
                     backgroundColor: change.type === 'add' ? '#d4edda' : change.type === 'remove' ? '#f8d7da' : '#fff3cd',
                     color: change.type === 'add' ? '#155724' : change.type === 'remove' ? '#721c24' : '#856404',
                   }}>
-                    {change.type === 'add' ? '추가' : change.type === 'remove' ? '삭제' : '수정'}
+                    {change.type === 'add' ? t('tool.changeAdd') : change.type === 'remove' ? t('tool.changeRemove') : t('tool.changeModify')}
                   </span>
                   <span>{change.field} {change.count}개</span>
                 </div>
@@ -351,7 +353,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
                     {change.details.slice(0, 5).map((detail, i) => (
                       <div key={i}>• {detail}</div>
                     ))}
-                    {change.details.length > 5 && <div>• ... 외 {change.details.length - 5}개</div>}
+                    {change.details.length > 5 && <div>• {t('tool.andMore', { count: change.details.length - 5 })}</div>}
                   </div>
                 )}
               </div>
@@ -359,10 +361,10 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button style={styles.applyBtn} onClick={handleApplyToBop}>
-              반영하기
+              {t('tool.apply')}
             </button>
             <button style={styles.secondaryBtn} onClick={cancelApply}>
-              취소
+              {t('tool.cancelApply')}
             </button>
           </div>
         </div>
@@ -372,12 +374,12 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
       {execResult && (
         <div style={{ ...styles.section, borderTop: '1px solid #e0e0e0', paddingTop: 16, marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <label style={{ ...styles.label, marginBottom: 0 }}>AI 개선</label>
+            <label style={{ ...styles.label, marginBottom: 0 }}>{t('tool.aiImprove')}</label>
             <button
               style={showImprove ? styles.secondaryBtn : styles.aiBtn}
               onClick={() => { setShowImprove(!showImprove); setImproveResult(null); setImproveFeedback(''); }}
             >
-              {showImprove ? '접기' : '✨ AI로 개선하기'}
+              {showImprove ? t('tool.collapse') : `✨ ${t('tool.startImprove')}`}
             </button>
           </div>
 
@@ -385,7 +387,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
             <>
               {/* 수정 범위 선택 */}
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>수정 범위 선택:</div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>{t('tool.scopeSelect')}</div>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <label style={styles.checkboxLabel}>
                     <input
@@ -393,7 +395,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
                       checked={improveScope.adapter}
                       onChange={e => setImproveScope(prev => ({ ...prev, adapter: e.target.checked }))}
                     />
-                    어댑터 코드
+                    {t('tool.scopeAdapter')}
                   </label>
                   <label style={styles.checkboxLabel}>
                     <input
@@ -401,7 +403,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
                       checked={improveScope.params}
                       onChange={e => setImproveScope(prev => ({ ...prev, params: e.target.checked }))}
                     />
-                    파라미터 스키마
+                    {t('tool.scopeParams')}
                   </label>
                   <label style={styles.checkboxLabel}>
                     <input
@@ -409,7 +411,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
                       checked={improveScope.script}
                       onChange={e => setImproveScope(prev => ({ ...prev, script: e.target.checked }))}
                     />
-                    스크립트 코드
+                    {t('tool.scopeScript')}
                   </label>
                 </div>
               </div>
@@ -417,7 +419,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
               {/* 피드백 입력 */}
               <textarea
                 style={{ ...styles.textarea, marginBottom: 8 }}
-                placeholder="예: 장애물 정보는 BOP에서 가져오고, 벽 간격은 파라미터로 받을 수 있게 해줘."
+                placeholder={t('tool.improvePlaceholder')}
                 value={improveFeedback}
                 onChange={e => setImproveFeedback(e.target.value)}
                 rows={3}
@@ -427,19 +429,19 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
                 onClick={handleImprove}
                 disabled={improving || !improveFeedback.trim() || (!improveScope.adapter && !improveScope.params && !improveScope.script)}
               >
-                {improving ? '개선 중...' : '개선 요청'}
+                {improving ? t('tool.improving') : t('tool.improveRequest')}
               </button>
 
               {/* 개선 결과 미리보기 */}
               {improveResult && improveResult.success && (
                 <div style={{ marginTop: 16 }}>
                   <div style={{ ...styles.resultCard, borderLeft: '4px solid #667eea' }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8, color: '#667eea' }}>개선 미리보기</div>
+                    <div style={{ fontWeight: 600, marginBottom: 8, color: '#667eea' }}>{t('tool.improvePreview')}</div>
                     <div style={{ fontSize: 13, marginBottom: 8 }}>{improveResult.explanation}</div>
 
                     {improveResult.changes_summary?.length > 0 && (
                       <div style={{ marginBottom: 12 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 4 }}>변경 사항:</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 4 }}>{t('tool.changes')}</div>
                         {improveResult.changes_summary.map((change, idx) => (
                           <div key={idx} style={{ fontSize: 12, color: '#666', marginLeft: 8 }}>• {change}</div>
                         ))}
@@ -461,13 +463,13 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
                     )}
                     {improveResult.preview?.params_schema && (
                       <details style={{ marginTop: 4 }}>
-                        <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>파라미터 스키마</summary>
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>{t('tool.scopeParams')}</summary>
                         <pre style={{ ...styles.codePreview, maxHeight: 150 }}>{JSON.stringify(improveResult.preview.params_schema, null, 2)}</pre>
                       </details>
                     )}
                     {improveResult.preview?.script_code && (
                       <details style={{ marginTop: 4 }}>
-                        <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>스크립트 코드</summary>
+                        <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>{t('tool.scopeScript')}</summary>
                         <pre style={{ ...styles.codePreview, maxHeight: 200 }}>{improveResult.preview.script_code}</pre>
                       </details>
                     )}
@@ -480,14 +482,14 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
                       onClick={() => handleApplyImprovement(true)}
                       disabled={applying}
                     >
-                      {applying ? '적용 중...' : `새 버전으로 저장 (${getNextVersionLabel(tool.tool_id)})`}
+                      {applying ? t('tool.applying') : t('tool.saveAsNew', { version: getNextVersionLabel(tool.tool_id) })}
                     </button>
                     <button
                       style={styles.dangerBtn}
                       onClick={() => handleApplyImprovement(false)}
                       disabled={applying}
                     >
-                      현재 도구에 덮어쓰기
+                      {t('tool.overwrite')}
                     </button>
                   </div>
                 </div>
@@ -499,7 +501,7 @@ function ToolDetailView({ tool, onNavigate, onDelete }) {
 
       {/* 삭제 */}
       <div style={{ ...styles.section, borderTop: '1px solid #eee', paddingTop: 16, marginTop: 16 }}>
-        <button style={styles.dangerBtn} onClick={handleDelete}>삭제하기</button>
+        <button style={styles.dangerBtn} onClick={handleDelete}>{t('tool.deleteTool')}</button>
       </div>
 
       {error && <div style={styles.error}>{error}</div>}

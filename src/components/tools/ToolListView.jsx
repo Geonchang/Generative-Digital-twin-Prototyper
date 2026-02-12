@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import useTranslation from '../../i18n/useTranslation';
 
 function ToolListView({
   tools,
@@ -11,21 +12,23 @@ function ToolListView({
   onDeleteSelected,
   onNavigate
 }) {
+  const { t } = useTranslation();
+
   return (
     <div style={styles.content}>
       <div style={styles.header}>
-        <h3 style={styles.title}>도구 관리</h3>
+        <h3 style={styles.title}>{t('tool.management')}</h3>
         <div style={{ display: 'flex', gap: 8 }}>
           <button style={styles.aiBtn} onClick={() => onNavigate('generate')}>
-            ✨ AI 생성
+            ✨ {t('tool.aiGenerate')}
           </button>
           <button style={styles.secondaryBtn} onClick={() => onNavigate('upload')}>
-            + 업로드
+            + {t('tool.upload')}
           </button>
         </div>
       </div>
 
-      {/* 다중 선택 도구 */}
+      {/* Multi selection */}
       {!listLoading && tools.length > 0 && (
         <div style={styles.selectionBar}>
           <label style={styles.checkboxLabel}>
@@ -35,26 +38,26 @@ function ToolListView({
               onChange={onToggleSelectAll}
               style={{ cursor: 'pointer' }}
             />
-            <span>전체 선택 ({selectedToolIds.length}/{tools.length})</span>
+            <span>{t('tool.selectAll', { selected: selectedToolIds.length, total: tools.length })}</span>
           </label>
           {selectedToolIds.length > 0 && (
             <button
               style={{ ...styles.dangerBtn, padding: '4px 12px', fontSize: 12 }}
               onClick={onDeleteSelected}
             >
-              선택 삭제 ({selectedToolIds.length})
+              {t('tool.deleteSelected', { count: selectedToolIds.length })}
             </button>
           )}
         </div>
       )}
 
-      {listLoading && <div style={styles.info}>불러오는 중...</div>}
+      {listLoading && <div style={styles.info}>{t('tool.loading')}</div>}
 
       {!listLoading && tools.length === 0 && (
         <div style={styles.emptyState}>
-          <p style={{ fontWeight: 'bold', marginBottom: 8 }}>등록된 도구가 없습니다</p>
-          <p style={{ color: '#888', fontSize: 13 }}>
-            Python 최적화 스크립트를 업로드하여<br />BOP 데이터와 연동할 수 있습니다.
+          <p style={{ fontWeight: 'bold', marginBottom: 8 }}>{t('tool.noTools')}</p>
+          <p style={{ color: '#888', fontSize: 13, whiteSpace: 'pre-line' }}>
+            {t('tool.noToolsHint')}
           </p>
         </div>
       )}

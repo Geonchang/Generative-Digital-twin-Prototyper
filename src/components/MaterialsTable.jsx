@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import useBopStore from '../store/bopStore';
 import { getResourceSize } from './Viewer3D';
+import useTranslation from '../i18n/useTranslation';
 
 function MaterialsTable() {
   const { bopData, selectedResourceKey, setSelectedResource,
@@ -11,6 +12,7 @@ function MaterialsTable() {
   const [editingCell, setEditingCell] = useState(null);
   const [selectedMasterId, setSelectedMasterId] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
+  const { t } = useTranslation();
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -32,7 +34,7 @@ function MaterialsTable() {
 
   const handleDeleteMaterial = () => {
     if (!selectedMasterId) return;
-    if (window.confirm('선택한 자재를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.')) {
+    if (window.confirm(t('mt.confirmDelete'))) {
       deleteMaterial(selectedMasterId);
       setSelectedMasterId(null);
     }
@@ -40,7 +42,7 @@ function MaterialsTable() {
 
   const handleDeleteSelected = () => {
     if (selectedIds.length === 0) return;
-    if (window.confirm(`선택한 ${selectedIds.length}종의 자재를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.`)) {
+    if (window.confirm(t('mt.confirmDeleteMulti', { count: selectedIds.length }))) {
       selectedIds.forEach(id => deleteMaterial(id));
       setSelectedIds([]);
       setSelectedMasterId(null);
@@ -68,18 +70,18 @@ function MaterialsTable() {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <h2 style={styles.title}>자재 마스터</h2>
-          <div style={styles.count}>총 0종</div>
+          <h2 style={styles.title}>{t('mt.title')}</h2>
+          <div style={styles.count}>{t('mt.total', { count: 0 })}</div>
         </div>
         <div style={styles.actionBar}>
           <button style={styles.actionButton} onClick={handleAddMaterial}>
-            + 자재 추가
+            {t('mt.add')}
           </button>
         </div>
         <div style={styles.emptyState}>
-          <p>자재 데이터가 없습니다.</p>
+          <p>{t('mt.noData')}</p>
           <button style={styles.actionButton} onClick={handleAddMaterial}>
-            + 자재 추가
+            {t('mt.add')}
           </button>
         </div>
       </div>
@@ -88,19 +90,19 @@ function MaterialsTable() {
 
   // 각 자재가 사용되는 공정 찾기
   const getMaterialUsage = (materialId) => {
-    if (!bopData.processes) return [];
+    if (!bopData.resource_assignments) return [];
 
     const usage = [];
 
-    bopData.processes.forEach(process => {
-      const materialResource = process.resources?.find(
-        r => r.resource_type === 'material' && r.resource_id === materialId
-      );
+    bopData.resource_assignments.forEach(ra => {
+      if (ra.resource_type === 'material' && ra.resource_id === materialId) {
+        const detail = (bopData.process_details || []).find(
+          d => d.process_id === ra.process_id && d.parallel_index === ra.parallel_index
+        );
 
-      if (materialResource) {
         usage.push({
-          process,
-          resource: materialResource,
+          assignment: ra,
+          detail,
         });
       }
     });
@@ -112,14 +114,14 @@ function MaterialsTable() {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <h2 style={styles.title}>자재 마스터</h2>
-        <div style={styles.count}>총 {bopData.materials.length}종</div>
+        <h2 style={styles.title}>{t('mt.title')}</h2>
+        <div style={styles.count}>{t('mt.total', { count: bopData.materials.length })}</div>
       </div>
 
       {/* Action Bar */}
       <div style={styles.actionBar}>
         <button style={styles.actionButton} onClick={handleAddMaterial}>
-          + 자재 추가
+          {t('mt.add')}
         </button>
         <button
           style={{
@@ -129,7 +131,7 @@ function MaterialsTable() {
           disabled={selectedIds.length === 0}
           onClick={handleDeleteSelected}
         >
-          선택 항목 삭제 ({selectedIds.length})
+          {t('mt.deleteSelected', { count: selectedIds.length })}
         </button>
       </div>
 
@@ -146,14 +148,14 @@ function MaterialsTable() {
                   style={styles.checkbox}
                 />
               </th>
-              <th style={{ ...styles.th, width: '100px' }}>자재 ID</th>
-              <th style={{ ...styles.th, minWidth: '150px' }}>자재명</th>
-              <th style={{ ...styles.th, width: '60px' }}>단위</th>
-              <th style={{ ...styles.th, width: '80px' }}>수량</th>
-              <th style={{ ...styles.th, width: '100px' }}>사용 공정</th>
-              <th style={{ ...styles.th, width: '120px' }}>Location (x,z)</th>
-              <th style={{ ...styles.th, width: '150px' }}>Size (x,y,z)</th>
-              <th style={{ ...styles.th, width: '80px' }}>Rotation (Y)</th>
+              <th style={{ ...styles.th, width: '100px' }}>{t('mt.id')}</th>
+              <th style={{ ...styles.th, minWidth: '150px' }}>{t('mt.name')}</th>
+              <th style={{ ...styles.th, width: '60px' }}>{t('mt.unit')}</th>
+              <th style={{ ...styles.th, width: '80px' }}>{t('mt.quantity')}</th>
+              <th style={{ ...styles.th, width: '100px' }}>{t('mt.usedIn')}</th>
+              <th style={{ ...styles.th, width: '120px' }}>{t('common.location')}</th>
+              <th style={{ ...styles.th, width: '150px' }}>{t('common.sizeWHD')}</th>
+              <th style={{ ...styles.th, width: '80px' }}>{t('common.rotation')}</th>
             </tr>
           </thead>
           <tbody>
@@ -204,25 +206,28 @@ function MaterialsTable() {
                         <span style={styles.unit}>{material.unit}</span>
                       )}
                     </td>
-                    <td style={styles.td} colSpan={5}><span style={styles.notUsed}>미사용</span></td>
+                    <td style={styles.td} colSpan={5}><span style={styles.notUsed}>{t('mt.notUsed')}</span></td>
                   </tr>
                 );
               }
 
-              return usage.map(({ process, resource }, idx) => {
-                const lineLabel = process.process_id;
-                const resourceKey = `material:${material.material_id}:${process.process_id}`;
+              return usage.map(({ assignment, detail }, idx) => {
+                const lineLabel = `${assignment.process_id}:${assignment.parallel_index}`;
+                const resourceKey = `material:${material.material_id}:${assignment.process_id}:${assignment.parallel_index}`;
                 const isSelected = selectedResourceKey === resourceKey;
 
-                const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
-                const scale = resource.scale || { x: 1, y: 1, z: 1 };
-                const rotationY = resource.rotation_y || 0;
+                const relLoc = assignment.relative_location || { x: 0, y: 0, z: 0 };
+                const scale = assignment.scale || { x: 1, y: 1, z: 1 };
+                const rotationY = assignment.rotation_y || 0;
 
                 // Effective position 계산 (auto-layout 적용)
-                const resourceIndex = process.resources.findIndex(r =>
-                  r.resource_type === resource.resource_type && r.resource_id === resource.resource_id
+                const processResources = (bopData.resource_assignments || []).filter(
+                  r => r.process_id === assignment.process_id && r.parallel_index === assignment.parallel_index
                 );
-                const totalResources = process.resources.length;
+                const resourceIndex = processResources.findIndex(r =>
+                  r.resource_type === assignment.resource_type && r.resource_id === assignment.resource_id
+                );
+                const totalResources = processResources.length;
                 const effectivePos = (relLoc.x !== 0 || relLoc.z !== 0)
                   ? { x: relLoc.x, z: relLoc.z }
                   : { x: 0, z: resourceIndex * 0.9 - (totalResources - 1) * 0.9 / 2 };
@@ -236,7 +241,7 @@ function MaterialsTable() {
 
                 return (
                   <tr
-                    key={`${material.material_id}-${process.process_id}`}
+                    key={`${material.material_id}-${assignment.process_id}-${assignment.parallel_index}`}
                     ref={isSelected ? selectedRowRef : null}
                     style={{
                       ...styles.row,
@@ -245,7 +250,7 @@ function MaterialsTable() {
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedResource('material', material.material_id, process.process_id);
+                      setSelectedResource('material', material.material_id, assignment.process_id, assignment.parallel_index);
                       setSelectedMasterId(material.material_id);
                     }}
                   >
@@ -294,11 +299,11 @@ function MaterialsTable() {
                           <input
                             type="number"
                             style={{ ...styles.editInput, width: '60px' }}
-                            value={resource.quantity || 0}
+                            value={assignment.quantity || 0}
                             onChange={(e) => {
                               const val = parseFloat(e.target.value);
                               if (!isNaN(val) && val >= 0) {
-                                updateResourceQuantity(process.process_id, 'material', material.material_id, val);
+                                updateResourceQuantity(assignment.process_id, assignment.parallel_index, 'material', material.material_id, val);
                               }
                             }}
                             onClick={(e) => e.stopPropagation()}
@@ -308,7 +313,7 @@ function MaterialsTable() {
                           <span style={styles.unit}>{material.unit}</span>
                         </div>
                       ) : (
-                        <span style={styles.quantity}>{resource.quantity} {material.unit}</span>
+                        <span style={styles.quantity}>{assignment.quantity} {material.unit}</span>
                       )}
                     </td>
                     <td style={styles.td}>
@@ -321,7 +326,7 @@ function MaterialsTable() {
                     </td>
                     <td style={styles.td}>
                       <div style={styles.locationCell}>
-                        {actualSize.x.toFixed(2)}, {actualSize.y.toFixed(2)}, {actualSize.z.toFixed(2)}
+                        ({actualSize.x.toFixed(1)}, {actualSize.y.toFixed(1)}, {actualSize.z.toFixed(1)})
                       </div>
                     </td>
                     <td style={styles.td}>

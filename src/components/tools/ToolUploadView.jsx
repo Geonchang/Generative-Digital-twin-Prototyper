@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react';
 import { api } from '../../services/api';
 import useBopStore from '../../store/bopStore';
+import useTranslation from '../../i18n/useTranslation';
 
 function ToolUploadView({ onNavigate, onUploadComplete }) {
   const { addMessage } = useBopStore();
+  const { t } = useTranslation();
 
   const [uploadedCode, setUploadedCode] = useState('');
   const [fileName, setFileName] = useState('');
@@ -20,7 +22,7 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
     const file = e.target.files[0];
     if (!file) return;
     if (!file.name.endsWith('.py')) {
-      setError('Python (.py) 파일만 업로드 가능합니다.');
+      setError(t('tool.pyOnly'));
       return;
     }
     setError('');
@@ -67,7 +69,7 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
       };
 
       await api.registerTool(registerData);
-      addMessage('assistant', `"${analysisResult.tool_name}" 도구가 등록되었습니다.`);
+      addMessage('assistant', t('tool.registeredMsg', { name: analysisResult.tool_name }));
 
       // Reset
       setUploadedCode('');
@@ -84,13 +86,13 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
   return (
     <div style={styles.content}>
       <div style={styles.header}>
-        <button style={styles.backBtn} onClick={() => onNavigate('main')}>← 목록</button>
-        <h3 style={styles.title}>도구 업로드</h3>
+        <button style={styles.backBtn} onClick={() => onNavigate('main')}>← {t('tool.backToList')}</button>
+        <h3 style={styles.title}>{t('tool.uploadTitle')}</h3>
       </div>
 
       {/* Step 1: File Upload */}
       <div style={styles.section}>
-        <label style={styles.label}>1. Python 스크립트 선택</label>
+        <label style={styles.label}>{t('tool.step1FileLabel')}</label>
         <input
           ref={fileInputRef}
           type="file"
@@ -99,14 +101,14 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
           style={{ display: 'none' }}
         />
         <button style={styles.secondaryBtn} onClick={() => fileInputRef.current?.click()}>
-          {fileName || '파일 선택...'}
+          {fileName || t('tool.fileSelect')}
         </button>
       </div>
 
       {/* Step 2: Code Preview */}
       {uploadedCode && (
         <div style={styles.section}>
-          <label style={styles.label}>2. 코드 미리보기</label>
+          <label style={styles.label}>{t('tool.step2Preview')}</label>
           <pre style={{ ...styles.codePreview, maxHeight: '300px', overflow: 'auto' }}>
             {uploadedCode}
           </pre>
@@ -122,12 +124,12 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
               checked={useSchemaOverride}
               onChange={e => setUseSchemaOverride(e.target.checked)}
             />
-            스키마 직접 지정 (AI 분석 스킵)
+            {t('tool.schemaOverride')}
           </label>
           {useSchemaOverride && (
             <div style={{ ...styles.resultCard, marginTop: 8 }}>
               <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>입력 스키마 (JSON)</label>
+                <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>{t('tool.inputSchemaJson')}</label>
                 <textarea
                   style={{ ...styles.textarea, fontFamily: 'monospace', fontSize: 11, minHeight: 120 }}
                   placeholder='{"type": "json", "description": "BOP 데이터"}'
@@ -138,13 +140,13 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
                       setSchemaOverride(prev => ({ ...prev, input: parsed }));
                       setError('');
                     } catch (err) {
-                      setError('입력 스키마 JSON 형식 오류');
+                      setError(t('tool.inputSchemaJsonError'));
                     }
                   }}
                 />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>출력 스키마 (JSON)</label>
+                <label style={{ fontSize: 12, color: '#555', display: 'block', marginBottom: 4 }}>{t('tool.outputSchemaJson')}</label>
                 <textarea
                   style={{ ...styles.textarea, fontFamily: 'monospace', fontSize: 11, minHeight: 120 }}
                   placeholder='{"type": "json", "description": "수정된 BOP 데이터"}'
@@ -155,7 +157,7 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
                       setSchemaOverride(prev => ({ ...prev, output: parsed }));
                       setError('');
                     } catch (err) {
-                      setError('출력 스키마 JSON 형식 오류');
+                      setError(t('tool.outputSchemaJsonError'));
                     }
                   }}
                 />
@@ -168,13 +170,13 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
       {/* Step 3: Analyze Button */}
       {uploadedCode && !analysisResult && (
         <div style={styles.section}>
-          <label style={styles.label}>3. {useSchemaOverride ? '스키마로 등록' : 'AI 분석'}</label>
+          <label style={styles.label}>{t('tool.step3Analyze', { mode: useSchemaOverride ? t('tool.schemaMode') : t('tool.analyzeMode') })}</label>
           <button
             style={styles.primaryBtn}
             onClick={handleAnalyze}
             disabled={analyzing || (useSchemaOverride && (!schemaOverride.input || !schemaOverride.output))}
           >
-            {analyzing ? (useSchemaOverride ? '등록 준비 중...' : '분석 중...') : (useSchemaOverride ? '스키마로 등록' : '분석하기')}
+            {analyzing ? (useSchemaOverride ? t('tool.preparingRegister') : t('tool.analyzing')) : (useSchemaOverride ? t('tool.schemaMode') : t('tool.analyze'))}
           </button>
         </div>
       )}
@@ -182,10 +184,10 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
       {/* Step 4: Analysis Result */}
       {analysisResult && (
         <div style={styles.section}>
-          <label style={styles.label}>4. 분석 결과</label>
+          <label style={styles.label}>{t('tool.step4Result')}</label>
           <div style={styles.resultCard}>
             <div style={styles.resultRow}>
-              <span style={styles.resultLabel}>도구명:</span>
+              <span style={styles.resultLabel}>{t('tool.toolName')}</span>
               <input
                 style={styles.input}
                 value={analysisResult.tool_name}
@@ -193,7 +195,7 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
               />
             </div>
             <div style={styles.resultRow}>
-              <span style={styles.resultLabel}>설명:</span>
+              <span style={styles.resultLabel}>{t('tool.description')}</span>
               <input
                 style={styles.input}
                 value={analysisResult.description}
@@ -201,13 +203,13 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
               />
             </div>
             <div style={styles.resultRow}>
-              <span style={styles.resultLabel}>입력:</span>
+              <span style={styles.resultLabel}>{t('tool.input')}</span>
               <span style={styles.resultValue}>
                 {analysisResult.input_schema?.type} - {analysisResult.input_schema?.description}
               </span>
             </div>
             <div style={styles.resultRow}>
-              <span style={styles.resultLabel}>출력:</span>
+              <span style={styles.resultLabel}>{t('tool.output')}</span>
               <span style={styles.resultValue}>
                 {analysisResult.output_schema?.type} - {analysisResult.output_schema?.description}
               </span>
@@ -215,13 +217,13 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
             {analysisResult.params_schema?.length > 0 && (
               <div style={{ marginTop: 8, borderTop: '1px solid #e0e0e0', paddingTop: 8 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginBottom: 6 }}>
-                  추가 파라미터 ({analysisResult.params_schema.length}개)
+                  {t('tool.additionalParams', { count: analysisResult.params_schema.length })}
                 </div>
                 {analysisResult.params_schema.map((p, idx) => (
                   <div key={idx} style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
                     <span style={{ fontWeight: 500 }}>{p.label}</span>
                     <span style={{ color: '#999' }}> ({p.key}, {p.type})</span>
-                    {p.required && <span style={{ color: '#c0392b', marginLeft: 4 }}>*필수</span>}
+                    {p.required && <span style={{ color: '#c0392b', marginLeft: 4 }}>{t('tool.required')}</span>}
                   </div>
                 ))}
               </div>
@@ -233,13 +235,13 @@ function ToolUploadView({ onNavigate, onUploadComplete }) {
       {/* Step 5: Register */}
       {analysisResult && (
         <div style={styles.section}>
-          <label style={styles.label}>5. 도구 등록</label>
+          <label style={styles.label}>{t('tool.step5Register')}</label>
           <button
             style={styles.primaryBtn}
             onClick={handleRegister}
             disabled={registering}
           >
-            {registering ? '등록 중 (어댑터 코드 생성)...' : '등록하기'}
+            {registering ? t('tool.registeringAdapter') : t('tool.registerBtn')}
           </button>
         </div>
       )}

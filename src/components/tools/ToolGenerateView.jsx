@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { api } from '../../services/api';
 import useBopStore from '../../store/bopStore';
+import useTranslation from '../../i18n/useTranslation';
 
 function ToolGenerateView({ onNavigate, onGenerateComplete }) {
   const { addMessage } = useBopStore();
+  const { t } = useTranslation();
 
   const [genDescription, setGenDescription] = useState('');
   const [generatingSchema, setGeneratingSchema] = useState(false);
@@ -32,7 +34,7 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
         setEditedOutputSchema(result.output_schema);
         setEditedParams(result.suggested_params || []);
       } else {
-        setError(result.message || '스키마 생성에 실패했습니다.');
+        setError(result.message || t('tool.schemaFailed'));
       }
     } catch (err) {
       setError(err.message);
@@ -61,10 +63,10 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
         setEditedParams(result.suggested_params || []);
         setImproveFeedback('');
         if (result.changes_summary && result.changes_summary.length > 0) {
-          addMessage('system', `✅ 스키마가 개선되었습니다.\n\n변경 사항:\n${result.changes_summary.map(c => `• ${c}`).join('\n')}`);
+          addMessage('system', t('tool.schemaImprovedMsg', { changes: result.changes_summary.map(c => `• ${c}`).join('\n') }));
         }
       } else {
-        setError(result.message || '스키마 개선에 실패했습니다.');
+        setError(result.message || t('tool.schemaImproveFailed'));
       }
     } catch (err) {
       setError(err.message);
@@ -84,7 +86,7 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
         setGeneratedResult(result);
         setEditedCode(result.script_code || '');
       } else {
-        setError(result.message || '스크립트 생성에 실패했습니다.');
+        setError(result.message || t('tool.scriptFailed'));
       }
     } catch (err) {
       setError(err.message);
@@ -117,7 +119,7 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
         params_schema: editedParams.length > 0 ? editedParams : null,
       });
 
-      addMessage('assistant', `"${generatedResult.tool_name}" 도구가 생성되었습니다.`);
+      addMessage('assistant', t('tool.generatedMsg', { name: generatedResult.tool_name }));
       onGenerateComplete();
     } catch (err) {
       setError(err.message);
@@ -318,16 +320,16 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
   return (
     <div style={styles.content}>
       <div style={styles.header}>
-        <button style={styles.backBtn} onClick={() => onNavigate('main')}>← 목록</button>
-        <h3 style={styles.title}>AI로 도구 생성</h3>
+        <button style={styles.backBtn} onClick={() => onNavigate('main')}>← {t('tool.backToList')}</button>
+        <h3 style={styles.title}>{t('tool.aiGenerateTitle')}</h3>
       </div>
 
       {/* Step 1: Description Input */}
       <div style={styles.section}>
-        <label style={styles.label}>1단계: 원하는 도구 기능 설명</label>
+        <label style={styles.label}>{t('tool.step1Label')}</label>
         <textarea
           style={styles.textarea}
-          placeholder="예: 공정 간 거리를 계산해서 최소 거리보다 가까운 공정들을 찾아주는 도구가 필요해. 최소 거리는 파라미터로 받고 싶어."
+          placeholder={t('tool.step1Placeholder')}
           value={genDescription}
           onChange={e => setGenDescription(e.target.value)}
           rows={4}
@@ -339,16 +341,16 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
             onClick={handleGenerateSchema}
             disabled={generatingSchema || !genDescription.trim()}
           >
-            {generatingSchema ? 'AI가 스키마 생성 중...' : '✨ 스키마 생성하기'}
+            {generatingSchema ? t('tool.generatingSchema') : `✨ ${t('tool.generateSchema')}`}
           </button>
         )}
         {generatedSchema && (
           <div style={{ ...styles.completedStep, marginTop: 8 }}>
-            <div style={{ fontWeight: 600, color: '#2d7a3a' }}>✅ 1단계 완료: 스키마 생성 성공</div>
+            <div style={{ fontWeight: 600, color: '#2d7a3a' }}>✅ {t('tool.step1Done')}</div>
           </div>
         )}
         <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>
-          먼저 AI가 도구에 필요한 입출력 스키마를 생성합니다.
+          {t('tool.step1Hint')}
         </div>
       </div>
 
@@ -356,23 +358,23 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
       {generatedSchema && !generatedResult && (
         <>
           <div style={styles.section}>
-            <label style={styles.label}>2단계: 생성된 스키마 확인 및 수정</label>
+            <label style={styles.label}>{t('tool.step2Label')}</label>
             <div style={styles.resultCard}>
               <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>도구명:</span>
+                <span style={styles.resultLabel}>{t('tool.toolName')}</span>
                 <span style={styles.resultValue}>{generatedSchema.tool_name}</span>
               </div>
               <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>설명:</span>
+                <span style={styles.resultLabel}>{t('tool.description')}</span>
                 <span style={styles.resultValue}>{generatedSchema.description}</span>
               </div>
             </div>
           </div>
 
           <div style={styles.section}>
-            <label style={styles.label}>입력 스키마</label>
+            <label style={styles.label}>{t('tool.inputSchema')}</label>
             <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>
-              AI가 생성한 스키마입니다. 필요시 수정하세요.
+              {t('tool.inputSchemaHint')}
             </div>
             <textarea
               style={{ ...styles.textarea, fontFamily: 'monospace', fontSize: 11, minHeight: 180 }}
@@ -383,7 +385,7 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
                   setEditedInputSchema(parsed);
                   setError('');
                 } catch (err) {
-                  setError('입력 스키마 JSON 형식 오류: ' + err.message);
+                  setError(t('tool.inputSchemaError') + err.message);
                 }
               }}
             />
@@ -392,7 +394,7 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
             {generatedSchema?.example_input && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: '#555', marginBottom: 4 }}>
-                  📝 입력 예시 데이터 (AI 생성)
+                  📝 {t('tool.inputExample')}
                 </div>
                 <pre style={{ ...styles.codePreview, backgroundColor: '#f0f8ff', maxHeight: '200px' }}>
                   {typeof generatedSchema.example_input === 'string'
@@ -404,9 +406,9 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
           </div>
 
           <div style={styles.section}>
-            <label style={styles.label}>출력 스키마</label>
+            <label style={styles.label}>{t('tool.outputSchema')}</label>
             <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>
-              AI가 생성한 스키마입니다. 필요시 수정하세요.
+              {t('tool.outputSchemaHint')}
             </div>
             <textarea
               style={{ ...styles.textarea, fontFamily: 'monospace', fontSize: 11, minHeight: 180 }}
@@ -417,7 +419,7 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
                   setEditedOutputSchema(parsed);
                   setError('');
                 } catch (err) {
-                  setError('출력 스키마 JSON 형식 오류: ' + err.message);
+                  setError(t('tool.outputSchemaError') + err.message);
                 }
               }}
             />
@@ -426,7 +428,7 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
             {generatedSchema?.example_output && (
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: '#555', marginBottom: 4 }}>
-                  📝 출력 예시 데이터 (AI 생성)
+                  📝 {t('tool.outputExample')}
                 </div>
                 <pre style={{ ...styles.codePreview, backgroundColor: '#f0f8ff', maxHeight: '200px' }}>
                   {typeof generatedSchema.example_output === 'string'
@@ -438,20 +440,20 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
           </div>
 
           <div style={styles.section}>
-            <label style={styles.label}>파라미터 (선택)</label>
+            <label style={styles.label}>{t('tool.paramsOptional')}</label>
             <div style={styles.resultCard}>
               {editedParams.map((param, idx) => (
                 <div key={idx} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #e0e0e0' }}>
                   <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                     <input
                       style={{ ...styles.input, flex: 1 }}
-                      placeholder="키"
+                      placeholder={t('tool.paramKey')}
                       value={param.key}
                       onChange={e => updateParam(idx, 'key', e.target.value)}
                     />
                     <input
                       style={{ ...styles.input, flex: 1 }}
-                      placeholder="레이블"
+                      placeholder={t('tool.paramLabel')}
                       value={param.label}
                       onChange={e => updateParam(idx, 'label', e.target.value)}
                     />
@@ -468,26 +470,26 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
                       style={{ ...styles.dangerBtn, padding: '4px 8px', fontSize: 11 }}
                       onClick={() => removeParam(idx)}
                     >
-                      삭제
+                      {t('tool.paramDelete')}
                     </button>
                   </div>
                 </div>
               ))}
               <button style={styles.secondaryBtn} onClick={addParam}>
-                + 파라미터 추가
+                {t('tool.addParam')}
               </button>
             </div>
           </div>
 
           {/* Schema Improvement Section */}
           <div style={styles.section}>
-            <label style={styles.label}>스키마 개선 (선택)</label>
+            <label style={styles.label}>{t('tool.schemaImproveLabel')}</label>
             <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>
-              스키마가 마음에 들지 않으면 개선 요청을 입력하세요. AI가 피드백을 반영하여 스키마를 개선합니다.
+              {t('tool.schemaImproveHint')}
             </div>
             <textarea
               style={{ ...styles.textarea, minHeight: 60 }}
-              placeholder="예: 출력에 총 개수 필드를 추가해줘, 파라미터로 임계값을 받을 수 있게 해줘"
+              placeholder={t('tool.schemaImprovePlaceholder')}
               value={improveFeedback}
               onChange={e => setImproveFeedback(e.target.value)}
               rows={2}
@@ -497,21 +499,21 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
               onClick={handleImproveSchema}
               disabled={improvingSchema || !improveFeedback.trim()}
             >
-              {improvingSchema ? 'AI가 스키마 개선 중...' : '✨ 스키마 개선하기'}
+              {improvingSchema ? t('tool.improvingSchema') : `✨ ${t('tool.improveSchema')}`}
             </button>
           </div>
 
           <div style={styles.section}>
-            <label style={styles.label}>3단계: 스크립트 생성</label>
+            <label style={styles.label}>{t('tool.step3Label')}</label>
             <button
               style={styles.aiBtn}
               onClick={handleGenerateScript}
               disabled={generating}
             >
-              {generating ? 'AI가 스크립트 생성 중...' : '✨ 스크립트 생성하기'}
+              {generating ? t('tool.generatingScript') : `✨ ${t('tool.generateScript')}`}
             </button>
             <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>
-              확정된 스키마를 기반으로 Python 스크립트를 생성합니다.
+              {t('tool.step3Hint')}
             </div>
           </div>
         </>
@@ -521,14 +523,14 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
       {generatedResult && (
         <>
           <div style={styles.completedStep}>
-            <div style={{ fontWeight: 600, color: '#2d7a3a' }}>✅ 3단계 완료: 스크립트 생성 성공</div>
+            <div style={{ fontWeight: 600, color: '#2d7a3a' }}>✅ {t('tool.step3Done')}</div>
             <div style={{ fontSize: 13, marginTop: 4, color: '#555' }}>{generatedResult.tool_name}</div>
           </div>
 
           <div style={styles.section}>
-            <label style={styles.label}>4단계: 생성된 코드 확인 및 수정</label>
+            <label style={styles.label}>{t('tool.step4Label')}</label>
             <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>
-              AI가 생성한 Python 스크립트입니다. 필요시 수정하세요.
+              {t('tool.step4Hint')}
             </div>
             <textarea
               style={{ ...styles.textarea, fontFamily: 'monospace', fontSize: 11, minHeight: 300 }}
@@ -538,16 +540,16 @@ function ToolGenerateView({ onNavigate, onGenerateComplete }) {
           </div>
 
           <div style={styles.section}>
-            <label style={styles.label}>5단계: 도구 등록</label>
+            <label style={styles.label}>{t('tool.step5Label')}</label>
             <button
               style={styles.primaryBtn}
               onClick={handleRegister}
               disabled={registering || !editedCode.trim()}
             >
-              {registering ? '등록 중 (어댑터 자동 생성)...' : '도구 등록하기'}
+              {registering ? t('tool.registering') : t('tool.register')}
             </button>
             <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>
-              도구를 등록하면 AI가 자동으로 BOP 어댑터 코드를 생성합니다.
+              {t('tool.registerHint')}
             </div>
           </div>
         </>

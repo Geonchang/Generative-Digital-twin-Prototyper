@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import useBopStore from '../store/bopStore';
 import { api } from '../services/api';
+import useTranslation from '../i18n/useTranslation';
 
 function UnifiedChatPanel() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { messages, setBopData, addMessage, exportBopData, selectedModel, setSelectedModel, supportedModels, setSupportedModels } = useBopStore();
+  const { messages, setBopData, addMessage, exportBopData, selectedModel, setSelectedModel, supportedModels, setSupportedModels, selectedLanguage, setSelectedLanguage } = useBopStore();
   const messagesEndRef = useRef(null);
+  const { t } = useTranslation();
 
   // Load supported models on component mount
   useEffect(() => {
@@ -37,7 +39,7 @@ function UnifiedChatPanel() {
 
   const handleSend = async () => {
     if (!input.trim()) {
-      setError('메시지를 입력해주세요');
+      setError(t('chat.emptyError'));
       return;
     }
 
@@ -59,8 +61,8 @@ function UnifiedChatPanel() {
         ? collapsedBop
         : null;
 
-      // 통합 채팅 API 호출 (선택된 모델 사용)
-      const response = await api.unifiedChat(userMessage, bopToSend, currentMessages, selectedModel);
+      // 통합 채팅 API 호출 (선택된 모델 및 언어 사용)
+      const response = await api.unifiedChat(userMessage, bopToSend, currentMessages, selectedModel, selectedLanguage);
 
       console.log('[DEBUG] API Response:', response);
       console.log('[DEBUG] BOP Data exists:', !!response.bop_data);
@@ -81,7 +83,7 @@ function UnifiedChatPanel() {
       const errorMessage = err.message || String(err);
       setError(errorMessage);
       // 에러 메시지도 히스토리에 추가
-      addMessage('assistant', `오류: ${errorMessage}`);
+      addMessage('assistant', `${t('chat.error')}: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -97,34 +99,62 @@ function UnifiedChatPanel() {
   return (
     <div style={styles.container}>
       <div style={styles.titleBar}>
-        <h2 style={styles.title}>AI 어시스턴트</h2>
-        {Object.keys(supportedModels).length > 0 && (
-          <select
-            style={styles.modelSelect}
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            disabled={loading}
-          >
-            {Object.entries(supportedModels).map(([modelId, modelInfo]) => (
-              <option key={modelId} value={modelId}>
-                {modelInfo.display}
-              </option>
-            ))}
-          </select>
-        )}
+        <h2 style={styles.title}>{t('chat.title')}</h2>
+        <div style={styles.titleControls}>
+          {Object.keys(supportedModels).length > 0 && (
+            <select
+              style={styles.modelSelect}
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              disabled={loading}
+            >
+              {Object.entries(supportedModels).map(([modelId, modelInfo]) => (
+                <option key={modelId} value={modelId}>
+                  {modelInfo.display}
+                </option>
+              ))}
+            </select>
+          )}
+          <div style={styles.langToggle}>
+            <button
+              style={{
+                ...styles.langButton,
+                ...(selectedLanguage === 'ko' ? styles.langButtonActive : {}),
+              }}
+              onClick={() => setSelectedLanguage('ko')}
+              disabled={loading}
+            >
+              KR
+            </button>
+            <button
+              style={{
+                ...styles.langButton,
+                ...(selectedLanguage === 'en' ? styles.langButtonActive : {}),
+              }}
+              onClick={() => setSelectedLanguage('en')}
+              disabled={loading}
+            >
+              EN
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 대화 히스토리 */}
       <div style={styles.messagesContainer}>
         {messages.length === 0 && (
           <div style={styles.placeholder}>
-            <p style={styles.placeholderTitle}>BOP 생성 및 관리 어시스턴트</p>
-            <p style={styles.placeholderText}>예시:</p>
+            <p style={styles.placeholderTitle}>
+              {t('chat.placeholder')}
+            </p>
+            <p style={styles.placeholderText}>
+              {t('chat.examples')}
+            </p>
             <ul style={styles.exampleList}>
-              <li>"자전거 제조 라인 BOP 만들어줘"</li>
-              <li>"3번 공정 삭제해줘"</li>
-              <li>"검사 공정 추가해줘"</li>
-              <li>"현재 bottleneck이 뭐야?"</li>
+              <li>{t('chat.ex1')}</li>
+              <li>{t('chat.ex2')}</li>
+              <li>{t('chat.ex3')}</li>
+              <li>{t('chat.ex4')}</li>
             </ul>
           </div>
         )}
@@ -147,7 +177,7 @@ function UnifiedChatPanel() {
         {loading && (
           <div style={{ ...styles.message, ...styles.assistantMessage }}>
             <div style={styles.messageRole}>🤖 AI</div>
-            <div style={styles.messageContent}>생각 중...</div>
+            <div style={styles.messageContent}>{t('chat.thinking')}</div>
           </div>
         )}
 
@@ -163,7 +193,7 @@ function UnifiedChatPanel() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="메시지를 입력하세요 (Shift+Enter로 줄바꿈)"
+            placeholder={t('chat.inputPlaceholder')}
             disabled={loading}
             rows={2}
           />
@@ -172,7 +202,7 @@ function UnifiedChatPanel() {
             onClick={handleSend}
             disabled={loading || !input.trim()}
           >
-            전송
+            {t('chat.send')}
           </button>
         </div>
       </div>
@@ -200,6 +230,11 @@ const styles = {
     fontSize: '18px',
     fontWeight: 'bold',
   },
+  titleControls: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+  },
   modelSelect: {
     padding: '5px 10px',
     borderRadius: '4px',
@@ -207,6 +242,26 @@ const styles = {
     fontSize: '13px',
     backgroundColor: '#fff',
     cursor: 'pointer',
+  },
+  langToggle: {
+    display: 'flex',
+    borderRadius: '4px',
+    overflow: 'hidden',
+    border: '1px solid #ccc',
+  },
+  langButton: {
+    padding: '4px 10px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    border: 'none',
+    backgroundColor: '#fff',
+    color: '#666',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s, color 0.2s',
+  },
+  langButtonActive: {
+    backgroundColor: '#4a90e2',
+    color: '#fff',
   },
   messagesContainer: {
     flex: 1,

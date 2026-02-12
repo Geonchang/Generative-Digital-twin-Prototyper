@@ -21,14 +21,16 @@ export function useToolExecution() {
 
     const changes = [];
     const fieldNames = {
-      processes: '공정',
+      processes: '공정 라우팅',
+      process_details: '공정 상세',
+      resource_assignments: '리소스 배치',
       equipments: '설비',
       workers: '작업자',
       materials: '자재',
       obstacles: '장애물'
     };
 
-    const arrayFields = ['processes', 'equipments', 'workers', 'materials', 'obstacles'];
+    const arrayFields = ['processes', 'process_details', 'resource_assignments', 'equipments', 'workers', 'materials', 'obstacles'];
     arrayFields.forEach(field => {
       const origArr = original[field] || [];
       const updArr = updated[field] || [];
@@ -40,26 +42,44 @@ export function useToolExecution() {
         changes.push({ type: 'remove', field: fieldNames[field] || field, count: -added });
       }
 
-      if (field === 'processes') {
+      if (field === 'process_details') {
         let modified = 0;
         const modifiedDetails = [];
-        origArr.forEach(origProc => {
-          const updProc = updArr.find(p => p.process_id === origProc.process_id);
-          if (updProc && JSON.stringify(origProc) !== JSON.stringify(updProc)) {
+
+        // Group by process_id for parallel count comparison
+        const origParCounts = new Map();
+        const updParCounts = new Map();
+        origArr.forEach(d => origParCounts.set(d.process_id, (origParCounts.get(d.process_id) || 0) + 1));
+        updArr.forEach(d => updParCounts.set(d.process_id, (updParCounts.get(d.process_id) || 0) + 1));
+
+        const allProcessIds = new Set([...origParCounts.keys(), ...updParCounts.keys()]);
+        allProcessIds.forEach(pid => {
+          const origCount = origParCounts.get(pid) || 0;
+          const updCount = updParCounts.get(pid) || 0;
+          if (origCount !== updCount) {
+            const detail = updArr.find(d => d.process_id === pid) || origArr.find(d => d.process_id === pid);
+            modifiedDetails.push(`${detail?.name || pid}: 병렬 ${origCount} → ${updCount}`);
+          }
+        });
+
+        // Check individual detail changes (CT etc.)
+        origArr.forEach(origDetail => {
+          const updDetail = updArr.find(d =>
+            d.process_id === origDetail.process_id && d.parallel_index === origDetail.parallel_index
+          );
+          if (updDetail && JSON.stringify(origDetail) !== JSON.stringify(updDetail)) {
             modified++;
-            if (origProc.parallel_count !== updProc.parallel_count) {
-              modifiedDetails.push(`${origProc.name}: 병렬 ${origProc.parallel_count || 1} → ${updProc.parallel_count || 1}`);
-            }
-            if (origProc.cycle_time_sec !== updProc.cycle_time_sec) {
-              modifiedDetails.push(`${origProc.name}: CT ${origProc.cycle_time_sec}s → ${updProc.cycle_time_sec}s`);
+            if (origDetail.cycle_time_sec !== updDetail.cycle_time_sec) {
+              modifiedDetails.push(`${origDetail.name}: CT ${origDetail.cycle_time_sec}s → ${updDetail.cycle_time_sec}s`);
             }
           }
         });
-        if (modified > 0) {
+
+        if (modified > 0 || modifiedDetails.length > 0) {
           changes.push({
             type: 'modify',
             field: fieldNames[field],
-            count: modified,
+            count: modified || modifiedDetails.length,
             details: modifiedDetails.length > 0 ? modifiedDetails : null
           });
         }

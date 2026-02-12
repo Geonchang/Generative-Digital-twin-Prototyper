@@ -6,18 +6,20 @@ import ObstacleTable from './ObstacleTable';
 import ScenariosPanel from './ScenariosPanel';
 import ToolsPanel from './ToolsPanel';
 import useBopStore from '../store/bopStore';
+import useTranslation from '../i18n/useTranslation';
 
 function TabbedPanel() {
   const { activeTab, setActiveTab } = useBopStore();
+  const { t } = useTranslation();
 
   const tabs = [
     { id: 'bop', label: 'BOP', icon: '📋' },
-    { id: 'equipments', label: '장비', icon: '🤖' },
-    { id: 'workers', label: '작업자', icon: '👷' },
-    { id: 'materials', label: '자재', icon: '📦' },
-    { id: 'obstacles', label: '장애물', icon: '🚧' },
-    { id: 'tools', label: '도구', icon: '🔧' },
-    { id: 'scenarios', label: '시나리오', icon: '📁' },
+    { id: 'equipments', label: t('tab.equipment'), icon: '🤖' },
+    { id: 'workers', label: t('tab.workers'), icon: '👷' },
+    { id: 'materials', label: t('tab.materials'), icon: '📦' },
+    { id: 'obstacles', label: t('tab.obstacles'), icon: '🚧' },
+    { id: 'tools', label: t('tab.tools'), icon: '🔧' },
+    { id: 'scenarios', label: t('tab.scenarios'), icon: '📁' },
   ];
 
   return (

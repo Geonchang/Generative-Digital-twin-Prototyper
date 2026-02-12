@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import useBopStore from '../store/bopStore';
 import { getResourceSize } from './Viewer3D';
+import useTranslation from '../i18n/useTranslation';
 
 function EquipmentsTable() {
   const { bopData, selectedResourceKey, setSelectedResource,
@@ -10,6 +11,7 @@ function EquipmentsTable() {
   const [editingCell, setEditingCell] = useState(null);
   const [selectedMasterId, setSelectedMasterId] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
+  const { t } = useTranslation();
 
   // Auto-scroll to selected row
   useEffect(() => {
@@ -31,7 +33,7 @@ function EquipmentsTable() {
 
   const handleDeleteEquipment = () => {
     if (!selectedMasterId) return;
-    if (window.confirm('선택한 장비를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.')) {
+    if (window.confirm(t('eq.confirmDelete'))) {
       deleteEquipment(selectedMasterId);
       setSelectedMasterId(null);
     }
@@ -39,7 +41,7 @@ function EquipmentsTable() {
 
   const handleDeleteSelected = () => {
     if (selectedIds.length === 0) return;
-    if (window.confirm(`선택한 ${selectedIds.length}개의 장비를 삭제하시겠습니까? 할당된 공정에서도 제거됩니다.`)) {
+    if (window.confirm(t('eq.confirmDeleteMulti', { count: selectedIds.length }))) {
       selectedIds.forEach(id => deleteEquipment(id));
       setSelectedIds([]);
       setSelectedMasterId(null);
@@ -67,18 +69,18 @@ function EquipmentsTable() {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <h2 style={styles.title}>장비 마스터</h2>
-          <div style={styles.count}>총 0개</div>
+          <h2 style={styles.title}>{t('eq.title')}</h2>
+          <div style={styles.count}>{t('eq.total', { count: 0 })}</div>
         </div>
         <div style={styles.actionBar}>
           <button style={styles.actionButton} onClick={handleAddEquipment}>
-            + 장비 추가
+            {t('eq.add')}
           </button>
         </div>
         <div style={styles.emptyState}>
-          <p>장비 데이터가 없습니다.</p>
+          <p>{t('eq.noData')}</p>
           <button style={styles.actionButton} onClick={handleAddEquipment}>
-            + 장비 추가
+            {t('eq.add')}
           </button>
         </div>
       </div>
@@ -87,9 +89,9 @@ function EquipmentsTable() {
 
   const getEquipmentTypeLabel = (type) => {
     switch (type) {
-      case 'robot': return '로봇';
-      case 'machine': return '기계';
-      case 'manual_station': return '수작업대';
+      case 'robot': return t('eq.robot');
+      case 'machine': return t('eq.machine');
+      case 'manual_station': return t('eq.manualStation');
       default: return type;
     }
   };
@@ -105,25 +107,28 @@ function EquipmentsTable() {
 
   // 각 장비가 사용되는 공정 찾기 및 위치 정보
   const getProcessesUsingEquipment = (equipmentId) => {
-    if (!bopData.processes) return [];
+    if (!bopData.resource_assignments) return [];
     const result = [];
 
-    bopData.processes.forEach(process => {
-      const resource = process.resources?.find(
-        r => r.resource_type === 'equipment' && r.resource_id === equipmentId
-      );
+    bopData.resource_assignments.forEach(ra => {
+      if (ra.resource_type === 'equipment' && ra.resource_id === equipmentId) {
+        // Look up process detail for location info
+        const detail = (bopData.process_details || []).find(
+          d => d.process_id === ra.process_id && d.parallel_index === ra.parallel_index
+        );
+        const processLocation = detail?.location || { x: 0, y: 0, z: 0 };
 
-      if (resource) {
         // 실제 위치 = 공정 위치 + 상대 위치
+        const relLoc = ra.relative_location || { x: 0, y: 0, z: 0 };
         const actualLocation = {
-          x: process.location.x + resource.relative_location.x,
-          y: process.location.y + resource.relative_location.y,
-          z: process.location.z + resource.relative_location.z,
+          x: processLocation.x + relLoc.x,
+          y: processLocation.y + relLoc.y,
+          z: processLocation.z + relLoc.z,
         };
 
         result.push({
-          process,
-          resource,
+          assignment: ra,
+          detail,
           actualLocation,
         });
       }
@@ -136,14 +141,14 @@ function EquipmentsTable() {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <h2 style={styles.title}>장비 마스터</h2>
-        <div style={styles.count}>총 {bopData.equipments.length}개</div>
+        <h2 style={styles.title}>{t('eq.title')}</h2>
+        <div style={styles.count}>{t('eq.total', { count: bopData.equipments.length })}</div>
       </div>
 
       {/* Action Bar */}
       <div style={styles.actionBar}>
         <button style={styles.actionButton} onClick={handleAddEquipment}>
-          + 장비 추가
+          {t('eq.add')}
         </button>
         <button
           style={{
@@ -153,7 +158,7 @@ function EquipmentsTable() {
           disabled={selectedIds.length === 0}
           onClick={handleDeleteSelected}
         >
-          선택 항목 삭제 ({selectedIds.length})
+          {t('eq.deleteSelected', { count: selectedIds.length })}
         </button>
       </div>
 
@@ -170,13 +175,13 @@ function EquipmentsTable() {
                   style={styles.checkbox}
                 />
               </th>
-              <th style={{ ...styles.th, width: '100px' }}>장비 ID</th>
-              <th style={{ ...styles.th, minWidth: '150px' }}>장비명</th>
-              <th style={{ ...styles.th, width: '80px' }}>유형</th>
-              <th style={{ ...styles.th, width: '100px' }}>사용 공정</th>
-              <th style={{ ...styles.th, width: '120px' }}>Location (x,z)</th>
-              <th style={{ ...styles.th, width: '150px' }}>Size (x,y,z)</th>
-              <th style={{ ...styles.th, width: '80px' }}>Rotation (Y)</th>
+              <th style={{ ...styles.th, width: '100px' }}>{t('eq.id')}</th>
+              <th style={{ ...styles.th, minWidth: '150px' }}>{t('eq.name')}</th>
+              <th style={{ ...styles.th, width: '80px' }}>{t('eq.type')}</th>
+              <th style={{ ...styles.th, width: '100px' }}>{t('eq.usedIn')}</th>
+              <th style={{ ...styles.th, width: '120px' }}>{t('common.location')}</th>
+              <th style={{ ...styles.th, width: '150px' }}>{t('common.sizeWHD')}</th>
+              <th style={{ ...styles.th, width: '80px' }}>{t('common.rotation')}</th>
             </tr>
           </thead>
           <tbody>
@@ -222,9 +227,9 @@ function EquipmentsTable() {
                           onChange={(e) => updateEquipment(equipment.equipment_id, { type: e.target.value })}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <option value="robot">로봇</option>
-                          <option value="machine">기계</option>
-                          <option value="manual_station">수작업대</option>
+                          <option value="robot">{t('eq.robot')}</option>
+                          <option value="machine">{t('eq.machine')}</option>
+                          <option value="manual_station">{t('eq.manualStation')}</option>
                         </select>
                       ) : (
                         <span style={{ ...styles.typeBadge, backgroundColor: getEquipmentTypeColor(equipment.type) }}>
@@ -232,25 +237,28 @@ function EquipmentsTable() {
                         </span>
                       )}
                     </td>
-                    <td style={styles.td} colSpan={4}><span style={styles.notUsed}>미사용</span></td>
+                    <td style={styles.td} colSpan={4}><span style={styles.notUsed}>{t('eq.notUsed')}</span></td>
                   </tr>
                 );
               }
 
-              return usedProcesses.map(({ process, resource }, idx) => {
-                const lineLabel = process.process_id;
-                const resourceKey = `equipment:${equipment.equipment_id}:${process.process_id}`;
+              return usedProcesses.map(({ assignment, detail }, idx) => {
+                const lineLabel = `${assignment.process_id}:${assignment.parallel_index}`;
+                const resourceKey = `equipment:${equipment.equipment_id}:${assignment.process_id}:${assignment.parallel_index}`;
                 const isSelected = selectedResourceKey === resourceKey;
 
-                const relLoc = resource.relative_location || { x: 0, y: 0, z: 0 };
-                const scale = resource.scale || { x: 1, y: 1, z: 1 };
-                const rotationY = resource.rotation_y || 0;
+                const relLoc = assignment.relative_location || { x: 0, y: 0, z: 0 };
+                const scale = assignment.scale || { x: 1, y: 1, z: 1 };
+                const rotationY = assignment.rotation_y || 0;
 
                 // Effective position 계산 (auto-layout 적용)
-                const resourceIndex = process.resources.findIndex(r =>
-                  r.resource_type === resource.resource_type && r.resource_id === resource.resource_id
+                const processResources = (bopData.resource_assignments || []).filter(
+                  r => r.process_id === assignment.process_id && r.parallel_index === assignment.parallel_index
                 );
-                const totalResources = process.resources.length;
+                const resourceIndex = processResources.findIndex(r =>
+                  r.resource_type === assignment.resource_type && r.resource_id === assignment.resource_id
+                );
+                const totalResources = processResources.length;
                 const effectivePos = (relLoc.x !== 0 || relLoc.z !== 0)
                   ? { x: relLoc.x, z: relLoc.z }
                   : { x: 0, z: resourceIndex * 0.9 - (totalResources - 1) * 0.9 / 2 };
@@ -264,7 +272,7 @@ function EquipmentsTable() {
 
                 return (
                   <tr
-                    key={`${equipment.equipment_id}-${process.process_id}`}
+                    key={`${equipment.equipment_id}-${assignment.process_id}-${assignment.parallel_index}`}
                     ref={isSelected ? selectedRowRef : null}
                     style={{
                       ...styles.row,
@@ -273,7 +281,7 @@ function EquipmentsTable() {
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedResource('equipment', equipment.equipment_id, process.process_id);
+                      setSelectedResource('equipment', equipment.equipment_id, assignment.process_id, assignment.parallel_index);
                       setSelectedMasterId(equipment.equipment_id);
                     }}
                   >
@@ -331,7 +339,7 @@ function EquipmentsTable() {
                     </td>
                     <td style={styles.td}>
                       <div style={styles.locationCell}>
-                        {actualSize.x.toFixed(2)}, {actualSize.y.toFixed(2)}, {actualSize.z.toFixed(2)}
+                        ({actualSize.x.toFixed(1)}, {actualSize.y.toFixed(1)}, {actualSize.z.toFixed(1)})
                       </div>
                     </td>
                     <td style={styles.td}>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import useBopStore from '../store/bopStore';
+import useTranslation from '../i18n/useTranslation';
 
 function ObstacleTable() {
   const {
@@ -14,14 +15,15 @@ function ObstacleTable() {
     pendingObstacleType,
     setPendingObstacleType
   } = useBopStore();
+  const { t } = useTranslation();
   const selectedRowRef = useRef(null);
   const [selectedIds, setSelectedIds] = useState([]);
 
   const obstacleTypes = [
-    { id: 'fence', label: '펜스', icon: '🚧', color: '#ff9800' },
-    { id: 'zone', label: '구역', icon: '⚠️', color: '#f44336' },
-    { id: 'pillar', label: '기둥', icon: '🏛️', color: '#795548' },
-    { id: 'wall', label: '벽', icon: '🧱', color: '#607d8b' },
+    { id: 'fence', label: t('obs.fence'), icon: '🚧', color: '#ff9800' },
+    { id: 'zone', label: t('obs.zone'), icon: '⚠️', color: '#f44336' },
+    { id: 'pillar', label: t('obs.pillar'), icon: '🏛️', color: '#795548' },
+    { id: 'wall', label: t('obs.wall'), icon: '🧱', color: '#607d8b' },
   ];
 
   // Auto-scroll to selected row
@@ -40,14 +42,14 @@ function ObstacleTable() {
 
   const handleDeleteObstacle = () => {
     if (!selectedObstacleId) return;
-    if (window.confirm('선택한 장애물을 삭제하시겠습니까?')) {
+    if (window.confirm(t('obs.confirmDelete'))) {
       deleteObstacle(selectedObstacleId);
     }
   };
 
   const handleDeleteSelected = () => {
     if (selectedIds.length === 0) return;
-    if (window.confirm(`선택한 ${selectedIds.length}개의 장애물을 삭제하시겠습니까?`)) {
+    if (window.confirm(t('obs.confirmDeleteMulti', { count: selectedIds.length }))) {
       selectedIds.forEach(id => deleteObstacle(id));
       setSelectedIds([]);
     }
@@ -80,12 +82,12 @@ function ObstacleTable() {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <h2 style={styles.title}>장애물</h2>
-          <div style={styles.count}>총 0개</div>
+          <h2 style={styles.title}>{t('obs.title')}</h2>
+          <div style={styles.count}>{t('obs.total', { count: 0 })}</div>
         </div>
         {/* Type Selection Bar */}
         <div style={styles.typeSelectionBar}>
-          <span style={styles.typeSelectionLabel}>유형 선택:</span>
+          <span style={styles.typeSelectionLabel}>{t('obs.typeSelect')}</span>
           <div style={styles.typeButtonGroup}>
             {obstacleTypes.map((type) => (
               <button
@@ -109,7 +111,9 @@ function ObstacleTable() {
         </div>
         <div style={styles.actionBar}>
           <button style={styles.actionButton} onClick={handleAddObstacle}>
-            + {obstacleTypes.find(t => t.id === pendingObstacleType)?.label || '장애물'} 추가
+            {obstacleTypes.find(tp => tp.id === pendingObstacleType)?.label
+              ? t('obs.add', { type: obstacleTypes.find(tp => tp.id === pendingObstacleType).label })
+              : t('obs.addDefault')}
           </button>
           <button
             style={{
@@ -118,14 +122,13 @@ function ObstacleTable() {
             }}
             onClick={handleToggleCreationMode}
           >
-            {obstacleCreationMode ? '생성 모드 종료' : '3D에서 생성'}
+            {obstacleCreationMode ? t('obs.exitCreation') : t('obs.createIn3D')}
           </button>
         </div>
         <div style={styles.emptyState}>
-          <p>장애물 데이터가 없습니다.</p>
-          <p style={{ fontSize: '12px', color: '#999' }}>
-            위에서 유형을 선택하고 "3D에서 생성" 버튼을 클릭하여<br />
-            바닥면에 두 점을 찍어 장애물 영역을 지정하세요.
+          <p>{t('obs.noData')}</p>
+          <p style={{ fontSize: '12px', color: '#999', whiteSpace: 'pre-line' }}>
+            {t('obs.createGuide')}
           </p>
         </div>
       </div>
@@ -134,10 +137,10 @@ function ObstacleTable() {
 
   const getObstacleTypeLabel = (type) => {
     switch (type) {
-      case 'fence': return '펜스';
-      case 'zone': return '구역';
-      case 'pillar': return '기둥';
-      case 'wall': return '벽';
+      case 'fence': return t('obs.fence');
+      case 'zone': return t('obs.zone');
+      case 'pillar': return t('obs.pillar');
+      case 'wall': return t('obs.wall');
       default: return type;
     }
   };
@@ -156,13 +159,13 @@ function ObstacleTable() {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <h2 style={styles.title}>장애물</h2>
-        <div style={styles.count}>총 {obstacles.length}개</div>
+        <h2 style={styles.title}>{t('obs.title')}</h2>
+        <div style={styles.count}>{t('obs.total', { count: obstacles.length })}</div>
       </div>
 
       {/* Type Selection Bar */}
       <div style={styles.typeSelectionBar}>
-        <span style={styles.typeSelectionLabel}>유형 선택:</span>
+        <span style={styles.typeSelectionLabel}>{t('obs.typeSelect')}</span>
         <div style={styles.typeButtonGroup}>
           {obstacleTypes.map((type) => (
             <button
@@ -188,7 +191,9 @@ function ObstacleTable() {
       {/* Action Bar */}
       <div style={styles.actionBar}>
         <button style={styles.actionButton} onClick={handleAddObstacle}>
-          + {obstacleTypes.find(t => t.id === pendingObstacleType)?.label || '장애물'} 추가
+          {obstacleTypes.find(tp => tp.id === pendingObstacleType)?.label
+            ? t('obs.add', { type: obstacleTypes.find(tp => tp.id === pendingObstacleType).label })
+            : t('obs.addDefault')}
         </button>
         <button
           style={{
@@ -197,7 +202,7 @@ function ObstacleTable() {
           }}
           onClick={handleToggleCreationMode}
         >
-          {obstacleCreationMode ? '생성 모드 종료' : '3D에서 생성'}
+          {obstacleCreationMode ? t('obs.exitCreation') : t('obs.createIn3D')}
         </button>
         <button
           style={{
@@ -207,14 +212,14 @@ function ObstacleTable() {
           disabled={selectedIds.length === 0}
           onClick={handleDeleteSelected}
         >
-          선택 항목 삭제 ({selectedIds.length})
+          {t('obs.deleteSelected', { count: selectedIds.length })}
         </button>
       </div>
 
       {/* Creation Mode Notice */}
       {obstacleCreationMode && (
         <div style={styles.creationModeNotice}>
-          <strong>{obstacleTypes.find(t => t.id === pendingObstacleType)?.icon} {obstacleTypes.find(t => t.id === pendingObstacleType)?.label}</strong> 생성 중 - 3D 뷰에서 바닥면을 클릭하여 두 꼭지점을 지정하세요.
+          <strong>{obstacleTypes.find(tp => tp.id === pendingObstacleType)?.icon} {obstacleTypes.find(tp => tp.id === pendingObstacleType)?.label}</strong> {t('obs.creationNotice')}
         </div>
       )}
 
@@ -232,11 +237,11 @@ function ObstacleTable() {
                 />
               </th>
               <th style={{ ...styles.th, width: '80px' }}>ID</th>
-              <th style={{ ...styles.th, minWidth: '120px' }}>이름</th>
-              <th style={{ ...styles.th, width: '70px' }}>유형</th>
-              <th style={{ ...styles.th, width: '100px' }}>위치 (X, Z)</th>
-              <th style={{ ...styles.th, width: '140px' }}>크기 (W, H, D)</th>
-              <th style={{ ...styles.th, width: '70px' }}>회전</th>
+              <th style={{ ...styles.th, minWidth: '120px' }}>{t('obs.obstName')}</th>
+              <th style={{ ...styles.th, width: '70px' }}>{t('obs.obstType')}</th>
+              <th style={{ ...styles.th, width: '100px' }}>{t('common.location')}</th>
+              <th style={{ ...styles.th, width: '140px' }}>{t('common.sizeWHD')}</th>
+              <th style={{ ...styles.th, width: '70px' }}>{t('common.rotation')}</th>
             </tr>
           </thead>
           <tbody>
@@ -286,10 +291,10 @@ function ObstacleTable() {
                         onChange={(e) => updateObstacle(obstacle.obstacle_id, { type: e.target.value })}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <option value="fence">펜스</option>
-                        <option value="zone">구역</option>
-                        <option value="pillar">기둥</option>
-                        <option value="wall">벽</option>
+                        <option value="fence">{t('obs.fence')}</option>
+                        <option value="zone">{t('obs.zone')}</option>
+                        <option value="pillar">{t('obs.pillar')}</option>
+                        <option value="wall">{t('obs.wall')}</option>
                       </select>
                     ) : (
                       <span style={{ ...styles.typeBadge, backgroundColor: getObstacleTypeColor(obstacle.type) }}>
@@ -341,7 +346,7 @@ function ObstacleTable() {
                       </div>
                     ) : (
                       <div style={styles.locationCell}>
-                        {size.width.toFixed(1)}, {size.height.toFixed(1)}, {size.depth.toFixed(1)}
+                        ({size.width.toFixed(1)}, {size.height.toFixed(1)}, {size.depth.toFixed(1)})
                       </div>
                     )}
                   </td>
