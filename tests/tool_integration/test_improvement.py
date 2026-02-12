@@ -307,7 +307,7 @@ if __name__ == "__main__":
 '''
 
     # 의도적으로 잘못된 어댑터 (process 레벨에서 cycle_time을 찾으려 함)
-    # BOP 구조에서 cycle_time_sec은 parallel_lines 안에 있음
+    # BOP 구조에서 cycle_time_sec은 process_details 안에 있음
     broken_pre_process = '''def convert_bop_to_input(bop_json, params):
     import json
     result = {"processes": []}
@@ -355,7 +355,7 @@ if __name__ == "__main__":
             script_code=script_code,
             params_schema=[],
             execution_result=exec_result,
-            feedback="pre_process에서 KeyError('cycle_time_sec')가 발생합니다. BOP에서 cycle_time_sec은 process 레벨이 아니라 processes[].parallel_lines[] 안에 있습니다. parallel_lines[0]['cycle_time_sec']을 사용하도록 수정해주세요."
+            feedback="pre_process에서 KeyError('cycle_time_sec')가 발생합니다. BOP에서 cycle_time_sec은 processes[] 안이 아니라 process_details[] 안에 있습니다. bop_json['process_details']에서 process_id별로 cycle_time_sec을 조회하도록 수정해주세요."
         )
     except Exception as e:
         print(f"  [예외] {str(e)[:100]}")
@@ -559,7 +559,7 @@ def test_case_3_script_logic_error(tester: ImprovementTester):
     print("=" * 60)
 
     tool_name = "total_cycle_calculator"
-    description = "모든 병렬 라인의 총 사이클 타임을 계산하는 도구"
+    description = "모든 공정 인스턴스의 총 사이클 타임을 계산하는 도구"
 
     # 버그 있는 스크립트 (합계가 아니라 마지막 값만 반환)
     broken_script = '''"""Total Cycle Calculator - HAS BUG"""
@@ -577,13 +577,12 @@ def main():
 
     # 버그: total에 누적하지 않고 덮어씀
     total = 0
-    for proc in data.get("processes", []):
-        for line in proc.get("parallel_lines", []):
-            total = line.get("cycle_time_sec", 0)  # 버그! += 이어야 함
+    for detail in data.get("process_details", []):
+        total = detail.get("cycle_time_sec", 0)  # 버그! += 이어야 함
 
     result = {
         "total_cycle_time": total,
-        "process_count": len(data.get("processes", []))
+        "process_count": len(data.get("process_details", []))
     }
 
     with open(args.output, 'w', encoding='utf-8') as f:
@@ -626,7 +625,7 @@ if __name__ == "__main__":
 
     # 2. AI 개선 요청
     # BOP 데이터: P001(45), P002-0(90), P002-1(95), P003(120), P004(60), P005(75)
-    # 모든 parallel_lines 합계 = 45 + 90 + 95 + 120 + 60 + 75 = 485
+    # 모든 process_details 합계 = 45 + 90 + 95 + 120 + 60 + 75 = 485
     expected_total = 45 + 90 + 95 + 120 + 60 + 75  # 485
 
     print("\n[2단계] AI에게 로직 수정 요청")
@@ -638,7 +637,7 @@ if __name__ == "__main__":
         script_code=broken_script,
         params_schema=[],
         execution_result=exec_result,
-        feedback=f"스크립트에 버그가 있습니다. total_cycle_time이 {wrong_total}로 나오는데, 모든 parallel_lines의 cycle_time을 합산해야 합니다. += 연산자를 사용해야 하는데 = 연산자를 사용하고 있습니다."
+        feedback=f"스크립트에 버그가 있습니다. total_cycle_time이 {wrong_total}로 나오는데, 모든 process_details의 cycle_time을 합산해야 합니다. += 연산자를 사용해야 하는데 = 연산자를 사용하고 있습니다."
     )
 
     if not improvement:
