@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { getResourceSize } from '../components/Viewer3D';
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -20,9 +21,10 @@ export const api = {
    * @param {string|null} model - LLM 모델 (null이면 기본 모델 사용)
    * @returns {Promise<Object>} { message: string, bop_data: Object|null }
    */
-  async unifiedChat(message, currentBop = null, messages = [], model = null) {
+  async unifiedChat(message, currentBop = null, messages = [], model = null, language = null) {
     const body = { message, current_bop: currentBop };
     if (model) body.model = model;
+    if (language) body.language = language;
 
     const res = await fetch('/api/chat/unified', {
       method: 'POST',
@@ -49,121 +51,153 @@ export const api = {
   exportExcel(bopData) {
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: 프로젝트 정보
+    // Sheet 1: Project Info
     const projectRows = [
-      { '항목': '프로젝트명', '값': bopData.project_title || '' },
-      { '항목': '목표 UPH', '값': bopData.target_uph || '' },
-      { '항목': '공정 수', '값': (bopData.processes || []).length },
-      { '항목': '장비 수', '값': (bopData.equipments || []).length },
-      { '항목': '작업자 수', '값': (bopData.workers || []).length },
-      { '항목': '자재 수', '값': (bopData.materials || []).length },
-      { '항목': '장애물 수', '값': (bopData.obstacles || []).length },
+      { 'Item': 'Project Name', 'Value': bopData.project_title || '' },
+      { 'Item': 'Target UPH', 'Value': bopData.target_uph || '' },
+      { 'Item': 'Process Count', 'Value': (bopData.processes || []).length },
+      { 'Item': 'Equipment Count', 'Value': (bopData.equipments || []).length },
+      { 'Item': 'Worker Count', 'Value': (bopData.workers || []).length },
+      { 'Item': 'Material Count', 'Value': (bopData.materials || []).length },
+      { 'Item': 'Obstacle Count', 'Value': (bopData.obstacles || []).length },
     ];
     const wsProject = XLSX.utils.json_to_sheet(projectRows);
-    wsProject['!cols'] = [{ wch: 15 }, { wch: 30 }];
-    XLSX.utils.book_append_sheet(wb, wsProject, '프로젝트 정보');
+    wsProject['!cols'] = [{ wch: 18 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, wsProject, 'Project Info');
 
-    // Sheet 2: 공정 (연결 정보만)
-    const processRows = (bopData.processes || []).map(p => ({
-      '공정 ID': p.process_id,
-      '병렬 수': p.parallel_count || 1,
-      '선행 공정': (p.predecessor_ids || []).join(', '),
-      '후행 공정': (p.successor_ids || []).join(', '),
-    }));
-    const wsProcesses = XLSX.utils.json_to_sheet(processRows.length ? processRows : [{}]);
-    XLSX.utils.book_append_sheet(wb, wsProcesses, '공정');
+    // Sheet 2: Processes (routing only)
+    const processRows = (bopData.processes || []).map(p => {
+      const details = (bopData.process_details || []).filter(d => d.process_id === p.process_id);
+      const parallelCount = details.length || 1;
+      const cts = details.map(d => d.cycle_time_sec || 0);
+      const invSum = cts.reduce((sum, ct) => sum + (ct > 0 ? 1 / ct : 0), 0);
+      const effectiveCT = invSum > 0 ? +(1 / invSum).toFixed(1) : 0;
 
-    // Sheet 3: 공정별 병렬라인 상세 (모든 공정의 모든 라인 포함)
-    const parallelRows = [];
-    (bopData.processes || []).forEach(p => {
-      const parallelCount = p.parallel_count || 1;
-      const lines = p.parallel_lines && p.parallel_lines.length > 0
-        ? p.parallel_lines
-        : [{ parallel_index: 1, name: p.name, description: p.description, cycle_time_sec: p.cycle_time_sec, location: p.location, rotation_y: p.rotation_y }];
-
-      lines.forEach((line, idx) => {
-        parallelRows.push({
-          '공정 ID': p.process_id,
-          '병렬 인덱스': line.parallel_index ?? (idx + 1),
-          '공정명': line.name || p.name,
-          '설명': line.description ?? p.description ?? '',
-          '사이클타임(초)': line.cycle_time_sec ?? p.cycle_time_sec,
-          '위치 X': line.location?.x ?? 0,
-          '위치 Y': line.location?.y ?? 0,
-          '위치 Z': line.location?.z ?? 0,
-          '회전 Y': line.rotation_y ?? 0,
-        });
-      });
+      return {
+        'Process ID': p.process_id,
+        'Parallel Count': parallelCount,
+        'Cycle Time (sec)': cts[0] ?? 0,
+        'Effective Cycle Time (sec)': effectiveCT,
+        'Predecessors': (p.predecessor_ids || []).join(', '),
+        'Successors': (p.successor_ids || []).join(', '),
+      };
     });
-    const wsParallel = XLSX.utils.json_to_sheet(parallelRows.length ? parallelRows : [{}]);
-    XLSX.utils.book_append_sheet(wb, wsParallel, '병렬라인 상세');
+    const wsProcesses = XLSX.utils.json_to_sheet(processRows.length ? processRows : [{}]);
+    XLSX.utils.book_append_sheet(wb, wsProcesses, 'Processes');
 
-    // Sheet 4: 리소스 배치
-    const resourceRows = [];
-    (bopData.processes || []).forEach(p => {
-      (p.resources || []).forEach(r => {
-        resourceRows.push({
-          '공정 ID': p.process_id,
-          '병렬라인 인덱스': r.parallel_line_index ?? '',
-          '리소스 유형': r.resource_type,
-          '리소스 ID': r.resource_id,
-          '수량': r.quantity ?? 1,
-          '역할': r.role || '',
-          '상대위치 X': r.relative_location?.x ?? 0,
-          '상대위치 Y': r.relative_location?.y ?? 0,
-          '상대위치 Z': r.relative_location?.z ?? 0,
-          '회전 Y': r.rotation_y ?? 0,
-          '스케일 X': r.scale?.x ?? 1,
-          '스케일 Y': r.scale?.y ?? 1,
-          '스케일 Z': r.scale?.z ?? 1,
+    // Sheet 3: Process Details (directly from process_details)
+    const detailRows = (bopData.process_details || []).map(d => {
+      const lineResources = (bopData.resource_assignments || []).filter(
+        r => r.process_id === d.process_id && r.parallel_index === d.parallel_index
+      );
+      let sizeX = 0, sizeY = 0, sizeZ = 0;
+      if (lineResources.length > 0) {
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        let maxH = 0;
+        lineResources.forEach(r => {
+          const x = r.relative_location?.x ?? 0;
+          const z = r.relative_location?.z ?? 0;
+          const cs = r.computed_size || { width: 0.4, height: 0.4, depth: 0.4 };
+          minX = Math.min(minX, x - cs.width / 2);
+          maxX = Math.max(maxX, x + cs.width / 2);
+          minZ = Math.min(minZ, z - cs.depth / 2);
+          maxZ = Math.max(maxZ, z + cs.depth / 2);
+          maxH = Math.max(maxH, cs.height || 0);
         });
-      });
+        sizeX = +(maxX - minX).toFixed(2);
+        sizeY = +maxH.toFixed(2);
+        sizeZ = +(maxZ - minZ).toFixed(2);
+      }
+
+      return {
+        'Process ID': d.process_id,
+        'Parallel Index': d.parallel_index,
+        'Name': d.name,
+        'Description': d.description ?? '',
+        'Cycle Time (sec)': d.cycle_time_sec,
+        'Location X': d.location?.x ?? 0,
+        'Location Y': d.location?.y ?? 0,
+        'Location Z': d.location?.z ?? 0,
+        'Size X': sizeX,
+        'Size Y': sizeY,
+        'Size Z': sizeZ,
+        'Rotation Y': d.rotation_y ?? 0,
+      };
+    });
+    const wsDetail = XLSX.utils.json_to_sheet(detailRows.length ? detailRows : [{}]);
+    XLSX.utils.book_append_sheet(wb, wsDetail, 'Process Details');
+
+    // Sheet 4: Resource Assignments (directly from resource_assignments)
+    const equipmentTypeMap = {};
+    (bopData.equipments || []).forEach(e => { equipmentTypeMap[e.equipment_id] = e.type; });
+
+    const resourceRows = (bopData.resource_assignments || []).map(r => {
+      const cs = r.computed_size
+        || getResourceSize(r.resource_type, r.resource_type === 'equipment' ? equipmentTypeMap[r.resource_id] : null);
+
+      return {
+        'Process ID': r.process_id,
+        'Parallel Index': r.parallel_index,
+        'Resource Type': r.resource_type,
+        'Resource ID': r.resource_id,
+        'Quantity': r.quantity ?? 1,
+        'Offset X': r.relative_location?.x ?? 0,
+        'Offset Y': r.relative_location?.y ?? 0,
+        'Offset Z': r.relative_location?.z ?? 0,
+        'Size X': cs.width,
+        'Size Y': cs.height,
+        'Size Z': cs.depth,
+        'Scale X': r.scale?.x ?? 1,
+        'Scale Y': r.scale?.y ?? 1,
+        'Scale Z': r.scale?.z ?? 1,
+        'Rotation Y': r.rotation_y ?? 0,
+      };
     });
     const wsResources = XLSX.utils.json_to_sheet(resourceRows.length ? resourceRows : [{}]);
-    XLSX.utils.book_append_sheet(wb, wsResources, '리소스 배치');
+    XLSX.utils.book_append_sheet(wb, wsResources, 'Resource Assignments');
 
-    // Sheet 5: 장비
+    // Sheet 5: Equipment
     const eqRows = (bopData.equipments || []).map(e => ({
-      '장비 ID': e.equipment_id,
-      '장비명': e.name,
-      '유형': e.type,
+      'Equipment ID': e.equipment_id,
+      'Name': e.name,
+      'Type': e.type,
     }));
     const wsEquip = XLSX.utils.json_to_sheet(eqRows.length ? eqRows : [{}]);
-    XLSX.utils.book_append_sheet(wb, wsEquip, '장비');
+    XLSX.utils.book_append_sheet(wb, wsEquip, 'Equipment');
 
-    // Sheet 6: 작업자
+    // Sheet 6: Workers
     const wkRows = (bopData.workers || []).map(w => ({
-      '작업자 ID': w.worker_id,
-      '이름': w.name,
-      '숙련도': w.skill_level || '',
+      'Worker ID': w.worker_id,
+      'Name': w.name,
+      'Skill Level': w.skill_level || '',
     }));
     const wsWorkers = XLSX.utils.json_to_sheet(wkRows.length ? wkRows : [{}]);
-    XLSX.utils.book_append_sheet(wb, wsWorkers, '작업자');
+    XLSX.utils.book_append_sheet(wb, wsWorkers, 'Workers');
 
-    // Sheet 7: 자재
+    // Sheet 7: Materials
     const mtRows = (bopData.materials || []).map(m => ({
-      '자재 ID': m.material_id,
-      '자재명': m.name,
-      '단위': m.unit,
+      'Material ID': m.material_id,
+      'Name': m.name,
+      'Unit': m.unit,
     }));
     const wsMaterials = XLSX.utils.json_to_sheet(mtRows.length ? mtRows : [{}]);
-    XLSX.utils.book_append_sheet(wb, wsMaterials, '자재');
+    XLSX.utils.book_append_sheet(wb, wsMaterials, 'Materials');
 
-    // Sheet 8: 장애물
+    // Sheet 8: Obstacles
     const obsRows = (bopData.obstacles || []).map(o => ({
-      '장애물 ID': o.obstacle_id,
-      '이름': o.name || '',
-      '유형': o.type || '',
-      '위치 X': o.position?.x ?? 0,
-      '위치 Y': o.position?.y ?? 0,
-      '위치 Z': o.position?.z ?? 0,
-      '크기 X': o.size?.width ?? 0,
-      '크기 Y': o.size?.height ?? 0,
-      '크기 Z': o.size?.depth ?? 0,
-      '회전 Y': o.rotation_y ?? 0,
+      'Obstacle ID': o.obstacle_id,
+      'Name': o.name || '',
+      'Type': o.type || '',
+      'Location X': o.position?.x ?? 0,
+      'Location Y': o.position?.y ?? 0,
+      'Location Z': o.position?.z ?? 0,
+      'Size X': o.size?.width ?? 0,
+      'Size Y': o.size?.height ?? 0,
+      'Size Z': o.size?.depth ?? 0,
+      'Rotation Y': o.rotation_y ?? 0,
     }));
     const wsObstacles = XLSX.utils.json_to_sheet(obsRows.length ? obsRows : [{}]);
-    XLSX.utils.book_append_sheet(wb, wsObstacles, '장애물');
+    XLSX.utils.book_append_sheet(wb, wsObstacles, 'Obstacles');
 
     const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
