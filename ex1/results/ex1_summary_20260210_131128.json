@@ -1,0 +1,24 @@
+{
+  "experiment": "Ex1 Zero-shot BOP Generation",
+  "timestamp": "2026-02-10T13:11:28.921113",
+  "config": {
+    "temperature": 0.0,
+    "similarity_threshold": 0.4
+  },
+  "model_averages": {
+    "Gemini 2.5 Flash": {
+      "avg_accuracy": 0.6905,
+      "avg_sequence_match": 0.925,
+      "avg_latency_sec": 17.87,
+      "success_rate": 0.4,
+      "products_tested": 10
+    },
+    "GPT-4o": {
+      "avg_accuracy": null,
+      "avg_sequence_match": null,
+      "avg_latency_sec": null,
+      "success_rate": 0,
+      "products_tested": 10
+    }
+  }
+}

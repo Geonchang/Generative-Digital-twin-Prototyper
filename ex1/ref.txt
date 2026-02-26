@@ -1,0 +1,46 @@
+EV 배터 셀
+https://files.dep.state.pa.us/Energy/OfficeofPollutionPrevention/StateEnergyProgram/DEPA/Lithium%20Ion%20Battery%20Manufacturing.pdf
+https://vdma-industryguide.com/fileadmin/battprod/downloads/Production_Process_of_a_Lithium-Ion_Battery_Cell.pdf
+
+
+자동차 차체 (BIW)
+https://restpublisher.com/wp-content/uploads/2023/11/Process-Design-and-System-Layout-for-an-Automobile-Manufacturing-and-Assembly-Plant.pdf
+https://global.toyota/en/company/plant-tours/stamping/
+
+
+SMT
+https://www.pcbonline.com/blog/smt-manufacturing-process.html
+https://www.researchgate.net/publication/331877257_Surface_Mount_technology_Production_Line
+
+
+반도체 후공정
+https://amkormarcomexternal.blob.core.windows.net/amkordotcom/wp-content/uploads/2019/04/SiP-TS101-KR.pdf
+https://www.rapidus.inc/en/tech/te0010/
+
+
+태양광 모듈
+https://www.scribd.com/document/816455848/Process-Flow-Sheet
+https://docs.nrel.gov/docs/fy03osti/32943.pdf
+
+전기차 모터
+https://www.researchgate.net/publication/362802754_PRODUCTION_PROCESS_OF_A_HAIRPIN_STATOR
+https://ucpcdn.thyssenkrupp.com/_legacy/UCPthyssenkruppBAISSystemEngineering/assets.files/automobilindustrie/future-automotive-factory/tech-days/12-13_hairpinmanufacture.pdf
+
+
+OLED 패널
+https://ubiresearch.com/wp-content/uploads/2021/03/AMOLED-Manufacturing-Process-Report_EN_Sample.pdf
+https://lmi3d.com/wp-content/uploads/2020/06/INDUSTRYAPP_OLED_Display_Inspection_US_WEB.pdf
+
+
+세탁기
+https://www.scribd.com/presentation/834763378/Front-Load-Washing-Machine-Production-Line-Simulation
+https://www.researchgate.net/publication/316455710_Design_for_Manufacturing_and_Assembly_of_Washing_Machine
+
+
+연속식 제약
+https://qbdworks.com/wp-content/uploads/2014/06/Continuous-Manufacturing-FDA.pdf
+https://www.scribd.com/document/478270507/NEW-tablet-Manufacturing-Process-pdf
+
+타이어
+https://tt-net.tsubakimoto.co.jp/lib/catalog/pdf/en/app-tiremaking.pdf
+https://www.nexentire.com/international/information/tire_information/basic_sense/process.php

@@ -1,0 +1,35 @@
+{
+  "experiment": "Ex1 Zero-shot BOP Generation (SYSTEM_PROMPT)",
+  "timestamp": "2026-02-10T13:39:16.881091",
+  "config": {
+    "temperature": 0.0,
+    "similarity_threshold": 0.4,
+    "prompt_source": "app/prompts.py SYSTEM_PROMPT"
+  },
+  "model_averages": {
+    "GPT-4o Mini": {
+      "avg_accuracy": 0.2887,
+      "avg_sequence_match": 0.8167,
+      "avg_generated_count": 4.1,
+      "avg_latency_sec": 21.74,
+      "success_rate": 1.0,
+      "products_tested": 10
+    },
+    "o1-mini": {
+      "avg_accuracy": null,
+      "avg_sequence_match": null,
+      "avg_generated_count": null,
+      "avg_latency_sec": null,
+      "success_rate": 0,
+      "products_tested": 10
+    },
+    "o3-mini": {
+      "avg_accuracy": 0.3868,
+      "avg_sequence_match": 0.7,
+      "avg_generated_count": 3.9,
+      "avg_latency_sec": 26.66,
+      "success_rate": 1.0,
+      "products_tested": 10
+    }
+  }
+}

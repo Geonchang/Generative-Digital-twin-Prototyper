@@ -1,0 +1,1153 @@
+{
+  "experiment": "Ex1 Zero-shot BOP Generation (SYSTEM_PROMPT)",
+  "timestamp": "2026-02-10T13:39:16.876232",
+  "config": {
+    "temperature": 0.0,
+    "similarity_threshold": 0.4,
+    "prompt_source": "app/prompts.py SYSTEM_PROMPT",
+    "models": [
+      "gpt-4o-mini",
+      "o1-mini",
+      "o3-mini"
+    ],
+    "products": [
+      "P01",
+      "P02",
+      "P03",
+      "P04",
+      "P05",
+      "P06",
+      "P07",
+      "P08",
+      "P09",
+      "P10"
+    ]
+  },
+  "results": [
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Electrode Preparation",
+        "Electrode Coating",
+        "Electrode Drying",
+        "Electrode Inspection",
+        "Cell Assembly"
+      ],
+      "generated_equipments": [
+        "Mixing Machine",
+        "Manual Workstation",
+        "Coating Machine",
+        "Drying Oven",
+        "Assembly Machine"
+      ],
+      "process_count": 5,
+      "evaluation": {
+        "n": 4,
+        "M": 11,
+        "accuracy": 0.3636,
+        "sequence_match": 0.5,
+        "generated_count": 5,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 2,
+            "gt_step": "슬러리 혼합",
+            "gen_step": "Electrode Drying",
+            "similarity": 0.483
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "코팅",
+            "gen_step": "Electrode Coating",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 0,
+            "gt_step": "압연",
+            "gen_step": "Electrode Preparation",
+            "similarity": 0.438
+          },
+          {
+            "gt_idx": 8,
+            "gen_idx": 3,
+            "gt_step": "전해액 주입",
+            "gen_step": "Electrode Inspection",
+            "similarity": 0.564
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 22.96
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "용접",
+        "조립",
+        "검사",
+        "도장"
+      ],
+      "generated_equipments": [
+        "6축 용접 로봇",
+        "작업대",
+        "검사 기계",
+        "도장 로봇"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 1,
+        "M": 8,
+        "accuracy": 0.125,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 5,
+            "gen_idx": 1,
+            "gt_step": "하부/측면 조립",
+            "gen_step": "조립",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 19.84
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "부품 배치",
+        "납땜",
+        "검사",
+        "포장"
+      ],
+      "generated_equipments": [
+        "수동 작업대",
+        "부품 배치 로봇",
+        "납땜 기계"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 0,
+        "M": 7,
+        "accuracy": 0.0,
+        "sequence_match": 0.0,
+        "generated_count": 4,
+        "matches": []
+      },
+      "error": null,
+      "latency_sec": 23.34
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Die Attach",
+        "Wire Bonding",
+        "Encapsulation",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "Die Attach Machine",
+        "Manual Workstation",
+        "Wire Bonding Machine",
+        "Encapsulation Machine"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 1,
+            "gt_step": "범프 형성",
+            "gen_step": "Wire Bonding",
+            "similarity": 0.421
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "언더필 주입",
+            "gen_step": "Final Inspection",
+            "similarity": 0.556
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 2,
+            "gt_step": "몰딩(Encapsulation)",
+            "gen_step": "Encapsulation",
+            "similarity": 0.5
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 21.61
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "프레임 조립",
+        "모듈 부착",
+        "전기 연결",
+        "품질 검사"
+      ],
+      "generated_equipments": [
+        "수동 조립 스테이션",
+        "전동 드라이버",
+        "접착제 도포기",
+        "전선 커넥터"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 8,
+        "accuracy": 0.375,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 5,
+            "gen_idx": 0,
+            "gt_step": "프레이밍",
+            "gen_step": "프레임 조립",
+            "similarity": 0.4
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 1,
+            "gt_step": "정션 박스 부착",
+            "gen_step": "모듈 부착",
+            "similarity": 0.462
+          },
+          {
+            "gt_idx": 7,
+            "gen_idx": 3,
+            "gt_step": "검사",
+            "gen_step": "품질 검사",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 26.4
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Wire Winding",
+        "Insulation",
+        "Final Assembly",
+        "Quality Inspection"
+      ],
+      "generated_equipments": [
+        "Winding Machine",
+        "Manual Workstation",
+        "Insulation Machine",
+        "Assembly Machine",
+        "Inspection Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 9,
+        "accuracy": 0.3333,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "와이어 교정",
+            "gen_step": "Wire Winding",
+            "similarity": 0.667
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "탈피",
+            "gen_step": "Insulation",
+            "similarity": 0.444
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 3,
+            "gt_step": "슬롯 절연지 삽입",
+            "gen_step": "Quality Inspection",
+            "similarity": 0.526
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 20.92
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Material Preparation",
+        "Layer Deposition",
+        "Curing Process",
+        "Quality Inspection"
+      ],
+      "generated_equipments": [
+        "Manual Workstation",
+        "Deposition Machine",
+        "Curing Oven"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "PI 기판 코팅",
+            "gen_step": "Material Preparation",
+            "similarity": 0.4
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "TFT 제조",
+            "gen_step": "Layer Deposition",
+            "similarity": 0.452
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 3,
+            "gt_step": "유기물 증착(VTE)",
+            "gen_step": "Quality Inspection",
+            "similarity": 0.432
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 17.65
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "부품 조립",
+        "용접",
+        "품질 검사",
+        "포장"
+      ],
+      "generated_equipments": [
+        "작업대",
+        "용접 로봇"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 1,
+        "M": 6,
+        "accuracy": 0.1667,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 2,
+            "gen_idx": 0,
+            "gt_step": "드럼/수조 조립",
+            "gen_step": "부품 조립",
+            "similarity": 0.5
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 20.87
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Raw Material Preparation",
+        "Refining Process",
+        "Quality Inspection",
+        "Packaging"
+      ],
+      "generated_equipments": [
+        "Manual Preparation Station",
+        "Refining Machine",
+        "Inspection Station",
+        "Packaging Machine"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 2,
+        "M": 6,
+        "accuracy": 0.3333,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 2,
+            "gen_idx": 0,
+            "gt_step": "과립화",
+            "gen_step": "Raw Material Preparation",
+            "similarity": 0.457
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "건조",
+            "gen_step": "Packaging",
+            "similarity": 0.4
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 25.33
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "원료 혼합",
+        "형상 성형",
+        "경화",
+        "품질 검사"
+      ],
+      "generated_equipments": [
+        "혼합기",
+        "성형기",
+        "경화기",
+        "검사 기계"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 2,
+        "M": 6,
+        "accuracy": 0.3333,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 3,
+            "gen_idx": 1,
+            "gt_step": "성형",
+            "gen_step": "형상 성형",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 3,
+            "gt_step": "최종 검사",
+            "gen_step": "품질 검사",
+            "similarity": 0.6
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 18.44
+    },
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.45
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.24
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.25
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.24
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.47
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.23
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.2
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.24
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.22
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "model": "o1-mini",
+      "model_id": "o1-mini",
+      "success": false,
+      "generated_processes": null,
+      "generated_equipments": null,
+      "process_count": null,
+      "evaluation": null,
+      "error": "NotFoundError: Error code: 404 - {'error': {'message': 'The model `o1-mini` does not exist or you do not have access to it.', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}",
+      "latency_sec": 0.2
+    },
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Electrode Coating",
+        "Cell Assembly",
+        "Electrolyte Filling",
+        "Formation and Aging"
+      ],
+      "generated_equipments": [
+        "Coating Applicator Robot",
+        "Coating Station Workbench",
+        "Cell Assembly Machine",
+        "Assembly Workstation",
+        "Electrolyte Filling Machine",
+        "Filling Operator Station",
+        "Formation Cycling Robot",
+        "Formation Monitoring Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 11,
+        "accuracy": 0.2727,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 2,
+            "gt_step": "슬러리 혼합",
+            "gen_step": "Electrolyte Filling",
+            "similarity": 0.5
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "코팅",
+            "gen_step": "Electrode Coating",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "압연",
+            "gen_step": "Formation and Aging",
+            "similarity": 0.4
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 32.1
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Stamping",
+        "Welding",
+        "Assembly",
+        "Inspection"
+      ],
+      "generated_equipments": [
+        "Stamping Press",
+        "Robotic Welder",
+        "Welding Workstation",
+        "Assembly Workstation",
+        "Inspection Workstation"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 4,
+        "M": 8,
+        "accuracy": 0.5,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 1,
+            "gt_step": "코일 디코일링",
+            "gen_step": "Welding",
+            "similarity": 0.476
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "블랭킹",
+            "gen_step": "Stamping",
+            "similarity": 0.5
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "트리밍/피어싱",
+            "gen_step": "Inspection",
+            "similarity": 0.538
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 2,
+            "gt_step": "하부/측면 조립",
+            "gen_step": "Assembly",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 27.16
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Stencil Printing",
+        "Component Placement",
+        "Reflow Soldering",
+        "Automated Optical Inspection"
+      ],
+      "generated_equipments": [
+        "SMT Stencil Printer",
+        "Manual Workstation",
+        "Pick and Place Robot",
+        "Component Loading Station",
+        "Reflow Oven",
+        "Monitoring Workstation",
+        "AOI Machine",
+        "Manual Rework Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 2,
+            "gt_step": "PCB 로딩",
+            "gen_step": "Reflow Soldering",
+            "similarity": 0.444
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "솔더 인쇄",
+            "gen_step": "Stencil Printing",
+            "similarity": 0.71
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 3,
+            "gt_step": "AOI(광학 검사)",
+            "gen_step": "Automated Optical Inspection",
+            "similarity": 0.75
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 23.08
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Die Attach",
+        "Wire Bonding",
+        "Molding Encapsulation",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "Die Attach Robot",
+        "Manual Workstation P001",
+        "Wire Bonding Robot",
+        "Manual Workstation P002",
+        "Molding Machine",
+        "Manual Workstation P003",
+        "Inspection Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 1,
+            "gt_step": "범프 형성",
+            "gen_step": "Wire Bonding",
+            "similarity": 0.421
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "언더필 주입",
+            "gen_step": "Final Inspection",
+            "similarity": 0.556
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 2,
+            "gt_step": "몰딩(Encapsulation)",
+            "gen_step": "Molding Encapsulation",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 27.45
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "태양광 셀 배치",
+        "모듈 프레임 조립",
+        "전기 연결 및 배선",
+        "최종 검수 및 테스트"
+      ],
+      "generated_equipments": [
+        "6축 셀 배치 로봇",
+        "조립 작업대 1",
+        "프레임 조립 기계",
+        "조립 작업대 2",
+        "납땜 로봇",
+        "납땜 작업대",
+        "테스트 기계",
+        "검수 작업대"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 0,
+        "M": 8,
+        "accuracy": 0.0,
+        "sequence_match": 0.0,
+        "generated_count": 4,
+        "matches": []
+      },
+      "error": null,
+      "latency_sec": 28.79
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Stamping",
+        "Winding",
+        "Assembly",
+        "Inspection"
+      ],
+      "generated_equipments": [
+        "Stamping Press",
+        "Operator Workbench - Stamping",
+        "Winding Robot",
+        "Operator Workbench - Winding",
+        "Assembly Workstation",
+        "Inspection Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 9,
+        "accuracy": 0.3333,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 1,
+            "gt_step": "와이어 교정",
+            "gen_step": "Winding",
+            "similarity": 0.48
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "탈피",
+            "gen_step": "Stamping",
+            "similarity": 0.5
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 3,
+            "gt_step": "슬롯 절연지 삽입",
+            "gen_step": "Inspection",
+            "similarity": 0.533
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 26.56
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Glass Cutting",
+        "Thin Film Deposition",
+        "Encapsulation",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "Operator Workstation",
+        "Glass Cutting Machine",
+        "Deposition Robot",
+        "Process Control Workstation",
+        "Encapsulation Applicator Robot",
+        "Encapsulation Workstation",
+        "Inspection Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 4,
+        "M": 7,
+        "accuracy": 0.5714,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "PI 기판 코팅",
+            "gen_step": "Glass Cutting",
+            "similarity": 0.424
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "TFT 제조",
+            "gen_step": "Thin Film Deposition",
+            "similarity": 0.457
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "유기물 증착(VTE)",
+            "gen_step": "Encapsulation",
+            "similarity": 0.5
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "봉지(TFE/Frit Sealing)",
+            "gen_step": "Final Inspection",
+            "similarity": 0.483
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 22.93
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Stamping and Welding",
+        "Assembly and Installation",
+        "Final Inspection and Testing"
+      ],
+      "generated_equipments": [
+        "6-axis Welding Robot",
+        "Automated Assembly Machine",
+        "Manual Workstation A",
+        "Manual Workstation B",
+        "Manual Workstation C"
+      ],
+      "process_count": 3,
+      "evaluation": {
+        "n": 2,
+        "M": 6,
+        "accuracy": 0.3333,
+        "sequence_match": 1.0,
+        "generated_count": 3,
+        "matches": [
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "캐비닛 프레싱/벤딩",
+            "gen_step": "Stamping and Welding",
+            "similarity": 0.419
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 2,
+            "gt_step": "누수/기능 테스트",
+            "gen_step": "Final Inspection and Testing",
+            "similarity": 0.625
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 23.44
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Blending",
+        "Granulation",
+        "Compression",
+        "Coating"
+      ],
+      "generated_equipments": [
+        "Blending Workstation",
+        "High-shear Mixer",
+        "Granulation Workstation",
+        "Granulator",
+        "Compression Workstation",
+        "Tablet Press",
+        "Coating Workstation",
+        "Coating Machine"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 4,
+        "M": 6,
+        "accuracy": 0.6667,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "원료 공급",
+            "gen_step": "Blending",
+            "similarity": 0.667
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 3,
+            "gt_step": "연속 혼합",
+            "gen_step": "Coating",
+            "similarity": 0.462
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 1,
+            "gt_step": "과립화",
+            "gen_step": "Granulation",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 2,
+            "gt_step": "타정",
+            "gen_step": "Compression",
+            "similarity": 1.0
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 27.3
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Raw Material Preparation",
+        "Extrusion",
+        "Vulcanization",
+        "Quality Inspection"
+      ],
+      "generated_equipments": [
+        "Mixing Workstation",
+        "Automated Mixer",
+        "Extrusion Workbench",
+        "Extrusion Robot",
+        "Vulcanization Station",
+        "Vulcanization Press",
+        "Inspection Workstation"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 2,
+        "M": 6,
+        "accuracy": 0.3333,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "압출/압연",
+            "gen_step": "Extrusion",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 3,
+            "gt_step": "최종 검사",
+            "gen_step": "Quality Inspection",
+            "similarity": 0.765
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 27.77
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+{
+  "project_name": "Ex1 Benchmark",
+  "dataset_version": "1.1",
+  "language": "ko",
+  "ground_truth_bop": [
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "bop_steps": ["슬러리 혼합", "코팅", "건조", "압연", "슬리팅", "노칭/권취", "탭 용접", "패키징", "전해액 주입", "화성(Formation)", "디가싱"],
+      "equipment": ["반버리 믹서", "슬롯 다이 코터", "가열 캘린더", "레이저 노칭기", "진공 주입기", "사이클러"],
+      "references": [
+        {
+          "title": "VDMA - Production Process of a Lithium-Ion Battery Cell",
+          "url": "https://vdma-industryguide.com/fileadmin/battprod/downloads/Production_Process_of_a_Lithium-Ion_Battery_Cell.pdf"
+        }
+      ]
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "bop_steps": ["코일 디코일링", "블랭킹", "성형(Drawing)", "트리밍/피어싱", "플랜징/헤밍", "하부/측면 조립", "프레이밍(Framing)", "패널 장착"],
+      "equipment": ["디코일러", "블랭킹 프레스", "1,600톤급 기계식 프레스", "용접 로봇 클러스터", "접착제 디스펜서"],
+      "references": [
+        {
+          "title": "Toyota Global Plant Tour - Stamping",
+          "url": "https://global.toyota/en/company/plant-tours/stamping/"
+        },
+        {
+          "title": "Process Design and System Layout for an Automobile Manufacturing and Assembly Plant",
+          "url": "https://restpublisher.com/wp-content/uploads/2023/11/Process-Design-and-System-Layout-for-an-Automobile-Manufacturing-and-Assembly-Plant.pdf"
+        }
+      ]
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "bop_steps": ["PCB 로딩", "솔더 인쇄", "SPI(인쇄 검사)", "고속/이형 실장", "리플로우 솔더링", "AOI(광학 검사)", "AXI(X-ray 검사)"],
+      "equipment": ["스크린 프린터", "3D SPI", "고속 칩 마운터", "리플로우 오븐", "3D AOI"],
+      "references": [
+        {
+          "title": "PCBOnline - SMT Manufacturing Process",
+          "url": "https://www.pcbonline.com/blog/smt-manufacturing-process.html"
+        }
+      ]
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "bop_steps": ["범프 형성", "웨이퍼 다이싱", "범프 본딩(Flip-Chip)", "언더필 주입", "몰딩(Encapsulation)", "최종 테스트", "레이저 마킹"],
+      "equipment": ["웨이퍼 백그라인더", "다이아몬드 소/레이저 다이서", "플립칩 본더", "진공 몰딩 시스템", "번인 테스터"],
+      "references": [
+        {
+          "title": "Rapidus Tech - Packaging Technology",
+          "url": "https://www.rapidus.inc/en/tech/te0010/"
+        }
+      ]
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "bop_steps": ["셀 소팅/테스팅", "레이저 커팅", "태빙/스트링잉", "레이업", "라미네이션", "프레이밍", "정션 박스 부착", "검사"],
+      "equipment": ["자동 셀 소터", "레이저 스크라이버", "태버-스트링어", "자동 레이업 로봇", "진공 가열 라미네이터", "솔라 시뮬레이터"],
+      "references": [
+        {
+          "title": "Scribd - Process Flow Sheet for PV Module",
+          "url": "https://www.scribd.com/document/816455848/Process-Flow-Sheet"
+        }
+      ]
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "bop_steps": ["와이어 교정", "탈피", "절단", "벤딩", "슬롯 절연지 삽입", "헤어핀 삽입", "끝단 트위스팅", "레이저 용접", "함침"],
+      "equipment": ["서보 와이어 피더", "레이저 탈피기", "헤어핀 성형기", "인설팅 네스트", "스캐너 레이저 용접기"],
+      "references": [
+        {
+          "title": "ResearchGate - Production Process of a Hairpin Stator",
+          "url": "https://www.researchgate.net/publication/362802754_PRODUCTION_PROCESS_OF_A_HAIRPIN_STATOR"
+        },
+        {
+          "title": "thyssenkrupp - Hairpin Stator Manufacture: Industrial Proven Processes",
+          "url": "https://ucpcdn.thyssenkrupp.com/_legacy/UCPthyssenkruppBAISSystemEngineering/assets.files/automobilindustrie/future-automotive-factory/tech-days/12-13_hairpinmanufacture.pdf"
+        }
+      ]
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "bop_steps": ["PI 기판 코팅", "TFT 제조", "유기물 증착(VTE)", "봉지(TFE/Frit Sealing)", "패널 절단(LLO/Cell Cutting)", "ACF 본딩", "모듈 조립"],
+      "equipment": ["슬롯 다이 코터", "노광기(Stepper)", "진공 증착기", "레이저 박리 장치(LLO)", "자동 비전 테스터"],
+      "references": [
+        {
+          "title": "UBI Research - AMOLED Manufacturing Process Report",
+          "url": "https://ubiresearch.com/wp-content/uploads/2021/03/AMOLED-Manufacturing-Process-Report_EN_Sample.pdf"
+        }
+      ]
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "bop_steps": ["박판 디코일링", "캐비닛 프레싱/벤딩", "드럼/수조 조립", "모터/펌프 장착", "통합 최종 조립", "누수/기능 테스트"],
+      "equipment": ["대형 유압 프레스", "자동 클린칭기", "플라스틱 사출기", "컨베이어 조립 라인", "진동 분석 검사기"],
+      "references": [
+        {
+          "title": "Scribd - Front Load Washing Machine Production Line Simulation",
+          "url": "https://www.scribd.com/presentation/834763378/Front-Load-Washing-Machine-Production-Line-Simulation"
+        }
+      ]
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "bop_steps": ["원료 공급", "연속 혼합", "과립화", "건조", "타정", "코팅"],
+      "equipment": ["중량 감량식 피더", "연속 혼합기", "롤러 컴팩터", "유동층 건조기", "로터리 타정기", "인라인 PAT 장치"],
+      "references": [
+        {
+          "title": "CCPMJ - Continuous Manufacturing of Solid Dosage",
+          "url": "https://ccpmj.org/downloads/1_Dr.Lee_rev(en).pdf"
+        }
+      ]
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "bop_steps": ["고무 정련", "압출/압연", "비드 가공", "성형", "가류", "최종 검사"],
+      "equipment": ["반버리 믹서", "캘린더 롤러", "타이어 성형기", "가류 프레스", "유니포미티 검사기"],
+      "references": [
+        {
+          "title": "Tsubakimoto - Tire Making Application Guide",
+          "url": "https://tt-net.tsubakimoto.co.jp/lib/catalog/pdf/en/app-tiremaking.pdf"
+        }
+      ]
+    }
+  ]
+}

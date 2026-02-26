@@ -1,0 +1,2589 @@
+{
+  "experiment": "Ex1 Zero-shot BOP Generation (SYSTEM_PROMPT)",
+  "timestamp": "2026-02-10T14:13:48.182032",
+  "config": {
+    "temperature": 0.0,
+    "similarity_threshold": 0.4,
+    "prompt_source": "app/prompts.py SYSTEM_PROMPT",
+    "models": [
+      "gemini-2.5-flash",
+      "gpt-4o-mini",
+      "gpt-4o",
+      "o3-mini"
+    ],
+    "products": [
+      "P01",
+      "P02",
+      "P03",
+      "P04",
+      "P05",
+      "P06",
+      "P07",
+      "P08",
+      "P09",
+      "P10"
+    ]
+  },
+  "results": [
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Slurry Mixing (Anode/Cathode)",
+        "Electrode Coating & Drying",
+        "Calendering",
+        "Slitting",
+        "Notching",
+        "Stacking/Winding",
+        "Tab Welding",
+        "Pouch Sealing / Can Insertion",
+        "Electrolyte Injection",
+        "Initial Degassing & Pre-Sealing",
+        "Formation Cycling",
+        "Final Degassing & Sealing",
+        "Aging",
+        "OCV/Impedance Testing & Visual Inspection",
+        "Sorting & Packaging"
+      ],
+      "generated_equipments": [
+        "High-Shear Mixer",
+        "Precision Coater-Dryer",
+        "Roll Calender Machine",
+        "High-Speed Slitting Machine",
+        "Laser Notching Machine",
+        "Automated Stacking/Winding Robot",
+        "Ultrasonic Tab Welder",
+        "Welding Robot",
+        "Vacuum Sealing Machine",
+        "Electrolyte Injector",
+        "Initial Degassing Chamber",
+        "Pre-Sealing Machine",
+        "Formation Cycler Bank",
+        "Final Degassing Machine",
+        "Final Sealing Machine",
+        "Aging Rack System",
+        "OCV/Impedance Tester",
+        "Vision Inspection System",
+        "Cell Sorter",
+        "Packaging Robot",
+        "Slurry Preparation Workstation",
+        "Coating Control Station",
+        "Calendering Control Station",
+        "Slitting Inspection Station",
+        "Notching Control Station",
+        "Cell Assembly Workstation",
+        "Welding Workstation",
+        "Sealing Workstation",
+        "Injection Control Station",
+        "Inspection Workstation",
+        "Sorting & Packaging Workstation"
+      ],
+      "process_count": 15,
+      "evaluation": {
+        "n": 11,
+        "M": 11,
+        "accuracy": 1.0,
+        "sequence_match": 0.8727,
+        "generated_count": 15,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "슬러리 혼합",
+            "gen_step": "Slurry Mixing (Anode/Cathode)",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "코팅",
+            "gen_step": "Electrode Coating & Drying",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "건조",
+            "gen_step": "Calendering",
+            "similarity": 0.588
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 6,
+            "gt_step": "압연",
+            "gen_step": "Tab Welding",
+            "similarity": 0.545
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 3,
+            "gt_step": "슬리팅",
+            "gen_step": "Slitting",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 4,
+            "gt_step": "노칭/권취",
+            "gen_step": "Notching",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 5,
+            "gt_step": "탭 용접",
+            "gen_step": "Stacking/Winding",
+            "similarity": 0.538
+          },
+          {
+            "gt_idx": 7,
+            "gen_idx": 12,
+            "gt_step": "패키징",
+            "gen_step": "Aging",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 8,
+            "gen_idx": 8,
+            "gt_step": "전해액 주입",
+            "gen_step": "Electrolyte Injection",
+            "similarity": 0.7
+          },
+          {
+            "gt_idx": 9,
+            "gen_idx": 10,
+            "gt_step": "화성(Formation)",
+            "gen_step": "Formation Cycling",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 10,
+            "gen_idx": 9,
+            "gt_step": "디가싱",
+            "gen_step": "Initial Degassing & Pre-Sealing",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 42.85
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Underbody Panel Loading & Initial Welding",
+        "Underbody Main Assembly Welding",
+        "Side Body Panel Assembly (Left & Right)",
+        "Roof Panel Preparation & Loading",
+        "Main Body Framing & Welding",
+        "Secondary Welding & Reinforcement",
+        "Seam Sealing Application",
+        "Dimensional & Visual Inspection",
+        "Final BIW Transfer & Unloading"
+      ],
+      "generated_equipments": [
+        "6-axis Welding Robot",
+        "Underbody Fixture Station",
+        "Multi-axis Welding Robot",
+        "Underbody Main Welding Jig",
+        "Robotic Welding Station",
+        "Spot Welding Robot",
+        "Side Body Assembly Fixture",
+        "Roof Panel Loading Station",
+        "Main Framing Robot",
+        "BIW Framing Jig",
+        "Framing Welding Station",
+        "Auxiliary Welding Robot",
+        "Secondary Welding Station",
+        "Sealing Robot",
+        "Sealing Application Station",
+        "3D Vision Inspection System",
+        "Quality Inspection Station",
+        "Overhead Conveyor System",
+        "Unloading Bay"
+      ],
+      "process_count": 9,
+      "evaluation": {
+        "n": 4,
+        "M": 8,
+        "accuracy": 0.5,
+        "sequence_match": 0.5,
+        "generated_count": 9,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 3,
+            "gt_step": "코일 디코일링",
+            "gen_step": "Roof Panel Preparation & Loading",
+            "similarity": 0.409
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 6,
+            "gt_step": "트리밍/피어싱",
+            "gen_step": "Seam Sealing Application",
+            "similarity": 0.45
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 1,
+            "gt_step": "하부/측면 조립",
+            "gen_step": "Underbody Main Assembly Welding",
+            "similarity": 0.717
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 4,
+            "gt_step": "프레이밍(Framing)",
+            "gen_step": "Main Body Framing & Welding",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 27.14
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Solder Paste Printing",
+        "Solder Paste Inspection (SPI)",
+        "Component Placement (Pick & Place)",
+        "Reflow Soldering",
+        "Automated Optical Inspection (AOI)",
+        "PCB Depaneling",
+        "Functional Testing",
+        "Final Visual Inspection & Cleaning"
+      ],
+      "generated_equipments": [
+        "Automatic Solder Paste Printer",
+        "Manual PCB Loading Station",
+        "3D Solder Paste Inspection Machine",
+        "SPI Review Workstation",
+        "High-Speed Pick & Place Robot",
+        "Fine-Pitch Pick & Place Robot",
+        "Component Loading Station",
+        "Multi-Zone Reflow Oven",
+        "SMT Conveyor System",
+        "Automated Optical Inspection Machine",
+        "AOI Review Workstation",
+        "Automated Depaneling Machine",
+        "Depaneling Workstation",
+        "Automated Test Equipment (ATE)",
+        "Test Fixture Workstation",
+        "Inspection Magnifier Station",
+        "PCB Cleaning Station"
+      ],
+      "process_count": 8,
+      "evaluation": {
+        "n": 5,
+        "M": 7,
+        "accuracy": 0.7143,
+        "sequence_match": 0.6,
+        "generated_count": 8,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 5,
+            "gt_step": "PCB 로딩",
+            "gen_step": "PCB Depaneling",
+            "similarity": 0.64
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "솔더 인쇄",
+            "gen_step": "Solder Paste Printing",
+            "similarity": 0.833
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 1,
+            "gt_step": "SPI(인쇄 검사)",
+            "gen_step": "Solder Paste Inspection (SPI)",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 3,
+            "gt_step": "리플로우 솔더링",
+            "gen_step": "Reflow Soldering",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 4,
+            "gt_step": "AOI(광학 검사)",
+            "gen_step": "Automated Optical Inspection (AOI)",
+            "similarity": 1.0
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 29.81
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Die Attach",
+        "Wire Bonding",
+        "Molding",
+        "Marking",
+        "Singulation (Sawing)",
+        "Final Inspection & Test",
+        "Packaging"
+      ],
+      "generated_equipments": [
+        "Automatic Die Bonder",
+        "Automatic Wire Bonder",
+        "Automatic Molding Press",
+        "Laser Marking Machine",
+        "Automatic Dicing Saw",
+        "Automated Test Equipment (ATE)",
+        "Automated Optical Inspection (AOI) Machine",
+        "Die Attach Operator Workstation",
+        "Wire Bond Operator Workstation",
+        "Molding Operator Workstation",
+        "Marking Operator Workstation",
+        "Sawing Operator Workstation",
+        "Test & Rework Workstation",
+        "Automatic Packaging Machine",
+        "Final Packaging Workstation"
+      ],
+      "process_count": 7,
+      "evaluation": {
+        "n": 5,
+        "M": 7,
+        "accuracy": 0.7143,
+        "sequence_match": 0.8,
+        "generated_count": 7,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 2,
+            "gt_step": "범프 형성",
+            "gen_step": "Molding",
+            "similarity": 0.571
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 3,
+            "gt_step": "웨이퍼 다이싱",
+            "gen_step": "Marking",
+            "similarity": 0.526
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 1,
+            "gt_step": "범프 본딩(Flip-Chip)",
+            "gen_step": "Wire Bonding",
+            "similarity": 0.667
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 5,
+            "gt_step": "언더필 주입",
+            "gen_step": "Final Inspection & Test",
+            "similarity": 0.488
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 6,
+            "gt_step": "레이저 마킹",
+            "gen_step": "Packaging",
+            "similarity": 0.455
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 20.56
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Solar Cell Stringing & Tabbing",
+        "Glass Cleaning & Preparation",
+        "Layup (Encapsulation Layer Assembly)",
+        "Lamination",
+        "Edge Trimming & Deburring",
+        "Framing",
+        "Junction Box Attachment & Potting",
+        "Electrical Testing (Flash Test & EL Test)",
+        "Final Cleaning & Visual Inspection",
+        "Packaging"
+      ],
+      "generated_equipments": [
+        "Solar Cell Stringer",
+        "Glass Washing Machine",
+        "Layup Robot",
+        "Vacuum Laminator",
+        "Edge Trimming Machine",
+        "Framing Machine",
+        "Potting Dispenser",
+        "Solar Simulator",
+        "EL Tester",
+        "Strapping Machine",
+        "Manual Workstation 1",
+        "Manual Workstation 2",
+        "Manual Workstation 3",
+        "Manual Workstation 4",
+        "Manual Workstation 5",
+        "Manual Workstation 6",
+        "Manual Workstation 7",
+        "Manual Workstation 8",
+        "Manual Workstation 9",
+        "Manual Workstation 10"
+      ],
+      "process_count": 10,
+      "evaluation": {
+        "n": 8,
+        "M": 8,
+        "accuracy": 1.0,
+        "sequence_match": 0.6071,
+        "generated_count": 10,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 7,
+            "gt_step": "셀 소팅/테스팅",
+            "gen_step": "Electrical Testing (Flash Test & EL Test)",
+            "similarity": 0.595
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 9,
+            "gt_step": "레이저 커팅",
+            "gen_step": "Packaging",
+            "similarity": 0.455
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 0,
+            "gt_step": "태빙/스트링잉",
+            "gen_step": "Solar Cell Stringing & Tabbing",
+            "similarity": 0.5
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 2,
+            "gt_step": "레이업",
+            "gen_step": "Layup (Encapsulation Layer Assembly)",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 3,
+            "gt_step": "라미네이션",
+            "gen_step": "Lamination",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 5,
+            "gt_step": "프레이밍",
+            "gen_step": "Framing",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 6,
+            "gt_step": "정션 박스 부착",
+            "gen_step": "Junction Box Attachment & Potting",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 7,
+            "gen_idx": 8,
+            "gt_step": "검사",
+            "gen_step": "Final Cleaning & Visual Inspection",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 37.02
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Lamination Stacking & Core Assembly",
+        "Hairpin Forming & Pre-Bending",
+        "Hairpin Insertion",
+        "Hairpin Twisting & Brazing Preparation",
+        "Hairpin Brazing / Laser Welding",
+        "Insulation Coating (VPI)",
+        "Final Assembly & Electrical Testing"
+      ],
+      "generated_equipments": [
+        "Lamination Stacking Machine",
+        "Hydraulic Press",
+        "Manual Stacking Workstation",
+        "Hairpin Forming Machine",
+        "Quality Inspection Workstation",
+        "Hairpin Insertion Robot",
+        "Stator Loading/Unloading Station",
+        "Hairpin Twisting Robot",
+        "Cleaning Station",
+        "Preparation Workstation",
+        "Laser Welding Robot",
+        "Fume Extraction System",
+        "Welding Monitoring Station",
+        "VPI System (Vacuum Chamber & Tank)",
+        "Curing Oven",
+        "VPI Loading/Unloading Station",
+        "Final Assembly Workstation",
+        "Electrical Test Bench"
+      ],
+      "process_count": 7,
+      "evaluation": {
+        "n": 6,
+        "M": 9,
+        "accuracy": 0.6667,
+        "sequence_match": 0.3333,
+        "generated_count": 7,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 6,
+            "gt_step": "와이어 교정",
+            "gen_step": "Final Assembly & Electrical Testing",
+            "similarity": 0.431
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 5,
+            "gt_step": "탈피",
+            "gen_step": "Insulation Coating (VPI)",
+            "similarity": 0.462
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 1,
+            "gt_step": "벤딩",
+            "gen_step": "Hairpin Forming & Pre-Bending",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 2,
+            "gt_step": "슬롯 절연지 삽입",
+            "gen_step": "Hairpin Insertion",
+            "similarity": 0.649
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 4,
+            "gt_step": "헤어핀 삽입",
+            "gen_step": "Hairpin Brazing / Laser Welding",
+            "similarity": 0.652
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 3,
+            "gt_step": "끝단 트위스팅",
+            "gen_step": "Hairpin Twisting & Brazing Preparation",
+            "similarity": 0.417
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 38.97
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Substrate Cleaning & Preparation",
+        "TFT Array Deposition & Patterning",
+        "OLED Material Deposition (Evaporation)",
+        "Cathode Deposition",
+        "Encapsulation",
+        "Module Assembly & Testing",
+        "Final Inspection & Packaging"
+      ],
+      "generated_equipments": [
+        "Automated Wet Cleaning Machine",
+        "Manual Inspection Station",
+        "PVD/CVD System",
+        "Photolithography Stepper",
+        "Etching System",
+        "Manual Loading Station",
+        "OLED Evaporation System",
+        "Sputtering System",
+        "Encapsulation System",
+        "UV Curing System",
+        "Automated FPC Bonder",
+        "Driver IC Mounter",
+        "Electrical Test System",
+        "Assembly Workstation",
+        "Automated Optical Inspection (AOI) System",
+        "Packaging Machine"
+      ],
+      "process_count": 7,
+      "evaluation": {
+        "n": 6,
+        "M": 7,
+        "accuracy": 0.8571,
+        "sequence_match": 0.8667,
+        "generated_count": 7,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "PI 기판 코팅",
+            "gen_step": "Substrate Cleaning & Preparation",
+            "similarity": 0.6
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "TFT 제조",
+            "gen_step": "TFT Array Deposition & Patterning",
+            "similarity": 0.478
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 4,
+            "gt_step": "유기물 증착(VTE)",
+            "gen_step": "Encapsulation",
+            "similarity": 0.5
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "봉지(TFE/Frit Sealing)",
+            "gen_step": "Cathode Deposition",
+            "similarity": 0.516
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 6,
+            "gt_step": "패널 절단(LLO/Cell Cutting)",
+            "gen_step": "Final Inspection & Packaging",
+            "similarity": 0.41
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 5,
+            "gt_step": "모듈 조립",
+            "gen_step": "Module Assembly & Testing",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 24.46
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Chassis Sheet Metal Forming",
+        "Chassis Welding & Assembly",
+        "Drum Assembly",
+        "Motor & Transmission Installation",
+        "Control Panel & Wiring Installation",
+        "Tub & Chassis Integration",
+        "Final Assembly (Door, Top Cover, Hoses)",
+        "Functional Testing & Quality Control",
+        "Packaging"
+      ],
+      "generated_equipments": [
+        "Hydraulic Press 200T",
+        "Material Loading Station",
+        "FANUC Arc Mate 120iC",
+        "Chassis Welding Fixture",
+        "Drum Assembly Jig",
+        "Motor Mounting Fixture",
+        "Electrical Assembly Bench",
+        "Overhead Gantry Lift",
+        "Chassis Integration Workstation",
+        "Final Assembly Conveyor Section",
+        "Automated Functional Test Bench",
+        "Visual Inspection Booth",
+        "Packaging Conveyor",
+        "Packaging Workstation"
+      ],
+      "process_count": 9,
+      "evaluation": {
+        "n": 5,
+        "M": 6,
+        "accuracy": 0.8333,
+        "sequence_match": 1.0,
+        "generated_count": 9,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "박판 디코일링",
+            "gen_step": "Chassis Sheet Metal Forming",
+            "similarity": 0.667
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "캐비닛 프레싱/벤딩",
+            "gen_step": "Chassis Welding & Assembly",
+            "similarity": 0.426
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "드럼/수조 조립",
+            "gen_step": "Drum Assembly",
+            "similarity": 0.897
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 6,
+            "gt_step": "통합 최종 조립",
+            "gen_step": "Final Assembly (Door, Top Cover, Hoses)",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 7,
+            "gt_step": "누수/기능 테스트",
+            "gen_step": "Functional Testing & Quality Control",
+            "similarity": 0.593
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 26.08
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Raw Material Dispensing & Pre-blending",
+        "Continuous Blending",
+        "Continuous Wet Granulation",
+        "Continuous Drying",
+        "Milling & Sizing",
+        "Lubrication & Final Blending",
+        "Tablet Compression",
+        "Tablet Coating",
+        "Primary Packaging (Blister Filling)",
+        "Secondary Packaging (Cartoning)",
+        "Final Quality Control & Release"
+      ],
+      "generated_equipments": [
+        "Dispensing Booth",
+        "Continuous Powder Blender",
+        "Continuous Twin-Screw Granulator",
+        "Continuous Fluid Bed Dryer",
+        "Conical Mill",
+        "High-Speed Rotary Tablet Press",
+        "Continuous Tablet Coater",
+        "Blister Packaging Machine",
+        "Automatic Cartoning Machine",
+        "In-line Vision Inspection System",
+        "General Purpose Workstation"
+      ],
+      "process_count": 11,
+      "evaluation": {
+        "n": 5,
+        "M": 6,
+        "accuracy": 0.8333,
+        "sequence_match": 1.0,
+        "generated_count": 11,
+        "matches": [
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "연속 혼합",
+            "gen_step": "Continuous Blending",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "과립화",
+            "gen_step": "Continuous Wet Granulation",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "건조",
+            "gen_step": "Continuous Drying",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 6,
+            "gt_step": "타정",
+            "gen_step": "Tablet Compression",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 7,
+            "gt_step": "코팅",
+            "gen_step": "Tablet Coating",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 38.69
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_processes": [
+        "Raw Material Mixing",
+        "Component Extrusion & Calendering",
+        "Bead Wire Forming",
+        "Green Tire Building",
+        "Curing & Vulcanization",
+        "Final Finishing",
+        "Quality Inspection & Testing",
+        "Labeling & Packaging"
+      ],
+      "generated_equipments": [
+        "Banbury Mixer",
+        "Rubber Extruder",
+        "Fabric Calender Machine",
+        "Bead Wire Former",
+        "Tire Building Machine",
+        "Tire Curing Press",
+        "Tire Trimming Machine",
+        "Tire Uniformity Tester",
+        "Tire Balance Tester",
+        "Tire X-ray Inspection Machine",
+        "Automatic Labeling Machine",
+        "Manual Assembly Station"
+      ],
+      "process_count": 8,
+      "evaluation": {
+        "n": 6,
+        "M": 6,
+        "accuracy": 1.0,
+        "sequence_match": 1.0,
+        "generated_count": 8,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "고무 정련",
+            "gen_step": "Raw Material Mixing",
+            "similarity": 0.625
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "압출/압연",
+            "gen_step": "Component Extrusion & Calendering",
+            "similarity": 0.784
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "비드 가공",
+            "gen_step": "Bead Wire Forming",
+            "similarity": 0.625
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "성형",
+            "gen_step": "Green Tire Building",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 4,
+            "gt_step": "가류",
+            "gen_step": "Curing & Vulcanization",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 5,
+            "gt_step": "최종 검사",
+            "gen_step": "Final Finishing",
+            "similarity": 0.645
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 28.38
+    },
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Electrode Preparation",
+        "Electrode Coating",
+        "Electrode Drying",
+        "Electrode Assembly"
+      ],
+      "generated_equipments": [
+        "Manual Workbench",
+        "Mixing Machine",
+        "Coating Machine",
+        "Drying Oven",
+        "Assembly Machine"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 4,
+        "M": 11,
+        "accuracy": 0.3636,
+        "sequence_match": 0.5,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 2,
+            "gt_step": "슬러리 혼합",
+            "gen_step": "Electrode Drying",
+            "similarity": 0.483
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "코팅",
+            "gen_step": "Electrode Coating",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 0,
+            "gt_step": "압연",
+            "gen_step": "Electrode Preparation",
+            "similarity": 0.438
+          },
+          {
+            "gt_idx": 8,
+            "gen_idx": 3,
+            "gt_step": "전해액 주입",
+            "gen_step": "Electrode Assembly",
+            "similarity": 0.541
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 34.82
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "프레임 용접",
+        "부품 조립",
+        "품질 검사"
+      ],
+      "generated_equipments": [
+        "6축 용접 로봇",
+        "작업대",
+        "검사 작업대"
+      ],
+      "process_count": 3,
+      "evaluation": {
+        "n": 2,
+        "M": 8,
+        "accuracy": 0.25,
+        "sequence_match": 0.0,
+        "generated_count": 3,
+        "matches": [
+          {
+            "gt_idx": 5,
+            "gen_idx": 1,
+            "gt_step": "하부/측면 조립",
+            "gen_step": "부품 조립",
+            "similarity": 0.667
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 0,
+            "gt_step": "프레이밍(Framing)",
+            "gen_step": "프레임 용접",
+            "similarity": 0.4
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 20.15
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Component Placement",
+        "Soldering",
+        "Inspection"
+      ],
+      "generated_equipments": [
+        "Pick and Place Machine",
+        "Manual Workstation",
+        "Reflow Oven",
+        "Automated Optical Inspection Machine"
+      ],
+      "process_count": 3,
+      "evaluation": {
+        "n": 2,
+        "M": 7,
+        "accuracy": 0.2857,
+        "sequence_match": 1.0,
+        "generated_count": 3,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 1,
+            "gt_step": "PCB 로딩",
+            "gen_step": "Soldering",
+            "similarity": 0.5
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 2,
+            "gt_step": "솔더 인쇄",
+            "gen_step": "Inspection",
+            "similarity": 0.4
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 20.77
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Die Attach",
+        "Wire Bonding",
+        "Encapsulation",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "Die Attach Machine",
+        "Manual Workstation",
+        "Wire Bonding Machine",
+        "Encapsulation Machine",
+        "Inspection Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 1,
+            "gt_step": "범프 형성",
+            "gen_step": "Wire Bonding",
+            "similarity": 0.421
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "언더필 주입",
+            "gen_step": "Final Inspection",
+            "similarity": 0.556
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 2,
+            "gt_step": "몰딩(Encapsulation)",
+            "gen_step": "Encapsulation",
+            "similarity": 0.5
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 25.91
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "부품 준비",
+        "조립",
+        "품질 검사"
+      ],
+      "generated_equipments": [
+        "수동 작업대",
+        "로봇 조립기"
+      ],
+      "process_count": 3,
+      "evaluation": {
+        "n": 1,
+        "M": 8,
+        "accuracy": 0.125,
+        "sequence_match": 1.0,
+        "generated_count": 3,
+        "matches": [
+          {
+            "gt_idx": 7,
+            "gen_idx": 2,
+            "gt_step": "검사",
+            "gen_step": "품질 검사",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 24.69
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Wire Cutting",
+        "Wire Forming",
+        "Welding",
+        "Inspection"
+      ],
+      "generated_equipments": [
+        "Wire Cutting Machine",
+        "Manual Workbench",
+        "Wire Forming Machine",
+        "Welding Robot"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 4,
+        "M": 9,
+        "accuracy": 0.4444,
+        "sequence_match": 0.5,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "와이어 교정",
+            "gen_step": "Wire Cutting",
+            "similarity": 0.667
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 3,
+            "gt_step": "탈피",
+            "gen_step": "Inspection",
+            "similarity": 0.444
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "절단",
+            "gen_step": "Welding",
+            "similarity": 0.429
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 1,
+            "gt_step": "벤딩",
+            "gen_step": "Wire Forming",
+            "similarity": 0.421
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 24.69
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Material Preparation",
+        "Layer Deposition",
+        "Curing Process",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "Manual Workstation",
+        "Deposition Machine",
+        "Curing Oven"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "PI 기판 코팅",
+            "gen_step": "Material Preparation",
+            "similarity": 0.4
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "TFT 제조",
+            "gen_step": "Layer Deposition",
+            "similarity": 0.452
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 3,
+            "gt_step": "유기물 증착(VTE)",
+            "gen_step": "Final Inspection",
+            "similarity": 0.4
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 28.59
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "부품 조립",
+        "전기 배선",
+        "품질 검사"
+      ],
+      "generated_equipments": [
+        "조립 작업대",
+        "전기 작업대",
+        "검사 작업대"
+      ],
+      "process_count": 3,
+      "evaluation": {
+        "n": 1,
+        "M": 6,
+        "accuracy": 0.1667,
+        "sequence_match": 1.0,
+        "generated_count": 3,
+        "matches": [
+          {
+            "gt_idx": 2,
+            "gen_idx": 0,
+            "gt_step": "드럼/수조 조립",
+            "gen_step": "부품 조립",
+            "similarity": 0.5
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 24.79
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "Raw Material Preparation",
+        "Refining Process",
+        "Quality Inspection"
+      ],
+      "generated_equipments": [
+        "Manual Preparation Station",
+        "Refining Machine",
+        "Inspection Station"
+      ],
+      "process_count": 3,
+      "evaluation": {
+        "n": 1,
+        "M": 6,
+        "accuracy": 0.1667,
+        "sequence_match": 1.0,
+        "generated_count": 3,
+        "matches": [
+          {
+            "gt_idx": 2,
+            "gen_idx": 0,
+            "gt_step": "과립화",
+            "gen_step": "Raw Material Preparation",
+            "similarity": 0.457
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 28.59
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "model": "GPT-4o Mini",
+      "model_id": "gpt-4o-mini",
+      "success": true,
+      "generated_processes": [
+        "원료 혼합",
+        "형상 성형",
+        "경화",
+        "품질 검사"
+      ],
+      "generated_equipments": [
+        "혼합기",
+        "수동 작업대",
+        "성형기",
+        "경화기"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 2,
+        "M": 6,
+        "accuracy": 0.3333,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 3,
+            "gen_idx": 1,
+            "gt_step": "성형",
+            "gen_step": "형상 성형",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 3,
+            "gt_step": "최종 검사",
+            "gen_step": "품질 검사",
+            "similarity": 0.6
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 22.69
+    },
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "전극 코팅",
+        "전극 건조",
+        "전극 절단",
+        "셀 조립",
+        "화성"
+      ],
+      "generated_equipments": [
+        "코팅 기계",
+        "작업대",
+        "건조 오븐",
+        "절단 기계",
+        "작업대",
+        "조립 로봇",
+        "작업대",
+        "화성 장비",
+        "작업대"
+      ],
+      "process_count": 5,
+      "evaluation": {
+        "n": 3,
+        "M": 11,
+        "accuracy": 0.2727,
+        "sequence_match": 1.0,
+        "generated_count": 5,
+        "matches": [
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "코팅",
+            "gen_step": "전극 코팅",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 1,
+            "gt_step": "건조",
+            "gen_step": "전극 건조",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 9,
+            "gen_idx": 4,
+            "gt_step": "화성(Formation)",
+            "gen_step": "화성",
+            "similarity": 1.0
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 11.17
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "Body Frame Welding",
+        "Door Assembly",
+        "Roof Installation",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "6-axis Welding Robot",
+        "Manual Welding Station",
+        "Door Assembly Robot",
+        "Manual Assembly Station",
+        "Roof Installation Robot",
+        "Manual Installation Station",
+        "Inspection Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 2,
+        "M": 8,
+        "accuracy": 0.25,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "코일 디코일링",
+            "gen_step": "Body Frame Welding",
+            "similarity": 0.438
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 1,
+            "gt_step": "하부/측면 조립",
+            "gen_step": "Door Assembly",
+            "similarity": 0.629
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 8.68
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "Solder Paste Printing",
+        "Component Placement",
+        "Reflow Soldering",
+        "Automated Optical Inspection (AOI)"
+      ],
+      "generated_equipments": [
+        "Stencil Printer",
+        "Manual Station",
+        "Pick-and-Place Machine",
+        "Manual Station",
+        "Reflow Oven",
+        "Manual Station",
+        "AOI Machine",
+        "Manual Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 2,
+            "gt_step": "PCB 로딩",
+            "gen_step": "Reflow Soldering",
+            "similarity": 0.444
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "솔더 인쇄",
+            "gen_step": "Solder Paste Printing",
+            "similarity": 0.833
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 3,
+            "gt_step": "AOI(광학 검사)",
+            "gen_step": "Automated Optical Inspection (AOI)",
+            "similarity": 1.0
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 26.03
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "Die Attach",
+        "Wire Bonding",
+        "Encapsulation",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "Die Attach Machine",
+        "Manual Station",
+        "Wire Bonding Machine",
+        "Manual Station",
+        "Molding Machine",
+        "Manual Station",
+        "Inspection Machine",
+        "Manual Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 1,
+            "gt_step": "범프 형성",
+            "gen_step": "Wire Bonding",
+            "similarity": 0.421
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "언더필 주입",
+            "gen_step": "Final Inspection",
+            "similarity": 0.556
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 2,
+            "gt_step": "몰딩(Encapsulation)",
+            "gen_step": "Encapsulation",
+            "similarity": 0.5
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 9.62
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "셀 솔더링",
+        "스트링 레이업",
+        "라미네이션",
+        "프레임 조립",
+        "최종 검사"
+      ],
+      "generated_equipments": [
+        "솔더링 로봇",
+        "작업대",
+        "레이업 로봇",
+        "작업대",
+        "라미네이터",
+        "프레임 조립기",
+        "작업대",
+        "검사 장비",
+        "작업대"
+      ],
+      "process_count": 5,
+      "evaluation": {
+        "n": 4,
+        "M": 8,
+        "accuracy": 0.5,
+        "sequence_match": 1.0,
+        "generated_count": 5,
+        "matches": [
+          {
+            "gt_idx": 2,
+            "gen_idx": 1,
+            "gt_step": "태빙/스트링잉",
+            "gen_step": "스트링 레이업",
+            "similarity": 0.462
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 2,
+            "gt_step": "라미네이션",
+            "gen_step": "라미네이션",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 3,
+            "gt_step": "프레이밍",
+            "gen_step": "프레임 조립",
+            "similarity": 0.4
+          },
+          {
+            "gt_idx": 7,
+            "gen_idx": 4,
+            "gt_step": "검사",
+            "gen_step": "최종 검사",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 12.12
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "Hairpin 성형",
+        "Hairpin 절단",
+        "Hairpin 삽입",
+        "전기적 검사"
+      ],
+      "generated_equipments": [
+        "성형 기계",
+        "작업대",
+        "절단 기계",
+        "작업대",
+        "삽입 로봇",
+        "작업대",
+        "검사 장비",
+        "작업대"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 2,
+        "M": 9,
+        "accuracy": 0.2222,
+        "sequence_match": 0.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 2,
+            "gen_idx": 1,
+            "gt_step": "절단",
+            "gen_step": "Hairpin 절단",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 0,
+            "gt_step": "헤어핀 삽입",
+            "gen_step": "Hairpin 성형",
+            "similarity": 0.593
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 8.75
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "기판 세정",
+        "유기물 증착",
+        "봉지 공정",
+        "최종 검사"
+      ],
+      "generated_equipments": [
+        "세정 기계",
+        "작업대",
+        "증착 기계",
+        "작업대",
+        "봉지 기계",
+        "작업대",
+        "검사 장비",
+        "작업대"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "PI 기판 코팅",
+            "gen_step": "기판 세정",
+            "similarity": 0.462
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 1,
+            "gt_step": "유기물 증착(VTE)",
+            "gen_step": "유기물 증착",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 2,
+            "gt_step": "봉지(TFE/Frit Sealing)",
+            "gen_step": "봉지 공정",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 10.95
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "Frame Welding",
+        "Drum Assembly",
+        "Control Panel Installation",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "6-axis Welding Robot",
+        "Welding Manual Station",
+        "Automated Assembly Machine",
+        "Assembly Manual Station",
+        "Installation Manual Station",
+        "Inspection Manual Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 6,
+        "accuracy": 0.5,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "박판 디코일링",
+            "gen_step": "Frame Welding",
+            "similarity": 0.471
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 3,
+            "gt_step": "캐비닛 프레싱/벤딩",
+            "gen_step": "Final Inspection",
+            "similarity": 0.41
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 1,
+            "gt_step": "드럼/수조 조립",
+            "gen_step": "Drum Assembly",
+            "similarity": 0.897
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 9.31
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "Raw Material Preparation",
+        "Mixing",
+        "Refining",
+        "Quality Inspection"
+      ],
+      "generated_equipments": [
+        "Weighing Machine",
+        "Material Handling Station",
+        "Industrial Mixer",
+        "Mixing Supervision Station",
+        "Refining Machine",
+        "Refining Operation Station",
+        "Inspection Station",
+        "Inspection Manual Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 6,
+        "accuracy": 0.5,
+        "sequence_match": 0.3333,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 2,
+            "gt_step": "원료 공급",
+            "gen_step": "Refining",
+            "similarity": 0.533
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 0,
+            "gt_step": "과립화",
+            "gen_step": "Raw Material Preparation",
+            "similarity": 0.457
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 1,
+            "gt_step": "건조",
+            "gen_step": "Mixing",
+            "similarity": 0.5
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 10.44
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": true,
+      "generated_processes": [
+        "Rubber Mixing",
+        "Tire Building",
+        "Vulcanization",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "Rubber Mixing Machine",
+        "Mixing Workstation",
+        "Tire Building Machine",
+        "Assembly Workstation",
+        "Vulcanizing Press",
+        "Vulcanization Workstation",
+        "Inspection Machine",
+        "Inspection Workstation"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 6,
+        "accuracy": 0.5,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "고무 정련",
+            "gen_step": "Rubber Mixing",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 1,
+            "gt_step": "성형",
+            "gen_step": "Tire Building",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 3,
+            "gt_step": "최종 검사",
+            "gen_step": "Final Inspection",
+            "similarity": 1.0
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 13.99
+    },
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Electrode Slurry Mixing",
+        "Electrode Coating",
+        "Drying Process",
+        "Calendering and Slitting",
+        "Cell Assembly and Formation"
+      ],
+      "generated_equipments": [
+        "Workstation 1",
+        "Mixing Machine",
+        "Coating Robot",
+        "Workstation 2",
+        "Drying Oven",
+        "Workstation 3",
+        "Calender Machine",
+        "Workstation 4",
+        "Assembly Robot",
+        "Workstation 5"
+      ],
+      "process_count": 5,
+      "evaluation": {
+        "n": 5,
+        "M": 11,
+        "accuracy": 0.4545,
+        "sequence_match": 1.0,
+        "generated_count": 5,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "슬러리 혼합",
+            "gen_step": "Electrode Slurry Mixing",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "코팅",
+            "gen_step": "Electrode Coating",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "건조",
+            "gen_step": "Drying Process",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "압연",
+            "gen_step": "Calendering and Slitting",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 9,
+            "gen_idx": 4,
+            "gt_step": "화성(Formation)",
+            "gen_step": "Cell Assembly and Formation",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 33.99
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Stamping",
+        "Welding",
+        "Assembly",
+        "Inspection"
+      ],
+      "generated_equipments": [
+        "Operator Workstation",
+        "Stamping Press",
+        "Welding Robot",
+        "Robot Operation Station",
+        "Assembly Fixture Machine",
+        "Assembly Workstation",
+        "Automated Inspection Machine",
+        "Inspection Workstation"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 4,
+        "M": 8,
+        "accuracy": 0.5,
+        "sequence_match": 0.6667,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 1,
+            "gt_step": "코일 디코일링",
+            "gen_step": "Welding",
+            "similarity": 0.476
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "블랭킹",
+            "gen_step": "Stamping",
+            "similarity": 0.5
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "트리밍/피어싱",
+            "gen_step": "Inspection",
+            "similarity": 0.538
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 2,
+            "gt_step": "하부/측면 조립",
+            "gen_step": "Assembly",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 29.16
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Component Placement",
+        "Reflow Soldering",
+        "AOI Inspection",
+        "Functional Testing"
+      ],
+      "generated_equipments": [
+        "Pick and Place Robot",
+        "SMT Manual Workstation",
+        "Reflow Oven",
+        "Reflow Manual Workstation",
+        "AOI Machine",
+        "Inspection Manual Station",
+        "Functional Test Machine",
+        "Functional Test Manual Station"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 7,
+        "accuracy": 0.4286,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 1,
+            "gt_step": "PCB 로딩",
+            "gen_step": "Reflow Soldering",
+            "similarity": 0.444
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 2,
+            "gt_step": "솔더 인쇄",
+            "gen_step": "AOI Inspection",
+            "similarity": 0.483
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 3,
+            "gt_step": "리플로우 솔더링",
+            "gen_step": "Functional Testing",
+            "similarity": 0.412
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 25.08
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Die Cleaning",
+        "Die Attach",
+        "Wire Bonding",
+        "Encapsulation and Molding",
+        "Final Inspection and Testing"
+      ],
+      "generated_equipments": [
+        "Cleaning Workstation",
+        "Die Attach Robot",
+        "Die Attach Workstation",
+        "Wire Bonder",
+        "Wire Bonding Workstation",
+        "Molding Machine",
+        "Molding Workstation",
+        "Inspection Workstation"
+      ],
+      "process_count": 5,
+      "evaluation": {
+        "n": 4,
+        "M": 7,
+        "accuracy": 0.5714,
+        "sequence_match": 0.6667,
+        "generated_count": 5,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 2,
+            "gt_step": "범프 형성",
+            "gen_step": "Wire Bonding",
+            "similarity": 0.421
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 0,
+            "gt_step": "웨이퍼 다이싱",
+            "gen_step": "Die Cleaning",
+            "similarity": 0.5
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 4,
+            "gt_step": "언더필 주입",
+            "gen_step": "Final Inspection and Testing",
+            "similarity": 0.542
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 3,
+            "gt_step": "몰딩(Encapsulation)",
+            "gen_step": "Encapsulation and Molding",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 27.15
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Frame Assembly",
+        "Solar Cell Placement",
+        "Cell Interconnection",
+        "Encapsulation and Lamination",
+        "Final Inspection"
+      ],
+      "generated_equipments": [
+        "Manual Workstation A",
+        "Robotic Frame Welder",
+        "Automated Pick and Place",
+        "Soldering Robot",
+        "Lamination Machine"
+      ],
+      "process_count": 5,
+      "evaluation": {
+        "n": 3,
+        "M": 8,
+        "accuracy": 0.375,
+        "sequence_match": 1.0,
+        "generated_count": 5,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 2,
+            "gt_step": "셀 소팅/테스팅",
+            "gen_step": "Cell Interconnection",
+            "similarity": 0.615
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 3,
+            "gt_step": "라미네이션",
+            "gen_step": "Encapsulation and Lamination",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 7,
+            "gen_idx": 4,
+            "gt_step": "검사",
+            "gen_step": "Final Inspection",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 36.54
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Stamping",
+        "Bending",
+        "Welding",
+        "Inspection"
+      ],
+      "generated_equipments": [
+        "Manual Station Workbench",
+        "Stamping Press",
+        "Welding Robot",
+        "Bending Machine"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 4,
+        "M": 9,
+        "accuracy": 0.4444,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "와이어 교정",
+            "gen_step": "Stamping",
+            "similarity": 0.462
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "탈피",
+            "gen_step": "Bending",
+            "similarity": 0.533
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "절단",
+            "gen_step": "Welding",
+            "similarity": 0.429
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 3,
+            "gt_step": "슬롯 절연지 삽입",
+            "gen_step": "Inspection",
+            "similarity": 0.533
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 24.2
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Substrate Cleaning",
+        "Thin Film Deposition",
+        "Lithography",
+        "Etching",
+        "Final Inspection & Assembly"
+      ],
+      "generated_equipments": [
+        "PVD Deposition Robot",
+        "Ultrasonic Cleaning Machine",
+        "Cleaning Workbench",
+        "Deposition Workbench",
+        "Lithography Exposure Machine",
+        "Lithography Workstation",
+        "Etching Machine",
+        "Etching Workbench",
+        "Pick-and-Place Robot",
+        "Assembly Workstation"
+      ],
+      "process_count": 5,
+      "evaluation": {
+        "n": 4,
+        "M": 7,
+        "accuracy": 0.5714,
+        "sequence_match": 1.0,
+        "generated_count": 5,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "PI 기판 코팅",
+            "gen_step": "Substrate Cleaning",
+            "similarity": 0.789
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "TFT 제조",
+            "gen_step": "Thin Film Deposition",
+            "similarity": 0.457
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "봉지(TFE/Frit Sealing)",
+            "gen_step": "Etching",
+            "similarity": 0.4
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 4,
+            "gt_step": "모듈 조립",
+            "gen_step": "Final Inspection & Assembly",
+            "similarity": 0.55
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 30.38
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Chassis Assembly",
+        "Motor Installation",
+        "Wiring and Control Panel Installation",
+        "Final Quality Inspection"
+      ],
+      "generated_equipments": [
+        "Installation Robot",
+        "Chassis Assembly Machine",
+        "Assembly Workbench",
+        "Motor Installation Workbench",
+        "Wiring Workstation",
+        "Inspection Bench"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 2,
+        "M": 6,
+        "accuracy": 0.3333,
+        "sequence_match": 1.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 2,
+            "gen_idx": 0,
+            "gt_step": "드럼/수조 조립",
+            "gen_step": "Chassis Assembly",
+            "similarity": 0.562
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 1,
+            "gt_step": "모터/펌프 장착",
+            "gen_step": "Motor Installation",
+            "similarity": 0.444
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 26.64
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Raw Material Feeding",
+        "Blending",
+        "Granulation",
+        "Drying",
+        "Compression",
+        "Coating",
+        "Quality Inspection"
+      ],
+      "generated_equipments": [
+        "Feeder Machine",
+        "Operator Worktable",
+        "Automated Blender",
+        "Blender Control Manual Station",
+        "Granulator",
+        "Granulator Manual Station",
+        "Dryer",
+        "Dryer Operator Station",
+        "Tablet Press",
+        "Tablet Press Manual Station",
+        "Coating Machine",
+        "Coating Manual Station",
+        "Inspection Station"
+      ],
+      "process_count": 7,
+      "evaluation": {
+        "n": 6,
+        "M": 6,
+        "accuracy": 1.0,
+        "sequence_match": 1.0,
+        "generated_count": 7,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "원료 공급",
+            "gen_step": "Raw Material Feeding",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "연속 혼합",
+            "gen_step": "Blending",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "과립화",
+            "gen_step": "Granulation",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 3,
+            "gt_step": "건조",
+            "gen_step": "Drying",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 4,
+            "gt_step": "타정",
+            "gen_step": "Compression",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 5,
+            "gt_step": "코팅",
+            "gen_step": "Coating",
+            "similarity": 1.0
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 33.97
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "model": "o3-mini",
+      "model_id": "o3-mini",
+      "success": true,
+      "generated_processes": [
+        "Raw Material Preparation",
+        "Tire Building",
+        "Vulcanization",
+        "Inspection and Finishing"
+      ],
+      "generated_equipments": [
+        "Raw Material Workstation",
+        "Rubber Mixing Machine",
+        "Tire Assembly Robot",
+        "Assembly Workstation",
+        "Curing Press",
+        "Curing Workstation",
+        "Automated Inspection System",
+        "Inspection Workstation"
+      ],
+      "process_count": 4,
+      "evaluation": {
+        "n": 3,
+        "M": 6,
+        "accuracy": 0.5,
+        "sequence_match": 0.0,
+        "generated_count": 4,
+        "matches": [
+          {
+            "gt_idx": 1,
+            "gen_idx": 3,
+            "gt_step": "압출/압연",
+            "gen_step": "Inspection and Finishing",
+            "similarity": 0.455
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 1,
+            "gt_step": "성형",
+            "gen_step": "Tire Building",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 0,
+            "gt_step": "최종 검사",
+            "gen_step": "Raw Material Preparation",
+            "similarity": 0.5
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 26.31
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{kotex}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{url}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{GDP(Generative Digital-twin Prototyper): LLM 기반 공정 설계 자동화 및 분석 도구 연동 프레임워크}
+
+\author{\IEEEauthorblockN{이건창}
+\IEEEauthorblockA{\textit{DMC공학과} \\
+\textit{성균관대학교}\\
+수원, 대한민국 \\
+email@skku.edu}
+\and
+\IEEEauthorblockN{홍길동\textsuperscript{*}}
+\IEEEauthorblockA{\textit{DMC공학과} \\
+\textit{성균관대학교}\\
+수원, 대한민국 \\
+hwoo@skku.edu}
+}
+
+\maketitle
+
+\begin{abstract}
+스마트 인더스트리(Smart Industry)의 핵심 기술인 디지털 트윈 구현을 위해서는 정교한 제조 데이터와 이를 활용한 시뮬레이션 체계가 필수적이다. 그러나 제조 현장은 비전문가가 접근하기 어려운 데이터 폐쇄성과, 전문가가 직면하는 도구 간 인터페이스 파편화라는 이중의 장벽이 존재한다. 본 논문에서는 거대언어모델(LLM)을 기반으로 두 사용자 그룹의 문제를 동시에 해결하는 GDP(Generative Digital-twin Prototyper) 프레임워크를 제안한다. GDP는 첫째, 비전문가 및 연구자가 제조 지식 없이도 제로-샷(Zero-shot)으로 연구용 모의 공정 데이터를 생성할 수 있는 환경을 제공한다. 이는 휴머노이드 등 피지컬 AI(Physical AI) 연구를 위한 가상 테스트베드로 활용 가능하다. GDP는 이를 위해 지멘스(Siemens)가 제안한 BOP(Bill of Process) 개념을 채택하여 신뢰도 높은 공정 모델링을 수행한다. 둘째, 전문가 및 개발자가 시뮬레이션이나 최적화 도구를 연동할 때 발생하는 인터페이스 구축 비용을 LLM 기반 어댑터 자동 생성 및 Auto-Repair 메커니즘을 통해 획기적으로 낮춘다. 실험 결과, 10종 제품군에 대한 제로-샷 공정 생성에서 F1 88.9\%를 달성하여 비전문가의 데이터 확보 가능성을 입증하였으며, 전문가용 도구 연동 실험에서는 Auto-Repair를 통해 실행 통과율 100\%를 확보함과 동시에 16.2\%의 '조용한 실패(Silent Failure)' 현상을 규명하여 인터페이스 검증의 새로운 지표를 제시하였다.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Digital Twin, Smart Industry, Physical AI, Humanoid Testbed, Large Language Models (LLM), Bill of Process, Auto-Repair
+\end{IEEEkeywords}
+
+%% ============================================================
+\section{서론}
+%% ============================================================
+
+디지털 트윈 기술의 확산은 두 가지 사용자 그룹이 직면한 서로 다른 문제로 인해 정체되어 있다.
+
+첫째, \textbf{연구자 및 비전문가의 데이터 기아(Data Hunger)} 현상이다. 실제 제조 데이터는 기업 보안 자산으로 외부 연구용 활용이 극히 제한적이다. 특히 최근 주목받는 휴머노이드 등 피지컬 AI(Physical AI) 분야에서 로봇의 작업 지능을 학습시키기 위한 정교한 가상 환경의 수요가 급증하고 있으나, 비전문가들이 이러한 고해상도 공정 환경을 직접 구축하기에는 기술적 장벽이 존재한다.
+
+둘째, \textbf{엔지니어 및 전문가의 인터페이스 파편화} 문제이다. 설계된 공정 정보를 시뮬레이션이나 최적화 엔진으로 전달하기 위해서는 각 도구의 API와 스키마에 맞는 복잡한 어댑터 코드를 수작업으로 작성해야 한다. 이는 분석 도구 자체의 고도화보다 전처리 및 연동 작업에 더 많은 엔지니어링 리소스가 낭비되는 결과를 초래한다.
+
+본 연구는 LLM의 지식 추출 능력과 코드 생성 능력을 각각의 페르소나에 맞게 활용하는 GDP 프레임워크를 제안한다. 본 연구의 주요 기여는 다음과 같다:
+\begin{itemize}
+\item \textbf{비전문가용 데이터 프로토타이핑}: 자연어 명령만으로 지멘스(Siemens)의 BOP 구조를 준수하는 가상 공정 데이터를 생성하여, 피지컬 AI 학습을 위한 고충실도(High-fidelity) 테스트베드 부재 문제를 해결하였다.
+\item \textbf{전문가용 인터페이스 자동화}: 이기종 도구 연동을 위한 어댑터 코드를 자동 합성하고, 런타임 에러를 자가 복구하는 Auto-Repair 메커니즘을 통해 개발 효율성을 극대화하였다.
+\item \textbf{현장적 타당성 검증}: 전문가 및 비전문가 그룹의 작업 시간을 정량적으로 단축시킴과 동시에, 인터페이스 생성 시 발생할 수 있는 의미적 오류를 규명하였다.
+\end{itemize}
+
+%% ============================================================
+\section{관련 연구}
+%% ============================================================
+
+\subsection{디지털 트윈의 표준화 및 모델링 자동화}
+디지털 트윈은 물리적 자산의 가상 복제본으로서 시뮬레이션을 통해 최적의 의사결정을 지원한다~\cite{b1}. 최근 ISO 23247 표준은 제조 분야의 디지털 트윈 프레임워크를 제안하고 있으나, 이를 실제 현장에 적용하기 위해서는 여전히 숙련된 엔지니어의 높은 모델링 비용이 수반된다~\cite{b3, b4}. 기존의 온톨로지 기반 접근 방식은 제조 지식을 정형화하려 시도했으나, 사전에 정의된 규칙의 한계를 벗어나기 어렵고 복잡한 신규 시나리오에 유연하게 대응하지 못하는 한계가 있다~\cite{b5}.
+
+\subsection{거대언어모델(LLM)을 활용한 제조 지식 구조화}
+최근 GPT-4와 같은 LLM은 비정형 텍스트로부터 논리적 구조를 추출하는 데 뛰어난 성과를 보이고 있다~\cite{b6}. 특히 제조 도메인에서 작업 순서를 자동으로 추출하는 연구 등이 진행되고 있으나~\cite{b7}, 단순히 텍스트를 추출하는 수준을 넘어 지멘스(Siemens)의 BOP와 같은 체계적인 구조로 매핑하여 피지컬 AI 시뮬레이션 등과 즉각 연동하는 연구는 초기 단계이다~\cite{b8, b9}.
+
+\subsection{이기종 도구 통합 및 Auto-Repair 기술}
+공정 설계 데이터가 시뮬레이션이나 최적화 엔진으로 전달되는 과정에서의 '인터페이스 파편화'는 디지털 트윈 구축의 최대 병목이다~\cite{b10}. 최근 LLM의 코드 생성 능력을 활용하여 API 매핑 코드를 자동 합성하려는 시도가 활발하며~\cite{b12, b13}, 생성된 코드의 런타임 오류를 스스로 수정하는 'Auto-Repair' 메커니즘의 도입이 시스템 연동의 강건성을 확보하는 핵심 기술로 부상하고 있다~\cite{b14}.
+
+%% ============================================================
+\section{제안하는 GDP 프레임워크}
+%% ============================================================
+
+GDP 프레임워크는 사용자의 전문성과 목적에 따라 두 단계의 핵심 프로세스를 제공한다.
+
+\subsection{Step 1: 비전문가를 위한 연구용 데이터 생성}
+제조 지식이 부족한 연구자나 대학생 등의 비전문가는 LLM의 방대한 사전 지식을 활용한다. 사용자가 "전기차 배터리 공정을 생성해 줘"와 같은 추상적인 명령을 내리면, GDP는 이를 지멘스의 BOP 구조를 따르는 정밀한 JSON 데이터로 변환한다. 이 단계는 별도의 코딩이나 수동 설정 없이도 연구에 즉각 투입 가능한 수준의 모의 라인 데이터를 확보하는 데 목적이 있다. 특히 생성된 데이터는 3D 레이아웃으로 시각화되어, 휴머노이드 로봇의 경로 계획이나 작업 환경 인식을 연구하는 피지컬 AI 분야의 기초 테스트베드로 확장될 수 있다.
+
+\subsection{Step 2: 전문가를 위한 도구 연동 및 Auto-Repair}
+제조 인터페이스의 실질적 요구사항을 도출하기 위해, 공정 최적화 분야의 박사급 전문가(SME)를 대상으로 심층 인터뷰를 진행하였다. 이를 통해 GDP는 현업 전문가가 직면하는 인터페이스 장벽을 해결하기 위한 세 가지 핵심 기능을 제공한다.
+
+\subsubsection{기존 도구 어댑터 자동 생성}
+전문가가 기존에 보유한 분석 스크립트를 업로드하면, GDP는 소스 코드를 분석하여 BOP 데이터와의 어댑터를 생성한다. 현재 시스템은 표준적인 \texttt{argparse}를 통해 입력 JSON 파일을 읽고 결과 JSON을 출력하는 범용 인터페이스 구조를 지원하며, LLM은 업로드된 도구의 입출력 매개변수와 BOP 속성 간의 정밀한 매핑 로직을 작성한다.
+
+\subsubsection{AI 기반 분석 도구 합성}
+기존 도구가 없는 경우, 사용자의 분석 요구사항(예: "라인 밸런싱 최적화 도구를 만들어 줘")에 맞춰 LLM이 도구 본연의 분석 로직 자체를 자동으로 생성한다. 이는 전문가가 새로운 분석 시나리오를 빠르게 검증할 수 있는 프로토타이핑 환경을 제공한다.
+
+\subsubsection{스키마 기반 Human-in-the-loop 최적화 가이드}
+LLM이 해결하기 어려운 고난도 최적화 문제를 전문가가 직접 해결할 때, GDP는 전문가가 복잡한 BOP 데이터 구조를 직접 파싱하지 않도록 해당 분석에 최적화된 \textbf{입출력 데이터 스키마}만을 제안한다. 전문가는 제안된 경량화 스키마에 맞춰 로직을 구현하며, GDP는 이 스키마를 내부 BOP 데이터와 동기화하는 브릿지 코드를 자동으로 제공하여 전문가의 개발 부담을 최소화한다.
+
+도구 실행 중 발생하는 오류는 \textbf{Auto-Repair} 메커니즘을 통해 자가 수정되며, 이는 전문가가 인터페이스 디버깅보다 분석 알고리즘 고도화에만 집중할 수 있게 돕는다.
+
+%% ============================================================
+\section{실험 결과 및 분석}
+%% ============================================================
+
+\subsection{실험 1: 비전문가용 제로-샷 데이터 생성 성능}
+10종의 이종 제조 제품군을 대상으로 실시한 제로-샷 생성 실험에서, Gemini 2.5 Flash 모델이 F1 92.1\%로 가장 우수한 성능을 보였다. 특히 본 연구에서 제안한 \textbf{N:M 커버리지 기반 매칭}은 대형 모델이 수행하는 기술적 세분화를 정당하게 평가할 수 있음을 입증하였다(표 \ref{tab:gpt52_comparison}).
+
+\begin{table}[htbp]
+\caption{GPT-5.2 매칭 방법별 성능 비교}
+\label{tab:gpt52_comparison}
+\centering
+\begin{tabular}{l c c c}
+\hline
+\textbf{매칭 방법} & \textbf{Recall} & \textbf{Precision} & \textbf{F1} \\
+\hline
+1:1 Greedy       & 53.7\% & 37.1\% & 43.6\% \\
+N:M Coverage      & 64.1\% & 49.3\% & 54.9\% \\
+\hline
+\textbf{개선폭}  & \textbf{+10.4pp} & \textbf{+12.2pp} & \textbf{+11.3pp} \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{실험 2: 전문가용 연동 및 2단계 평가}
+Auto-Repair 메커니즘을 통해 실행 통과율은 100\%에 도달하였으나, 도메인 불변 조건을 활용한 출력 정확도 검증에서는 83.8\%의 성공률을 기록하였다(표 \ref{tab:two_tier}).
+
+\begin{table}[htbp]
+\caption{2단계 평가 결과 ($k=2$)}
+\label{tab:two_tier}
+\centering
+\begin{tabular}{c c c c}
+\hline
+$k$ & \textbf{실행 통과율} & \textbf{출력 정확률} & \textbf{격차} \\
+\hline
+0 & 80.0\%  & 98.4\% (63/64)  & 1.6\% \\
+2 & 100.0\% & 83.8\% (67/80)  & \textbf{16.2\%} \\
+\hline
+\end{tabular}
+\end{table}
+
+이 16.2\%의 격차는 '실행은 되지만 결과가 논리적으로 모순된' 상태인 \textbf{조용한 실패(Silent Failure)}를 의미하며, 인터페이스 자동화 시 도메인 검증 로직이 필수적임을 시사한다.
+
+%% ============================================================
+\section{결론}
+%% ============================================================
+본 연구는 GDP 프레임워크를 통해 비전문가의 피지컬 AI 연구용 데이터 확보와 전문가의 도구 연동 자동화 문제를 동시에 해결하였다. 특히 Auto-Repair를 통한 연동 강건성 확보와 2단계 평가를 통한 인터페이스 생성의 한계 규명은 디지털 트윈 자동화 분야에 중요한 기여를 할 것으로 기대된다.
+
+\section*{Acknowledgment}
+본 연구는 성균관대학교 DMC공학과의 지원을 받아 수행되었습니다.
+
+\begin{thebibliography}{00}
+\bibitem{b1} M. Grieves and J. Vickers, ``Digital twin,'' 2017.
+\bibitem{b3} ISO 23247-1:2021, ``Digital twin framework for manufacturing,'' 2021.
+\bibitem{b4} T. Uhlemann et al., ``The digital twin,'' 2017.
+\bibitem{b5} F. Ji et al., ``Ontology-based approach,'' 2022.
+\bibitem{b6} T. Brown et al., ``Language models are few-shot learners,'' 2020.
+\bibitem{b7} Siemens, ``BOP solution overview,'' 2023.
+\bibitem{b8} Y. Sui et al., ``Table meets LLM,'' 2024.
+\bibitem{b9} S. Hegselmann et al., ``TabLLM,'' 2022.
+\bibitem{b10} G. White et al., ``A digital twin smart city,'' 2021.
+\bibitem{b12} M. Chen et al., ``Evaluating LLMs trained on code,'' 2021.
+\bibitem{b13} N. Vandemoortele et al., ``Scalable table-to-KG matching,'' 2024.
+\bibitem{b14} Y. Brun et al., ``Engineering self-adaptive systems,'' 2013.
+\end{thebibliography}
+
+\end{document}

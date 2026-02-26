@@ -1,0 +1,209 @@
+% ============================================================
+% Gen-DT Paper Sections (English) — IEEE CASE 2026
+% Copy-paste ready for Overleaf (IEEE conference format)
+% ============================================================
+
+% ------------------------------------------------------------
+\section{THE PROPOSED FRAMEWORK}
+\label{sec:framework}
+% ------------------------------------------------------------
+
+This section presents the architecture and key components of the Generative Digital-Twin Prototyper (Gen-DT), a framework that leverages large language models (LLMs) to automatically generate structured Bill of Process (BOP) data for manufacturing line design.
+
+\subsection{System Overview}
+
+Gen-DT is a full-stack web application composed of three layers: (1)~a \textit{React-based frontend} with interactive 3D visualization, (2)~a \textit{FastAPI backend} that orchestrates LLM calls, post-processing, and data validation, and (3)~a \textit{pluggable LLM provider layer} that abstracts multiple generative AI services behind a unified interface.
+Fig.~\ref{fig:architecture} illustrates the overall system architecture.
+
+Given a natural-language description of a target product (e.g., ``EV battery cell manufacturing line''), Gen-DT produces a fully structured BOP in a single zero-shot LLM call.
+The BOP output includes ordered manufacturing processes, equipment, worker, and material assignments, predecessor/successor relationships forming a directed acyclic graph (DAG), and 3D spatial coordinates for digital-twin visualization.
+
+\subsection{BOP Data Model}
+
+The BOP data model is defined using Pydantic schemas and consists of the following entities:
+
+\begin{itemize}
+    \item \textbf{Process}: A single manufacturing step characterized by a unique process ID, name, description, cycle time, parallel count, predecessor/successor IDs, and a list of resources.
+    \item \textbf{Resource}: A typed reference (\texttt{equipment}, \texttt{worker}, or \texttt{material}) linking a process to a master-data entity with quantity, role, and relative 3D coordinates.
+    \item \textbf{Equipment}: Master data with equipment ID, name, and type (\texttt{robot}, \texttt{machine}, or \texttt{manual\_station}).
+    \item \textbf{Worker / Material}: Master data for human operators and raw materials, respectively.
+\end{itemize}
+
+The data model enforces referential integrity across all entities and detects cyclic dependencies in the process DAG through depth-first search (DFS) traversal.
+
+\subsection{LLM Provider Abstraction}
+
+To enable model-agnostic BOP generation, Gen-DT introduces a provider abstraction layer.
+An abstract base class \texttt{BaseLLMProvider} defines three core methods: \texttt{generate()}, \texttt{generate\_json()}, and \texttt{generate\_with\_retry()}.
+Concrete implementations for Google Gemini (REST API) and OpenAI (SDK-based) inherit from this base class.
+A factory function \texttt{get\_provider(model)} dynamically instantiates the appropriate provider based on the model identifier (e.g., \texttt{gemini-2.5-flash}, \texttt{gpt-4o}).
+This design allows seamless switching between LLM backends without modifying the generation pipeline.
+
+\subsection{BOP Generation Pipeline}
+\label{subsec:pipeline}
+
+The BOP generation pipeline consists of six sequential stages:
+
+\begin{enumerate}
+    \item \textbf{Prompt Construction}: A domain-specific system prompt, which instructs the LLM to act as a manufacturing process engineer, is concatenated with the user's natural-language request. The system prompt specifies the JSON output schema, resource typing rules, and validation constraints.
+
+    \item \textbf{LLM Inference}: The constructed prompt is sent to the selected LLM provider with deterministic decoding (temperature $= 0.0$). The framework supports up to three automatic retries upon JSON parsing failure.
+
+    \item \textbf{Manual Station Enforcement}: A post-processing step (\texttt{ensure\_manual\_stations}) scans every process and automatically injects a \texttt{manual\_station}-type equipment if the process contains workers or robots but lacks a workstation. This rule encodes a manufacturing best practice that every human or robotic operation requires a physical workstation.
+
+    \item \textbf{Resource Ordering}: Resources within each process are sorted into a canonical order: robot $\rightarrow$ machine $\rightarrow$ manual station $\rightarrow$ worker $\rightarrow$ material. This deterministic ordering ensures consistent 3D layouts and facilitates downstream analysis.
+
+    \item \textbf{DAG-based Automatic Layout}: Process coordinates are computed using topological-sort-based level assignment. Root processes (no predecessors) are placed at level~0; each subsequent process is placed at the maximum predecessor level $+1$. Within a level, processes are distributed along the Z-axis with uniform spacing. Resource coordinates are assigned relative to their parent process along the Z-axis.
+
+    \item \textbf{Validation}: The complete BOP undergoes Pydantic schema validation, referential integrity checks (all resource IDs must exist in master data), and DAG cycle detection via DFS.
+\end{enumerate}
+
+\subsection{Unified Conversational Interface}
+
+Gen-DT provides a unified chat endpoint (\texttt{/api/chat/unified}) that supports three interaction modes in a single API:
+
+\begin{itemize}
+    \item \textbf{BOP Creation}: When no current BOP exists, the system generates a new BOP from the user's description.
+    \item \textbf{BOP Modification}: When a current BOP is provided, the system modifies it according to the user's instruction while preserving existing spatial coordinates for unmodified elements.
+    \item \textbf{Question Answering (QA)}: The system answers analytical questions about the current BOP (e.g., bottleneck identification) without altering the BOP data.
+\end{itemize}
+
+This design enables iterative, conversational refinement of the manufacturing line design.
+
+\subsection{Tool Integration Module}
+
+Gen-DT includes a tool management subsystem that enables domain experts to register, execute, and iteratively improve custom simulation scripts (e.g., line balancing, throughput analysis).
+Each tool undergoes a four-stage lifecycle:
+
+\begin{enumerate}
+    \item \textbf{Analyze}: An LLM automatically infers the input/output schema from uploaded Python scripts.
+    \item \textbf{Register}: An adapter layer is LLM-generated to bridge the BOP data model and the tool's native I/O format.
+    \item \textbf{Execute}: The tool is executed against the current BOP data with user-specified parameters.
+    \item \textbf{Improve}: Based on user feedback and execution results, the LLM proposes modifications to the adapter, parameters, or script.
+\end{enumerate}
+
+% ------------------------------------------------------------
+\section{EXPERIMENTS}
+\label{sec:experiments}
+% ------------------------------------------------------------
+
+This section evaluates the zero-shot BOP generation capability of Gen-DT across five commercial LLMs using ten manufacturing product benchmarks.
+
+\subsection{Experimental Setup}
+
+\subsubsection{Ground Truth}
+
+We constructed a ground-truth dataset of ten representative manufacturing products spanning diverse industries: EV battery cells (P01), automotive body-in-white (P02), smartphone SMT (P03), semiconductor backend packaging (P04), solar PV module assembly (P05), EV motor hairpin stators (P06), OLED display panels (P07), household washing machines (P08), pharmaceutical tablet manufacturing (P09), and tire manufacturing (P10).
+Each product is annotated with an ordered list of BOP steps (6--11 steps per product) and associated equipment in both Korean and English.
+
+\subsubsection{Models Under Test}
+
+Five LLMs were evaluated:
+\begin{enumerate}
+    \item \textbf{Gemini 2.5 Flash} (Google, \texttt{gemini-2.5-flash})
+    \item \textbf{GPT-5 Mini} (OpenAI, \texttt{gpt-5-mini})
+    \item \textbf{GPT-4o} (OpenAI, \texttt{gpt-4o})
+    \item \textbf{GPT-4o Mini} (OpenAI, \texttt{gpt-4o-mini})
+    \item \textbf{o3-mini} (OpenAI, \texttt{o3-mini})
+\end{enumerate}
+
+All models were called with temperature $= 0.0$ for reproducibility, using Gen-DT's actual system prompt (\texttt{SYSTEM\_PROMPT} from \texttt{app/prompts.py}).
+
+\subsubsection{Evaluation Metrics}
+
+We employ two complementary metrics:
+
+\begin{itemize}
+    \item \textbf{$n/M$ Accuracy}: Let $M$ be the number of ground-truth BOP steps. A generated process name is considered a \textit{match} if its maximum fuzzy similarity (across Korean and English ground truth) exceeds a threshold $\tau = 0.4$. The similarity function combines keyword-level Jaccard similarity and character-level SequenceMatcher ratio. The accuracy is $n/M$, where $n$ is the number of matched steps under greedy bipartite matching.
+
+    \item \textbf{Sequence Match}: Among the $n$ matched steps, we compute the fraction of correctly ordered pairs. Formally, given matched pairs $(g_1, g_2, \ldots, g_n)$ with corresponding generated indices $(i_1, i_2, \ldots, i_n)$, the sequence match is:
+    \begin{equation}
+        \text{SeqMatch} = \frac{\sum_{j < k} \mathbf{1}[i_j < i_k]}{\binom{n}{2}}
+    \end{equation}
+\end{itemize}
+
+\subsection{Results}
+
+Table~\ref{tab:model_averages} presents the model-level aggregated results across all ten products.
+
+\begin{table}[htbp]
+\centering
+\caption{Model-level performance averages across 10 products.}
+\label{tab:model_averages}
+\begin{tabular}{lcccc}
+\hline
+\textbf{Model} & \textbf{Acc.(\%)} & \textbf{Seq.(\%)} & \textbf{Gen.} & \textbf{Lat.(s)} \\
+\hline
+Gemini 2.5 Flash & \textbf{81.2} & 75.8 & 9.1 & 31.4 \\
+GPT-5 Mini       & 67.8 & 82.6 & 8.9 & 85.7 \\
+o3-mini           & 51.8 & \textbf{83.3} & 4.7 & 29.3 \\
+GPT-4o            & 40.3 & 73.3 & 4.2 & \textbf{12.1} \\
+GPT-4o Mini       & 29.9 & 76.7 & 3.5 & 25.6 \\
+\hline
+\end{tabular}
+\begin{tablenotes}
+\small
+\item Acc.: $n/M$ Accuracy; Seq.: Sequence Match; Gen.: Average number of generated processes; Lat.: Average latency in seconds. All models achieved 100\% success rate.
+\end{tablenotes}
+\end{table}
+
+Table~\ref{tab:product_results} reports the per-product accuracy for each model.
+
+\begin{table}[htbp]
+\centering
+\caption{Per-product $n/M$ accuracy (\%) by model.}
+\label{tab:product_results}
+\begin{tabular}{lccccc}
+\hline
+\textbf{Product} & \textbf{Gemini} & \textbf{GPT-5m} & \textbf{o3m} & \textbf{4o} & \textbf{4om} \\
+\hline
+P01 (Battery)    & \textbf{100.0} & 90.9 & 45.5 & 27.3 & 36.4 \\
+P02 (BIW)        & 50.0  & \textbf{75.0} & 50.0 & 25.0 & 25.0 \\
+P03 (SMT)        & \textbf{71.4} & \textbf{71.4} & 42.9 & 42.9 & 28.6 \\
+P04 (Semi.)      & \textbf{71.4} & 57.1 & 57.1 & 42.9 & 42.9 \\
+P05 (Solar)      & \textbf{100.0} & 62.5 & 37.5 & 50.0 & 12.5 \\
+P06 (Motor)      & \textbf{66.7} & \textbf{66.7} & 44.4 & 22.2 & 44.4 \\
+P07 (OLED)       & \textbf{85.7} & 71.4 & 57.1 & 42.9 & 42.9 \\
+P08 (Washer)     & \textbf{83.3} & 50.0 & 33.3 & 50.0 & 16.7 \\
+P09 (Pharma.)    & 83.3 & 33.3 & \textbf{100.0} & 50.0 & 16.7 \\
+P10 (Tire)       & \textbf{100.0} & \textbf{100.0} & 50.0 & 50.0 & 33.3 \\
+\hline
+\textbf{Average} & \textbf{81.2} & 67.8 & 51.8 & 40.3 & 29.9 \\
+\hline
+\end{tabular}
+\begin{tablenotes}
+\small
+\item Gemini: Gemini 2.5 Flash; GPT-5m: GPT-5 Mini; o3m: o3-mini; 4o: GPT-4o; 4om: GPT-4o Mini.
+\end{tablenotes}
+\end{table}
+
+\subsection{Analysis}
+
+\subsubsection{Process Granularity and Accuracy}
+
+A strong positive correlation is observed between the number of generated processes and $n/M$ accuracy.
+Gemini 2.5 Flash and GPT-5 Mini generated an average of 9.1 and 8.9 processes, respectively, closely matching the ground-truth average of 7.5 steps.
+In contrast, GPT-4o, GPT-4o Mini, and o3-mini generated only 3.5--4.7 processes on average, producing overly abstract representations that missed critical manufacturing steps.
+This suggests that a model's ability to decompose manufacturing workflows into fine-grained steps is a key differentiator for BOP generation quality.
+
+\subsubsection{Sequence Consistency}
+
+Despite its lower accuracy, o3-mini achieved the highest sequence match (83.3\%), followed by GPT-5 Mini (82.6\%).
+This indicates that reasoning-optimized models tend to preserve correct process ordering even when their step coverage is limited.
+Conversely, Gemini 2.5 Flash, while achieving the highest accuracy, showed relatively lower sequence consistency (75.8\%), suggesting that generating more steps introduces occasional ordering errors.
+
+\subsubsection{Latency--Quality Tradeoff}
+
+GPT-4o exhibited the lowest latency (12.1\,s) but the fourth-lowest accuracy, while GPT-5 Mini showed the highest latency (85.7\,s) with the second-highest accuracy.
+Gemini 2.5 Flash presents the most favorable tradeoff, achieving the highest accuracy (81.2\%) with moderate latency (31.4\,s), making it the most suitable backbone for real-time interactive applications.
+
+\subsubsection{Domain Difficulty}
+
+Products with standardized, well-documented manufacturing processes (P10: Tire, P09: Pharmaceutical) exhibited higher accuracy across all models.
+Specialized or less-standardized domains (P02: Body-in-White, P04: Semiconductor Backend, P06: Hairpin Stator) proved more challenging, with most models scoring below 60\%.
+This highlights the importance of domain-specific prompt engineering or retrieval-augmented generation (RAG) for niche manufacturing domains.
+
+\subsubsection{Best-in-Class Results}
+
+Gemini 2.5 Flash achieved perfect accuracy (100\%) on three products (P01, P05, P10), demonstrating that zero-shot LLM-based BOP generation can match expert-level process knowledge for well-known product types.
+GPT-5 Mini was the only model to outperform Gemini on P02 (Body-in-White), suggesting complementary strengths across model families.

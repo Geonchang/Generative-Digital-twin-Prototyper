@@ -1,0 +1,847 @@
+{
+  "project_title": "Bicycle Assembly Line",
+  "target_uph": 20,
+  "processes": [
+    {
+      "process_id": "P001",
+      "predecessor_ids": [],
+      "successor_ids": [
+        "P002"
+      ],
+      "parallel_count": 3
+    },
+    {
+      "process_id": "P002",
+      "predecessor_ids": [
+        "P001"
+      ],
+      "successor_ids": [
+        "P003"
+      ],
+      "parallel_count": 3
+    },
+    {
+      "process_id": "P003",
+      "predecessor_ids": [
+        "P002"
+      ],
+      "successor_ids": [
+        "P004"
+      ],
+      "parallel_count": 2
+    },
+    {
+      "process_id": "P004",
+      "predecessor_ids": [
+        "P003"
+      ],
+      "successor_ids": [
+        "P005"
+      ],
+      "parallel_count": 2
+    },
+    {
+      "process_id": "P005",
+      "predecessor_ids": [
+        "P004"
+      ],
+      "successor_ids": [
+        "P006"
+      ],
+      "parallel_count": 1
+    },
+    {
+      "process_id": "P006",
+      "predecessor_ids": [
+        "P005"
+      ],
+      "successor_ids": [],
+      "parallel_count": 2
+    }
+  ],
+  "process_details": [
+    {
+      "process_id": "P001",
+      "parallel_index": 1,
+      "name": "Frame Assembly",
+      "description": "Assemble main frame, fork, and headset components.",
+      "cycle_time_sec": 150,
+      "location": {
+        "x": 0,
+        "y": 0,
+        "z": -0.09999999999999998
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1.7,
+        "depth": 2.4
+      }
+    },
+    {
+      "process_id": "P002",
+      "parallel_index": 1,
+      "name": "Wheel Building & Installation",
+      "description": "Lace and true wheels, install tires, and mount wheels to frame.",
+      "cycle_time_sec": 180,
+      "location": {
+        "x": 3,
+        "y": 0,
+        "z": -0.09999999999999998
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1.7,
+        "depth": 2.4
+      }
+    },
+    {
+      "process_id": "P003",
+      "parallel_index": 1,
+      "name": "Drivetrain Installation",
+      "description": "Install crankset, chain, derailleur(s), and cassette/freewheel.",
+      "cycle_time_sec": 120,
+      "location": {
+        "x": 6,
+        "y": 0,
+        "z": -0.09999999999999998
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1.7,
+        "depth": 2.4
+      }
+    },
+    {
+      "process_id": "P004",
+      "parallel_index": 1,
+      "name": "Brake System Installation",
+      "description": "Install brake calipers/discs, levers, and route cables.",
+      "cycle_time_sec": 90,
+      "location": {
+        "x": 9,
+        "y": 0,
+        "z": -0.09999999999999998
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1.7,
+        "depth": 2.4
+      }
+    },
+    {
+      "process_id": "P005",
+      "parallel_index": 1,
+      "name": "Handlebar & Seat Installation",
+      "description": "Install handlebars, stem, seat post, and saddle.",
+      "cycle_time_sec": 60,
+      "location": {
+        "x": 12,
+        "y": 0,
+        "z": -0.09999999999999998
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1.7,
+        "depth": 2.4
+      }
+    },
+    {
+      "process_id": "P006",
+      "parallel_index": 1,
+      "name": "Final Inspection & Packaging",
+      "description": "Perform final adjustments, quality checks, and package the bicycle.",
+      "cycle_time_sec": 100,
+      "location": {
+        "x": 15,
+        "y": 0,
+        "z": -0.09999999999999998
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1.7,
+        "depth": 2.4
+      }
+    },
+    {
+      "process_id": "P001",
+      "parallel_index": 2,
+      "name": "Frame Assembly",
+      "description": "Assemble main frame, fork, and headset components.",
+      "cycle_time_sec": 150,
+      "location": {
+        "x": 0,
+        "y": 0,
+        "z": 3
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 0.5,
+        "height": 0.5,
+        "depth": 0.5
+      }
+    },
+    {
+      "process_id": "P001",
+      "parallel_index": 3,
+      "name": "Frame Assembly",
+      "description": "Assemble main frame, fork, and headset components.",
+      "cycle_time_sec": 150,
+      "location": {
+        "x": 0,
+        "y": 0,
+        "z": 6
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 0.5,
+        "height": 0.5,
+        "depth": 0.5
+      }
+    },
+    {
+      "process_id": "P002",
+      "parallel_index": 2,
+      "name": "Wheel Building & Installation",
+      "description": "Lace and true wheels, install tires, and mount wheels to frame.",
+      "cycle_time_sec": 180,
+      "location": {
+        "x": 3,
+        "y": 0,
+        "z": 3
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 0.5,
+        "height": 0.5,
+        "depth": 0.5
+      }
+    },
+    {
+      "process_id": "P002",
+      "parallel_index": 3,
+      "name": "Wheel Building & Installation",
+      "description": "Lace and true wheels, install tires, and mount wheels to frame.",
+      "cycle_time_sec": 180,
+      "location": {
+        "x": 3,
+        "y": 0,
+        "z": 6
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 0.5,
+        "height": 0.5,
+        "depth": 0.5
+      }
+    },
+    {
+      "process_id": "P003",
+      "parallel_index": 2,
+      "name": "Drivetrain Installation",
+      "description": "Install crankset, chain, derailleur(s), and cassette/freewheel.",
+      "cycle_time_sec": 120,
+      "location": {
+        "x": 6,
+        "y": 0,
+        "z": 3
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 0.5,
+        "height": 0.5,
+        "depth": 0.5
+      }
+    },
+    {
+      "process_id": "P004",
+      "parallel_index": 2,
+      "name": "Brake System Installation",
+      "description": "Install brake calipers/discs, levers, and route cables.",
+      "cycle_time_sec": 90,
+      "location": {
+        "x": 9,
+        "y": 0,
+        "z": 3
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 0.5,
+        "height": 0.5,
+        "depth": 0.5
+      }
+    },
+    {
+      "process_id": "P006",
+      "parallel_index": 2,
+      "name": "Final Inspection & Packaging",
+      "description": "Perform final adjustments, quality checks, and package the bicycle.",
+      "cycle_time_sec": 100,
+      "location": {
+        "x": 15,
+        "y": 0,
+        "z": 3
+      },
+      "rotation_y": 0,
+      "computed_size": {
+        "width": 0.5,
+        "height": 0.5,
+        "depth": 0.5
+      }
+    }
+  ],
+  "resource_assignments": [
+    {
+      "process_id": "P001",
+      "parallel_index": 1,
+      "resource_type": "equipment",
+      "resource_id": "EQ001",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": -0.8
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1,
+        "depth": 0.8
+      }
+    },
+    {
+      "process_id": "P001",
+      "parallel_index": 1,
+      "resource_type": "worker",
+      "resource_id": "W001",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 0.09999999999999998
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.5,
+        "height": 1.7,
+        "depth": 0.3
+      }
+    },
+    {
+      "process_id": "P001",
+      "parallel_index": 1,
+      "resource_type": "material",
+      "resource_id": "M001",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.4,
+        "height": 0.25,
+        "depth": 0.4
+      }
+    },
+    {
+      "process_id": "P002",
+      "parallel_index": 1,
+      "resource_type": "equipment",
+      "resource_id": "EQ002",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": -0.8
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1,
+        "depth": 0.8
+      }
+    },
+    {
+      "process_id": "P002",
+      "parallel_index": 1,
+      "resource_type": "worker",
+      "resource_id": "W002",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 0.09999999999999998
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.5,
+        "height": 1.7,
+        "depth": 0.3
+      }
+    },
+    {
+      "process_id": "P002",
+      "parallel_index": 1,
+      "resource_type": "material",
+      "resource_id": "M002",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.4,
+        "height": 0.25,
+        "depth": 0.4
+      }
+    },
+    {
+      "process_id": "P003",
+      "parallel_index": 1,
+      "resource_type": "equipment",
+      "resource_id": "EQ003",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": -0.8
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1,
+        "depth": 0.8
+      }
+    },
+    {
+      "process_id": "P003",
+      "parallel_index": 1,
+      "resource_type": "worker",
+      "resource_id": "W003",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 0.09999999999999998
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.5,
+        "height": 1.7,
+        "depth": 0.3
+      }
+    },
+    {
+      "process_id": "P003",
+      "parallel_index": 1,
+      "resource_type": "material",
+      "resource_id": "M003",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.4,
+        "height": 0.25,
+        "depth": 0.4
+      }
+    },
+    {
+      "process_id": "P004",
+      "parallel_index": 1,
+      "resource_type": "equipment",
+      "resource_id": "EQ004",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": -0.8
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1,
+        "depth": 0.8
+      }
+    },
+    {
+      "process_id": "P004",
+      "parallel_index": 1,
+      "resource_type": "worker",
+      "resource_id": "W004",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 0.09999999999999998
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.5,
+        "height": 1.7,
+        "depth": 0.3
+      }
+    },
+    {
+      "process_id": "P004",
+      "parallel_index": 1,
+      "resource_type": "material",
+      "resource_id": "M004",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.4,
+        "height": 0.25,
+        "depth": 0.4
+      }
+    },
+    {
+      "process_id": "P005",
+      "parallel_index": 1,
+      "resource_type": "equipment",
+      "resource_id": "EQ005",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": -0.8
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1,
+        "depth": 0.8
+      }
+    },
+    {
+      "process_id": "P005",
+      "parallel_index": 1,
+      "resource_type": "worker",
+      "resource_id": "W005",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 0.09999999999999998
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.5,
+        "height": 1.7,
+        "depth": 0.3
+      }
+    },
+    {
+      "process_id": "P005",
+      "parallel_index": 1,
+      "resource_type": "material",
+      "resource_id": "M005",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.4,
+        "height": 0.25,
+        "depth": 0.4
+      }
+    },
+    {
+      "process_id": "P006",
+      "parallel_index": 1,
+      "resource_type": "equipment",
+      "resource_id": "EQ006",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": -0.8
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 1.6,
+        "height": 1,
+        "depth": 0.8
+      }
+    },
+    {
+      "process_id": "P006",
+      "parallel_index": 1,
+      "resource_type": "worker",
+      "resource_id": "W006",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 0.09999999999999998
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.5,
+        "height": 1.7,
+        "depth": 0.3
+      }
+    },
+    {
+      "process_id": "P006",
+      "parallel_index": 1,
+      "resource_type": "material",
+      "resource_id": "M006",
+      "quantity": 1,
+      "relative_location": {
+        "x": 0,
+        "y": 0,
+        "z": 1
+      },
+      "role": null,
+      "rotation_y": 0,
+      "scale": null,
+      "computed_size": {
+        "width": 0.4,
+        "height": 0.25,
+        "depth": 0.4
+      }
+    }
+  ],
+  "equipments": [
+    {
+      "equipment_id": "EQ001",
+      "name": "Frame Assembly Station",
+      "type": "manual_station",
+      "specifications": null
+    },
+    {
+      "equipment_id": "EQ002",
+      "name": "Wheel & Tire Station",
+      "type": "manual_station",
+      "specifications": null
+    },
+    {
+      "equipment_id": "EQ003",
+      "name": "Drivetrain Assembly Station",
+      "type": "manual_station",
+      "specifications": null
+    },
+    {
+      "equipment_id": "EQ004",
+      "name": "Brake System Station",
+      "type": "manual_station",
+      "specifications": null
+    },
+    {
+      "equipment_id": "EQ005",
+      "name": "Finishing Station",
+      "type": "manual_station",
+      "specifications": null
+    },
+    {
+      "equipment_id": "EQ006",
+      "name": "Inspection & Packaging Station",
+      "type": "manual_station",
+      "specifications": null
+    }
+  ],
+  "workers": [
+    {
+      "worker_id": "W001",
+      "name": "Frame Assembler",
+      "skill_level": null,
+      "certifications": null
+    },
+    {
+      "worker_id": "W002",
+      "name": "Wheel & Tire Specialist",
+      "skill_level": null,
+      "certifications": null
+    },
+    {
+      "worker_id": "W003",
+      "name": "Drivetrain Assembler",
+      "skill_level": null,
+      "certifications": null
+    },
+    {
+      "worker_id": "W004",
+      "name": "Brake System Installer",
+      "skill_level": null,
+      "certifications": null
+    },
+    {
+      "worker_id": "W005",
+      "name": "Finishing Assembler",
+      "skill_level": null,
+      "certifications": null
+    },
+    {
+      "worker_id": "W006",
+      "name": "QC & Packer",
+      "skill_level": null,
+      "certifications": null
+    }
+  ],
+  "materials": [
+    {
+      "material_id": "M001",
+      "name": "Bicycle Frame Kit",
+      "unit": "set",
+      "specifications": null
+    },
+    {
+      "material_id": "M002",
+      "name": "Wheel Assembly Kit",
+      "unit": "set",
+      "specifications": null
+    },
+    {
+      "material_id": "M003",
+      "name": "Drivetrain Component Set",
+      "unit": "set",
+      "specifications": null
+    },
+    {
+      "material_id": "M004",
+      "name": "Brake System Kit",
+      "unit": "set",
+      "specifications": null
+    },
+    {
+      "material_id": "M005",
+      "name": "Handlebar & Seat Kit",
+      "unit": "set",
+      "specifications": null
+    },
+    {
+      "material_id": "M006",
+      "name": "Bicycle Packaging Kit",
+      "unit": "set",
+      "specifications": null
+    }
+  ],
+  "_parallel_optimization": {
+    "target_uph": 50,
+    "takt_time_sec": 72,
+    "optimization": [
+      {
+        "process_id": "P001",
+        "name": "Frame Assembly",
+        "cycle_time_sec": 150,
+        "current_parallel": 1,
+        "optimal_parallel": 3,
+        "current_eff_ct": 150,
+        "optimized_eff_ct": 50,
+        "changed": true
+      },
+      {
+        "process_id": "P002",
+        "name": "Wheel Building & Installation",
+        "cycle_time_sec": 180,
+        "current_parallel": 1,
+        "optimal_parallel": 3,
+        "current_eff_ct": 180,
+        "optimized_eff_ct": 60,
+        "changed": true
+      },
+      {
+        "process_id": "P003",
+        "name": "Drivetrain Installation",
+        "cycle_time_sec": 120,
+        "current_parallel": 1,
+        "optimal_parallel": 2,
+        "current_eff_ct": 120,
+        "optimized_eff_ct": 60,
+        "changed": true
+      },
+      {
+        "process_id": "P004",
+        "name": "Brake System Installation",
+        "cycle_time_sec": 90,
+        "current_parallel": 1,
+        "optimal_parallel": 2,
+        "current_eff_ct": 90,
+        "optimized_eff_ct": 45,
+        "changed": true
+      },
+      {
+        "process_id": "P005",
+        "name": "Handlebar & Seat Installation",
+        "cycle_time_sec": 60,
+        "current_parallel": 1,
+        "optimal_parallel": 1,
+        "current_eff_ct": 60,
+        "optimized_eff_ct": 60,
+        "changed": false
+      },
+      {
+        "process_id": "P006",
+        "name": "Final Inspection & Packaging",
+        "cycle_time_sec": 100,
+        "current_parallel": 1,
+        "optimal_parallel": 2,
+        "current_eff_ct": 100,
+        "optimized_eff_ct": 50,
+        "changed": true
+      }
+    ],
+    "summary": {
+      "total_current_parallel": 6,
+      "total_optimal_parallel": 13,
+      "additional_lines_needed": 7,
+      "achieved_uph": 60,
+      "line_efficiency_pct": 75.23
+    }
+  }
+}

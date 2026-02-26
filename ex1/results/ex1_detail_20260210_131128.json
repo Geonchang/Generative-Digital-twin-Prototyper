@@ -1,0 +1,1544 @@
+{
+  "experiment": "Ex1 Zero-shot BOP Generation",
+  "timestamp": "2026-02-10T13:11:28.910942",
+  "config": {
+    "temperature": 0.0,
+    "similarity_threshold": 0.4,
+    "models": [
+      "gemini-2.5-flash",
+      "gpt-4o"
+    ],
+    "products": [
+      "P01",
+      "P02",
+      "P03",
+      "P04",
+      "P05",
+      "P06",
+      "P07",
+      "P08",
+      "P09",
+      "P10"
+    ]
+  },
+  "results": [
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": false,
+      "generated_steps": [
+        {
+          "step_name": "1. 전극 코팅 및 건조 (Electrode Coating & Drying)",
+          "description": "양극 및 음극 슬러리를 각각 알루미늄 및 구리 집전체 포일에 정밀하게 도포하고 건조하여 용매를 제거합니다.",
+          "equipment": [
+            "정밀 코터 (Precision Coater: Slot Die Coater 또는 Comma Bar Coater)",
+            "다중 구역 건조 오븐 (Multi-zone Drying Oven: Hot Air 또는 IR)",
+            "롤투롤 권취/풀림 장치 (Roll-to-Roll Winder/Unwinder)",
+            "장력 제어 시스템 (Tension Control System)",
+            "슬러리 공급 시스템 (Slurry Feeding System)"
+          ]
+        },
+        {
+          "step_name": "2. 전극 압연 (Electrode Calendering)",
+          "description": "건조된 전극을 압연하여 원하는 두께와 밀도를 확보하고 전극 활물질의 접착력을 향상시킵니다.",
+          "equipment": [
+            "정밀 압연기 (Precision Calendering Machine: Roller Press)",
+            "가열/냉각 시스템 (Heating/Cooling System)",
+            "장력 제어 시스템 (Tension Control System)"
+          ]
+        },
+        {
+          "step_name": "3. 전극 슬리팅 및 노칭 (Electrode Slitting & Notching)",
+          "description": "압연된 광폭 전극을 셀 설계에 맞는 폭으로 자르고, 탭(Tab)을 형성하기 위해 노칭(Notching) 작업을 수행합니다.",
+          "equipment": [
+            "정밀 슬리팅 머신 (Precision Slitting Machine: Rotary Blade)",
+            "레이저 노칭 머신 또는 기계식 다이 노칭 머신 (Laser Notching Machine or Mechanical Die Notching Machine)",
+            "분진 제거 시스템 (Dust Collection System)"
+          ]
+        },
+        {
+          "step_name": "4. 전극 진공 건조 (Pre-Assembly Vacuum Drying)",
+          "description": "슬리팅 및 노칭된 전극에서 잔류 수분을 제거하여 후속 공정에서의 불량 발생을 최소화합니다. (드라이룸 환경 필수)",
+          "equipment": [
+            "연속식 진공 건조 오븐 (Continuous Vacuum Drying Oven)",
+            "자동 로딩/언로딩 시스템 (Automatic Loading/Unloading System)",
+            "드라이룸 환경 (Dehumidified Dry Room)"
+          ]
+        },
+        {
+          "step_name": "5. 셀 스태킹/와인딩 (Cell Stacking/Winding)",
+          "description": "양극, 분리막, 음극을 번갈아 쌓거나(스태킹) 감아서(와인딩) 배터리 셀의 핵심인 전극 조립체를 형성합니다.",
+          "equipment": [
+            "자동 스태킹 머신 (Automatic Stacking Machine: Z-folding 또는 Lamination Type) 또는 자동 와인딩 머신 (Automatic Winding Machine)",
+            "비전 검사 시스템 (Vision Inspection System)",
+            "정전기 방지 시스템 (Static Electricity Control System)",
+            "드라이룸 환경 (Dehumidified Dry Room)"
+          ]
+        },
+        {
+          "step_name": "6. 탭 용접 (Tab Welding)",
+          "description": "전극 조립체의 집전체 탭과 외부 리드 탭을 용접하여 전기적 연결을 확보합니다.",
+          "equipment": [
+            "초음파 용접기 또는 레이저 용접기 (Ultrasonic Welder or Laser Welder)",
+            "자동 탭 공급 및 정렬 시스템 (Automatic Tab Feeding & Alignment System)",
+            "용접 품질 검사 시스템 (Weld Quality Inspection System)"
+          ]
+        },
+        {
+          "step_name": "7. 파우치 성형 및 초기 실링 (Pouch Forming & Initial Sealing)",
+          "description": "알루미늄 라미네이트 필름을 파우치 형태로 성형하고, 전극 조립체를 삽입한 후 3면을 실링합니다. (파우치 셀 기준)",
+          "equipment": [
+            "파우치 성형기 (Pouch Forming Machine)",
+            "자동 셀 삽입 장치 (Automatic Cell Insertion Device)",
+            "진공 열 실링 머신 (Vacuum Heat Sealing Machine: 3-side Sealing)",
+            "실링 품질 검사 시스템 (Sealing Quality Inspection System)"
+          ]
+        },
+        {
+          "step_name": "8. 전해액 주입 및 함침 (Electrolyte Filling & Impregnation)",
+          "description": "셀 내부에 정량의 전해액을 주입하고, 진공 상태에서 전해액이 전극 및 분리막에 충분히 스며들도록 함침시킵니다. (드라이룸 환경 필수)",
+          "equipment": [
+            "정밀 전해액 주입기 (Precision Electrolyte Filling Machine: Syringe Pump or Gear Pump)",
+            "진공 함침 챔버 (Vacuum Impregnation Chamber)",
+            "전해액 공급 및 회수 시스템 (Electrolyte Supply & Recovery System)",
+            "드라이룸 환경 (Dehumidified Dry Room)"
+          ]
+        },
+        {
+          "step_name": "9. 최종 실링 (Final Sealing)",
+          "description": "전해액 주입 후 남아있는 마지막 개방면을 진공 상태에서 실링하여 셀을 밀봉합니다.",
+          "equipment": [
+            "진공 열 실링 머신 (Vacuum Heat Sealing Machine: Final Sealing)",
+            "실링 품질 및 외관 검사 시스템 (Sealing Quality & Appearance Inspection System)"
+          ]
+        },
+        {
+          "step_name": "10. 화성 공정 (Formation Process)",
+          "description": "초기 충방전 사이클을 통해 전극 표면에 안정적인 SEI(Solid Electrolyte Interphase) 층을 형성하고, 셀을 활성화시킵니다.",
+          "equipment": [
+            "다채널 화성 장비 (Multi-channel Formation Cycler: Precision Current/Voltage Control)",
+            "온도 제어 챔버 (Temperature Controlled Chamber)",
+            "데이터 로깅 및 분석 시스템 (Data Logging & Analysis System)"
+          ]
+        },
+        {
+          "step_name": "11. 디개싱 및 재실링 (Degassing & Re-sealing)",
+          "description": "화성 공정 중 발생한 가스를 제거하고, 필요한 경우 셀을 다시 밀봉합니다. (일부 셀 디자인에서는 생략 가능)",
+          "equipment": [
+            "자동 디개싱 머신 (Automatic Degassing Machine: Vacuum Chamber, Gas Collection)",
+            "재실링 머신 (Re-sealing Machine: Heat Sealer)",
+            "가스 분석 시스템 (Gas Analysis System)"
+          ]
+        },
+        {
+          "step_name": "12. 에이징/숙성 (Aging/Rest)",
+          "description": "화성 공정 후 셀 내부의 화학적, 전기적 안정화를 위해 일정 시간 동안 휴지(Rest) 상태를 유지합니다.",
+          "equipment": [
+            "온도 및 습도 제어 에이징 챔버 (Temperature & Humidity Controlled Aging Chamber)",
+            "자동 셀 이송 시스템 (Automatic Cell Conveyor System)"
+          ]
+        },
+        {
+          "step_name": "13. 성능 검사 및 등급 분류 (Performance Testing & Grading)",
+          "description": "개방 회로 전압(OCV), 내부 저항(IR), 용량(Capacity) 등 핵심 성능 지표를 측정하고, 셀을 등급별로 분류합니다.",
+          "equipment": [
+            "OCV/IR 측정 장비 (OCV/IR Tester)",
+            "용량 측정 장비 (Capacity Tester: Charge/Discharge Cycler)",
+            "온도 제어 챔버 (Temperature Controlled Chamber)",
+            "자동 셀 분류기 (Automatic Cell Sorter)",
+            "데이터 관리 및 분석 시스템 (Data Management & Analysis System)"
+          ]
+        },
+        {
+          "step_name": "14. 최종 포장 (Final Packaging)",
+          "description": "등급 분류된 셀을 출하를 위해 최종 포장합니다.",
+          "equipment": [
+            "자동 라벨링 머신 (Automatic Labeling Machine)",
+            "자동 포장 머신 (Automatic Packaging Machine: Tray/Box Packing)",
+            "바코드/QR 코드 스캐너 (Barcode/QR Code Scanner)",
+            "컨베이어 시스템 (Conveyor System)"
+          ]
+        }
+      ],
+      "generated_equipment": [],
+      "evaluation": null,
+      "error": "AttributeError: 'dict' object has no attribute 'lower'",
+      "latency_sec": 20.02
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": false,
+      "generated_steps": [
+        {
+          "step_name": "1. 스탬핑 부품 입고 및 분류 (Stamped Parts Receiving & Sorting)",
+          "description": "프레스 공장에서 생산된 다양한 스탬핑 부품(패널, 보강재 등)을 입고하고, 생산 계획에 따라 적절한 조립 라인으로 공급하기 위해 분류 및 보관하는 단계입니다.",
+          "essential_equipment": [
+            "자동화된 창고 시스템 (AS/RS)",
+            "지게차 및 AGV (Automated Guided Vehicle)",
+            "부품 팔레트 및 랙",
+            "바코드/RFID 스캐너 및 재고 관리 시스템"
+          ]
+        },
+        {
+          "step_name": "2. 언더바디 서브 어셈블리 (Underbody Sub-Assembly)",
+          "description": "차체의 하부 구조를 형성하는 단계로, 플로어 패널, 사이드 멤버, 크로스 멤버, 휠 하우스 등 여러 스탬핑 부품을 용접 및 접착하여 언더바디의 주요 모듈을 조립합니다.",
+          "essential_equipment": [
+            "다축 용접 로봇 (스폿 용접, 레이저 용접, MIG/MAG 용접)",
+            "정밀 용접 지그 및 픽스처 (Reconfigurable Fixtures)",
+            "자동 부품 공급 장치 (Part Feeder)",
+            "접착제 도포 로봇 (Adhesive Dispensing Robot)",
+            "컨베이어 시스템 (스키드 컨베이어, 슬랫 컨베이어)"
+          ]
+        },
+        {
+          "step_name": "3. 사이드 프레임 서브 어셈블리 (Side Frame Sub-Assembly)",
+          "description": "차체의 좌우 측면 구조를 형성하는 단계로, 아웃터/이너 패널, 필러(A, B, C), 로커 패널 등을 용접 및 접착하여 사이드 프레임 모듈을 조립합니다. 도어 프레임의 헴밍(Hemming) 공정이 포함될 수 있습니다.",
+          "essential_equipment": [
+            "다축 용접 로봇 (스폿 용접, 레이저 용접)",
+            "정밀 용접 지그 및 픽스처",
+            "자동 부품 공급 장치",
+            "접착제 도포 로봇",
+            "헴밍 로봇 (Hemming Robot) 또는 롤러 헴밍 장비 (Roller Hemming Equipment)",
+            "컨베이어 시스템"
+          ]
+        },
+        {
+          "step_name": "4. 루프 및 프론트 엔드 서브 어셈블리 (Roof & Front End Sub-Assembly)",
+          "description": "루프 패널과 루프 레일, 그리고 엔진룸을 구성하는 프론트 엔드 모듈(라디에이터 서포트, 펜더 에이프런 등)을 조립하는 단계입니다. 루프의 경우 레이저 브레이징(Laser Brazing)이 사용될 수 있습니다.",
+          "essential_equipment": [
+            "다축 용접 로봇 (스폿 용접, 레이저 용접/브레이징)",
+            "정밀 용접 지그 및 픽스처",
+            "접착제 도포 로봇",
+            "컨베이어 시스템"
+          ]
+        },
+        {
+          "step_name": "5. 메인 바디 프레이밍 (Main Body Framing / Geo-Station)",
+          "description": "언더바디, 좌우 사이드 프레임, 루프, 프론트 엔드 등 주요 서브 어셈블리를 하나의 정밀한 지그(Geo-Station)에 고정하고, 초기 용접을 통해 차체의 기본 골격을 형성하는 가장 중요한 단계입니다. 차체의 치수 정확도가 결정됩니다.",
+          "essential_equipment": [
+            "고정밀 프레이밍 지그 (Reconfigurable Framing Fixture)",
+            "다수의 다축 용접 로봇 (스폿 용접, 레이저 용접)",
+            "자동 클램핑 시스템 (Automated Clamping System)",
+            "비전 시스템 (Vision System)을 이용한 부품 정렬 및 검증",
+            "중하중 컨베이어 시스템"
+          ]
+        },
+        {
+          "step_name": "6. 최종 용접 및 보강 (Final Welding & Reinforcement)",
+          "description": "메인 바디 프레이밍 이후, 차체 전체의 구조적 강성을 확보하기 위해 수천 개의 추가적인 스폿 용접, 아크 용접, 레이저 용접 및 구조용 접착제 도포를 수행하는 단계입니다.",
+          "essential_equipment": [
+            "다수의 다축 용접 로봇 (스폿 용접, 아크 용접, 레이저 용접)",
+            "접착제 도포 로봇",
+            "자동 용접 건 교환 시스템 (Automatic Gun Changer)",
+            "컨베이어 시스템 (오버헤드 컨베이어, 스키드 컨베이어)"
+          ]
+        },
+        {
+          "step_name": "7. 클로저 패널 조립 (Closure Panel Assembly)",
+          "description": "도어, 후드, 트렁크 리드 등 개폐 가능한 패널들을 차체에 장착하고, 힌지 볼팅, 간극 및 단차 조정을 통해 최종적인 외관 품질을 확보하는 단계입니다. 이 패널들은 별도의 라인에서 헴밍 및 보강 용접을 거쳐 조립될 수 있습니다.",
+          "essential_equipment": [
+            "로봇 매니퓰레이터 (Robot Manipulator) 또는 자동화된 리프팅 장치",
+            "자동 볼팅/스크류 드라이버 (Automated Bolting/Screwing System)",
+            "비전 시스템 (Vision System)을 이용한 간극/단차 측정 및 조정",
+            "수동 작업 스테이션 (Manual Workstation) 및 전동 공구",
+            "컨베이어 시스템"
+          ]
+        },
+        {
+          "step_name": "8. 품질 검사 및 치수 측정 (Quality Inspection & Dimensional Measurement)",
+          "description": "완성된 BIW의 치수 정확도, 용접 품질, 표면 결함 등을 종합적으로 검사하는 단계입니다. 이는 다음 공정인 도장 공정으로 넘어가기 전 최종 품질을 확인하는 중요한 과정입니다.",
+          "essential_equipment": [
+            "자동화된 3차원 측정기 (Automated CMM - Coordinate Measuring Machine)",
+            "레이저 스캐닝 시스템 (Laser Scanning System)",
+            "광학 측정 시스템 (Optical Measurement System)",
+            "초음파 용접 검사기 (Ultrasonic Weld Tester)",
+            "와전류 용접 검사기 (Eddy Current Weld Tester)",
+            "비전 검사 시스템 (Vision Inspection System) (표면 결함, 용접 비드 검사)",
+            "수동 검사 스테이션"
+          ]
+        },
+        {
+          "step_name": "9. 표면 처리 및 도장 공정 이송 (Surface Preparation & Transfer to Paint Shop)",
+          "description": "BIW 표면의 오일, 먼지 등 이물질을 제거하고, 차체 이음새에 실런트(Sealant)를 도포하여 방수 및 방음 기능을 강화합니다. 이후 도장 공장으로 차체를 이송합니다.",
+          "essential_equipment": [
+            "자동 세척 시스템 (Automated Washing System)",
+            "로봇 실런트 도포기 (Robotic Sealant Applicator)",
+            "오버헤드 컨베이어 시스템 (Overhead Conveyor System)",
+            "AGV (Automated Guided Vehicle) 또는 셔틀 시스템"
+          ]
+        }
+      ],
+      "generated_equipment": [],
+      "evaluation": null,
+      "error": "AttributeError: 'dict' object has no attribute 'lower'",
+      "latency_sec": 22.17
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_steps": [
+        "1. PCB 로딩 및 클리닝",
+        "2. 솔더 페이스트 인쇄",
+        "3. 솔더 페이스트 검사 (SPI)",
+        "4. 고속 칩 마운팅 (소형 부품)",
+        "5. 다기능 마운팅 (대형/이형/정밀 부품)",
+        "6. 리플로우 전 자동 광학 검사 (Pre-Reflow AOI) - 선택 사항",
+        "7. 리플로우 솔더링",
+        "8. 리플로우 후 자동 광학 검사 (Post-Reflow AOI)",
+        "9. 자동 X-ray 검사 (AXI) - BGA/QFN 등 숨겨진 솔더 조인트",
+        "10. 기능 테스트 (FCT) 또는 회로 내 테스트 (ICT)",
+        "11. PCB 언로딩 및 보관"
+      ],
+      "generated_equipment": [
+        "자동 PCB 로더 (Automatic PCB Loader)",
+        "PCB 클리너 (PCB Cleaner / Dust Remover)",
+        "솔더 페이스트 프린터 (Solder Paste Printer / Screen Printer)",
+        "3D 솔더 페이스트 검사기 (3D Solder Paste Inspection - SPI Machine)",
+        "고속 칩 마운터 (High-Speed Chip Mounter)",
+        "다기능 마운터 (Multi-Functional Mounter)",
+        "자동 광학 검사기 (Automated Optical Inspection - AOI Machine)",
+        "리플로우 오븐 (Reflow Oven)",
+        "자동 X-ray 검사기 (Automated X-ray Inspection - AXI Machine)",
+        "기능 테스트 장비 (Functional Tester - FCT)",
+        "회로 내 테스트 장비 (In-Circuit Tester - ICT)",
+        "자동 PCB 언로더 (Automatic PCB Unloader)",
+        "라인 컨베이어 시스템 (Line Conveyor System)"
+      ],
+      "evaluation": {
+        "n": 5,
+        "M": 7,
+        "accuracy": 0.7143,
+        "sequence_match": 1.0,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "PCB 로딩",
+            "gen_step": "1. PCB 로딩 및 클리닝",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "솔더 인쇄",
+            "gen_step": "2. 솔더 페이스트 인쇄",
+            "similarity": 0.667
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 2,
+            "gt_step": "SPI(인쇄 검사)",
+            "gen_step": "3. 솔더 페이스트 검사 (SPI)",
+            "similarity": 0.4
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 6,
+            "gt_step": "리플로우 솔더링",
+            "gen_step": "7. 리플로우 솔더링",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 7,
+            "gt_step": "AOI(광학 검사)",
+            "gen_step": "8. 리플로우 후 자동 광학 검사 (Post-Reflow AOI)",
+            "similarity": 0.429
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 17.8
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_steps": [
+        "웨이퍼 백그라인딩 및 씨닝 (Wafer Backgrinding & Thinning)",
+        "웨이퍼 다이싱 (Wafer Dicing)",
+        "다이 어태치 (Die Attach)",
+        "와이어 본딩 (Wire Bonding)",
+        "몰딩 (Molding)",
+        "포스트 몰드 큐어 (Post-Mold Cure)",
+        "디플래시 및 디게이트 (Deflash & Degate)",
+        "솔더볼 어태치 (Solder Ball Attach) - BGA/CSP 전용",
+        "싱귤레이션 및 트림 & 폼 (Singulation & Trim & Form)",
+        "패키지 마킹 (Package Marking)",
+        "최종 전기 테스트 (Final Electrical Test)",
+        "비전 검사 (Vision Inspection)",
+        "소팅 및 패킹 (Sorting & Packing)"
+      ],
+      "generated_equipment": [
+        {
+          "step": "웨이퍼 백그라인딩 및 씨닝 (Wafer Backgrinding & Thinning)",
+          "required_equipment": [
+            "웨이퍼 그라인더 (Wafer Grinder)",
+            "웨이퍼 폴리셔 (Wafer Polisher)",
+            "웨이퍼 클리너 (Wafer Cleaner)",
+            "백그라인딩 테이프 라미네이터 (Backgrinding Tape Laminator)"
+          ]
+        },
+        {
+          "step": "웨이퍼 다이싱 (Wafer Dicing)",
+          "required_equipment": [
+            "웨이퍼 다이서 (Wafer Dicer)",
+            "다이싱 테이프 마운터 (Dicing Tape Mounter)",
+            "UV 경화 시스템 (UV Curing System - 다이싱 테이프용)",
+            "웨이퍼 클리너 (Wafer Cleaner)"
+          ]
+        },
+        {
+          "step": "다이 어태치 (Die Attach)",
+          "required_equipment": [
+            "다이 본더 (Die Bonder / Die Attach Machine)",
+            "다이 이젝터 (Die Ejector)",
+            "리드프레임/기판 로더 (Leadframe/Substrate Loader)",
+            "에폭시 디스펜서 또는 다이 어태치 필름 라미네이터 (Epoxy Dispenser or Die Attach Film Laminator)",
+            "큐어링 오븐 (Curing Oven - 에폭시 경화용)"
+          ]
+        },
+        {
+          "step": "와이어 본딩 (Wire Bonding)",
+          "required_equipment": [
+            "와이어 본더 (Wire Bonder - Gold, Copper, Aluminum 등)",
+            "플라즈마 클리너 (Plasma Cleaner - 본딩 전 표면 처리용, 선택 사항 또는 본더 내장)"
+          ]
+        },
+        {
+          "step": "몰딩 (Molding)",
+          "required_equipment": [
+            "몰딩 프레스 (Molding Press - Transfer Molding, Compression Molding 등)",
+            "몰드 다이 (Mold Dies)",
+            "자동 몰드 클리너 (Auto Mold Cleaner)"
+          ]
+        },
+        {
+          "step": "포스트 몰드 큐어 (Post-Mold Cure)",
+          "required_equipment": [
+            "큐어링 오븐 (Curing Oven - 배치 또는 컨베이어 타입)"
+          ]
+        },
+        {
+          "step": "디플래시 및 디게이트 (Deflash & Degate)",
+          "required_equipment": [
+            "디플래싱 머신 (Deflashing Machine - 미디어 블라스팅, 화학적 방식 등)",
+            "클리닝 시스템 (Cleaning System)"
+          ]
+        },
+        {
+          "step": "솔더볼 어태치 (Solder Ball Attach) - BGA/CSP 전용",
+          "required_equipment": [
+            "솔더볼 어태처 (Solder Ball Attacher)",
+            "플럭스 디스펜서 (Flux Dispenser)",
+            "리플로우 오븐 (Reflow Oven)",
+            "클리닝 시스템 (Cleaning System)"
+          ]
+        },
+        {
+          "step": "싱귤레이션 및 트림 & 폼 (Singulation & Trim & Form)",
+          "required_equipment": [
+            "트림 & 폼 머신 (Trim & Form Machine - 리드프레임 패키지용)",
+            "싱귤레이션 쏘우 (Singulation Saw - 어레이 패키지 분리용)",
+            "펀치 프레스 (Punch Press - 특정 패키지 형태용)",
+            "리드 스캐너 (Lead Scanner - 리드 평탄도 및 벤딩 검사용)"
+          ]
+        },
+        {
+          "step": "패키지 마킹 (Package Marking)",
+          "required_equipment": [
+            "레이저 마커 (Laser Marker)",
+            "잉크 마커 (Ink Marker)",
+            "비전 시스템 (Vision System - 마킹 품질 검사용)"
+          ]
+        },
+        {
+          "step": "최종 전기 테스트 (Final Electrical Test)",
+          "required_equipment": [
+            "자동 테스트 장비 (Automatic Test Equipment - ATE)",
+            "패키지 핸들러 (Package Handler - 테스트 소켓에 패키지 로딩/언로딩)",
+            "온도 챔버 (Temperature Chamber - 고온/저온 테스트용)"
+          ]
+        },
+        {
+          "step": "비전 검사 (Vision Inspection)",
+          "required_equipment": [
+            "자동 광학 검사 시스템 (Automated Optical Inspection - AOI System)",
+            "3D 검사 시스템 (3D Inspection System - 범프, 솔더볼 높이 등 검사용)"
+          ]
+        },
+        {
+          "step": "소팅 및 패킹 (Sorting & Packing)",
+          "required_equipment": [
+            "소터 (Sorter - 양품/불량품 분류)",
+            "테이프 & 릴 머신 (Tape & Reel Machine - 테이프 캐리어에 패키지 삽입)",
+            "트레이 로더/언로더 (Tray Loader/Unloader)",
+            "라벨 프린터 (Label Printer)"
+          ]
+        }
+      ],
+      "evaluation": {
+        "n": 5,
+        "M": 7,
+        "accuracy": 0.7143,
+        "sequence_match": 0.9,
+        "matches": [
+          {
+            "gt_idx": 1,
+            "gen_idx": 1,
+            "gt_step": "웨이퍼 다이싱",
+            "gen_step": "웨이퍼 다이싱 (Wafer Dicing)",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 3,
+            "gt_step": "범프 본딩(Flip-Chip)",
+            "gen_step": "와이어 본딩 (Wire Bonding)",
+            "similarity": 0.545
+          },
+          {
+            "gt_idx": 4,
+            "gen_idx": 4,
+            "gt_step": "몰딩(Encapsulation)",
+            "gen_step": "몰딩 (Molding)",
+            "similarity": 1.0
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 10,
+            "gt_step": "최종 테스트",
+            "gen_step": "최종 전기 테스트 (Final Electrical Test)",
+            "similarity": 0.8
+          },
+          {
+            "gt_idx": 6,
+            "gen_idx": 9,
+            "gt_step": "레이저 마킹",
+            "gen_step": "패키지 마킹 (Package Marking)",
+            "similarity": 0.5
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 13.86
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": false,
+      "generated_steps": [
+        {
+          "step_number": 1,
+          "step_name": "원자재 입고 및 준비 (Incoming Material Receiving & Preparation)",
+          "description": "모듈 생산에 필요한 모든 원자재(유리, 태양전지, EVA 필름, 백시트, 프레임, 정션박스 등)를 입고하고, 품질 검사 및 생산 라인 투입을 위한 준비 작업을 수행합니다.",
+          "equipment": [
+            "자동 유리 로더 (Automatic Glass Loader)",
+            "유리 세척 및 건조기 (Glass Washing & Drying Machine)",
+            "태양전지 자동 분류 및 테스트 장비 (Automatic Cell Sorter & Tester - IV Curve, Micro-crack Detection)",
+            "EVA/백시트 자동 절단기 (Automatic EVA/Backsheet Cutting Machine)",
+            "원자재 보관 랙 및 운반 시스템 (Material Storage Racks & Conveyance Systems)"
+          ]
+        },
+        {
+          "step_number": 2,
+          "step_name": "태양전지 스트링 및 태빙 (Cell Stringing & Tabbing)",
+          "description": "개별 태양전지를 직렬로 연결하여 스트링을 만들고, 전면 및 후면 버스바에 리본을 납땜하는 공정입니다.",
+          "equipment": [
+            "자동 태양전지 스트링거 (Automatic Cell Stringer - Tabber & Stringer)",
+            "납땜 인두 또는 레이저 납땜 장비 (Soldering Iron or Laser Soldering Equipment)",
+            "스트링 검사 시스템 (String Inspection System - Vision System)"
+          ]
+        },
+        {
+          "step_number": 3,
+          "step_name": "레이업 (Layup)",
+          "description": "유리, 전면 EVA 필름, 태양전지 스트링, 후면 EVA 필름, 백시트 순서로 적층하여 모듈 샌드위치를 구성하는 공정입니다. 정확한 정렬이 중요합니다.",
+          "equipment": [
+            "자동 유리 로딩 시스템 (Automatic Glass Loading System)",
+            "EVA 필름 자동 공급 및 배치 장비 (Automatic EVA Film Dispenser & Placement)",
+            "태양전지 스트링 자동 배치 로봇 (Automatic Cell String Placement Robot)",
+            "백시트 자동 공급 및 배치 장비 (Automatic Backsheet Dispenser & Placement)",
+            "비전 기반 정렬 시스템 (Vision-based Alignment System)"
+          ]
+        },
+        {
+          "step_number": 4,
+          "step_name": "라미네이션 (Lamination)",
+          "description": "적층된 모듈 샌드위치를 진공 상태에서 고온으로 가열하여 EVA 필름을 경화시키고 모든 층을 영구적으로 접착하여 태양전지를 외부 환경으로부터 보호하는 핵심 공정입니다.",
+          "equipment": [
+            "다단 진공 라미네이터 (Multi-stage Vacuum Laminator)",
+            "라미네이터 로딩/언로딩 컨베이어 (Laminator Loading/Unloading Conveyors)",
+            "진공 펌프 및 제어 시스템 (Vacuum Pump & Control System)"
+          ]
+        },
+        {
+          "step_number": 5,
+          "step_name": "냉각 및 트리밍 (Cooling & Trimming)",
+          "description": "라미네이션이 완료된 모듈을 냉각시키고, 모듈 가장자리에 돌출된 EVA 필름과 백시트를 정밀하게 절단하여 모듈의 크기를 맞추는 공정입니다.",
+          "equipment": [
+            "자동 냉각 컨베이어 (Automatic Cooling Conveyor)",
+            "자동 트리밍 머신 (Automatic Trimming Machine - Laser or Blade Type)"
+          ]
+        },
+        {
+          "step_number": 6,
+          "step_name": "프레임 부착 (Framing)",
+          "description": "모듈의 구조적 강성을 높이고 외부 충격으로부터 보호하기 위해 알루미늄 프레임을 부착하는 공정입니다.",
+          "equipment": [
+            "자동 프레임 로더 (Automatic Frame Loader)",
+            "자동 프레임 부착기 (Automatic Framing Machine - Corner Crimping/Screwing)",
+            "프레임 접착제 도포 장비 (Frame Adhesive Dispenser - if applicable)"
+          ]
+        },
+        {
+          "step_number": 7,
+          "step_name": "정션박스 부착 및 배선 (Junction Box Attachment & Wiring)",
+          "description": "모듈의 전기적 출력을 외부로 연결하기 위한 정션박스를 모듈 후면에 부착하고, 내부 버스바와 정션박스 케이블을 납땜하여 연결하는 공정입니다.",
+          "equipment": [
+            "정션박스 자동 접착제 도포기 (Automatic Junction Box Adhesive Dispenser)",
+            "정션박스 자동 배치 로봇 (Automatic Junction Box Placement Robot)",
+            "UV 또는 열 경화 장비 (UV or Heat Curing System)",
+            "자동 버스바 납땜 장비 (Automatic Busbar Soldering Equipment)",
+            "정션박스 배선 검사 시스템 (Junction Box Wiring Inspection System)"
+          ]
+        },
+        {
+          "step_number": 8,
+          "step_name": "전기적 성능 및 안전성 테스트 (Electrical Performance & Safety Testing)",
+          "description": "모듈의 전기적 성능(최대 출력, 개방 전압, 단락 전류 등)을 측정하고, 절연 저항, 접지 연속성, 바이패스 다이오드 기능 등 안전성 테스트를 수행합니다.",
+          "equipment": [
+            "태양광 시뮬레이터 (Solar Simulator - Flash Tester) 및 IV 커브 트레이서 (IV Curve Tracer)",
+            "EL (Electroluminescence) 테스터 (Micro-crack, Cell Defect Detection)",
+            "Hi-Pot (High Potential) 테스터 (Insulation Breakdown Test)",
+            "접지 연속성 테스터 (Ground Continuity Tester)",
+            "바이패스 다이오드 테스터 (Bypass Diode Tester)"
+          ]
+        },
+        {
+          "step_number": 9,
+          "step_name": "최종 검사, 클리닝 및 라벨링 (Final Inspection, Cleaning & Labeling)",
+          "description": "모듈의 외관 및 기능에 대한 최종 육안 검사를 수행하고, 표면을 클리닝한 후 제품 정보(바코드, 시리얼 넘버 등) 라벨을 부착합니다.",
+          "equipment": [
+            "육안 검사 스테이션 (Visual Inspection Station - Light Booth)",
+            "자동 모듈 클리닝 머신 (Automatic Module Cleaning Machine)",
+            "자동 라벨링 머신 (Automatic Labeling Machine)"
+          ]
+        },
+        {
+          "step_number": 10,
+          "step_name": "포장 및 출하 (Packaging & Shipping)",
+          "description": "완성된 모듈을 보호 필름으로 포장하고, 팔레트에 적재하여 출하 준비를 완료합니다.",
+          "equipment": [
+            "자동 포장기 (Automatic Packaging Machine - Shrink Wrap, Corner Protector Applicator)",
+            "자동 팔레타이저 (Automatic Palletizer)",
+            "지게차 또는 자동 운반 로봇 (Forklift or AGV for Pallet Transport)"
+          ]
+        }
+      ],
+      "generated_equipment": [
+        "자동 유리 로더 (Automatic Glass Loader)",
+        "유리 세척 및 건조기 (Glass Washing & Drying Machine)",
+        "태양전지 자동 분류 및 테스트 장비 (Automatic Cell Sorter & Tester)",
+        "EVA/백시트 자동 절단기 (Automatic EVA/Backsheet Cutting Machine)",
+        "원자재 보관 랙 및 운반 시스템 (Material Storage Racks & Conveyance Systems)",
+        "자동 태양전지 스트링거 (Automatic Cell Stringer)",
+        "납땜 인두 또는 레이저 납땜 장비 (Soldering Iron or Laser Soldering Equipment)",
+        "스트링 검사 시스템 (String Inspection System)",
+        "자동 유리 로딩 시스템 (Automatic Glass Loading System)",
+        "EVA 필름 자동 공급 및 배치 장비 (Automatic EVA Film Dispenser & Placement)",
+        "태양전지 스트링 자동 배치 로봇 (Automatic Cell String Placement Robot)",
+        "백시트 자동 공급 및 배치 장비 (Automatic Backsheet Dispenser & Placement)",
+        "비전 기반 정렬 시스템 (Vision-based Alignment System)",
+        "다단 진공 라미네이터 (Multi-stage Vacuum Laminator)",
+        "라미네이터 로딩/언로딩 컨베이어 (Laminator Loading/Unloading Conveyors)",
+        "진공 펌프 및 제어 시스템 (Vacuum Pump & Control System)",
+        "자동 냉각 컨베이어 (Automatic Cooling Conveyor)",
+        "자동 트리밍 머신 (Automatic Trimming Machine)",
+        "자동 프레임 로더 (Automatic Frame Loader)",
+        "자동 프레임 부착기 (Automatic Framing Machine)",
+        "프레임 접착제 도포 장비 (Frame Adhesive Dispenser)",
+        "정션박스 자동 접착제 도포기 (Automatic Junction Box Adhesive Dispenser)",
+        "정션박스 자동 배치 로봇 (Automatic Junction Box Placement Robot)",
+        "UV 또는 열 경화 장비 (UV or Heat Curing System)",
+        "자동 버스바 납땜 장비 (Automatic Busbar Soldering Equipment)",
+        "정션박스 배선 검사 시스템 (Junction Box Wiring Inspection System)",
+        "태양광 시뮬레이터 (Solar Simulator) 및 IV 커브 트레이서 (IV Curve Tracer)",
+        "EL (Electroluminescence) 테스터",
+        "Hi-Pot (High Potential) 테스터",
+        "접지 연속성 테스터 (Ground Continuity Tester)",
+        "바이패스 다이오드 테스터 (Bypass Diode Tester)",
+        "육안 검사 스테이션 (Visual Inspection Station)",
+        "자동 모듈 클리닝 머신 (Automatic Module Cleaning Machine)",
+        "자동 라벨링 머신 (Automatic Labeling Machine)",
+        "자동 포장기 (Automatic Packaging Machine)",
+        "자동 팔레타이저 (Automatic Palletizer)",
+        "지게차 또는 자동 운반 로봇 (Forklift or AGV)"
+      ],
+      "evaluation": null,
+      "error": "AttributeError: 'dict' object has no attribute 'lower'",
+      "latency_sec": 17.51
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": false,
+      "generated_steps": [
+        {
+          "step_name": "1. 스태터 코어 적층 및 고정",
+          "description": "전기 강판(라미네이션)을 정밀하게 적층하여 스태터 코어를 형성하고, 이를 고정하는 단계입니다.",
+          "equipment": [
+            "라미네이션 자동 공급 장치 (Decoiler & Feeder)",
+            "고속 스태킹 프레스 (Interlocking 또는 용접 기능 포함)",
+            "코어 용접/리벳팅 장비 (필요시, 예: 레이저 용접기, 리벳팅 머신)",
+            "코어 외경/내경 및 평탄도 측정 시스템 (인라인 QC)"
+          ]
+        },
+        {
+          "step_name": "2. 슬롯 절연지 삽입",
+          "description": "스태터 코어의 슬롯 내부에 절연지를 자동으로 삽입하여 헤어핀 도체와 코어 간의 전기적 절연을 확보합니다.",
+          "equipment": [
+            "자동 슬롯 절연지 공급 및 삽입기 (Slot Liner Insertion Machine)",
+            "절연지 유무 및 위치 비전 검사 시스템"
+          ]
+        },
+        {
+          "step_name": "3. 헤어핀 도체 제조 (성형 및 절연 코팅)",
+          "description": "구리 와이어 또는 바를 정밀하게 절단, 교정, 벤딩하여 헤어핀 형태로 성형하고, 필요한 경우 절연 코팅을 적용합니다.",
+          "equipment": [
+            "구리 코일 디코일러 및 교정기 (Copper Coil Decoiler & Straightener)",
+            "정밀 절단기 (Precision Cutting Machine)",
+            "CNC 헤어핀 벤딩 머신 (다단 벤딩 기능 포함)",
+            "헤어핀 절연 코팅 장비 (예: 파우더 코팅 시스템, 필름 랩핑 머신)",
+            "헤어핀 형상 및 절연 두께 비전 검사 시스템"
+          ]
+        },
+        {
+          "step_name": "4. 헤어핀 도체 슬롯 삽입",
+          "description": "제조된 헤어핀 도체를 스태터 코어의 슬롯에 자동으로 삽입하는 단계입니다. 다층 구조의 경우 여러 번 반복됩니다.",
+          "equipment": [
+            "자동 헤어핀 공급 장치 (Hairpin Feeder)",
+            "다축 로봇 기반 헤어핀 삽입기 (Multi-axis Robotic Hairpin Insertion Machine)",
+            "삽입 깊이 및 위치 비전 검사 시스템"
+          ]
+        },
+        {
+          "step_name": "5. 헤어핀 단부 성형 및 꼬임",
+          "description": "스태터 코어 외부로 돌출된 헤어핀 도체의 단부를 다음 용접 공정을 위해 정해진 형상으로 성형하고 꼬아주는 단계입니다.",
+          "equipment": [
+            "자동 헤어핀 단부 성형기 (End Forming Machine)",
+            "헤어핀 꼬임 장비 (Twisting Machine)",
+            "단부 형상 및 꼬임 각도 비전 검사 시스템"
+          ]
+        },
+        {
+          "step_name": "6. 헤어핀 단부 용접",
+          "description": "성형된 헤어핀 도체의 단부들을 서로 연결하여 전기적 회로를 완성하는 단계입니다. 주로 레이저 용접이 사용됩니다.",
+          "equipment": [
+            "고정밀 레이저 용접기 (다축 로봇 통합, Laser Welding Machine)",
+            "용접 품질 비전 검사 시스템 (용접 비드, 스패터, 위치 등)",
+            "용접부 전기 저항 측정 시스템 (인라인 QC)"
+          ]
+        },
+        {
+          "step_name": "7. 상간 절연 및 엔드턴 절연 적용",
+          "description": "각 상(Phase) 간의 절연 및 코일 엔드턴(End Turn) 부분의 절연을 강화하여 전기적 안정성과 기계적 보호를 제공합니다.",
+          "equipment": [
+            "자동 상간 절연지/필름 삽입기",
+            "엔드턴 절연 테이핑 로봇 또는 절연 코팅 장비",
+            "절연 상태 비전 검사 시스템"
+          ]
+        },
+        {
+          "step_name": "8. 함침 (VPI - Vacuum Pressure Impregnation)",
+          "description": "스태터 코일 전체에 절연 바니쉬 또는 레진을 진공 압력 방식으로 함침시켜 절연 성능, 열전도율, 기계적 강도를 향상시킵니다.",
+          "equipment": [
+            "진공 압력 함침 (VPI) 설비 (진공 챔버, 레진 탱크, 펌프, 제어 시스템)",
+            "레진 경화 오븐 (Curing Oven)",
+            "함침 전후 중량 측정 시스템 (레진 침투량 확인)"
+          ]
+        },
+        {
+          "step_name": "9. 최종 가공 및 하우징 조립 (선택 사항)",
+          "description": "함침이 완료된 스태터의 외경, 장착부 등을 정밀 가공하고, 필요한 경우 스태터 하우징에 압입 조립하는 단계입니다.",
+          "equipment": [
+            "CNC 가공기 (스태터 외경, 장착부 가공)",
+            "유압 프레스 (하우징 압입)",
+            "조립 지그 및 로봇",
+            "최종 치수 및 동심도 측정 시스템"
+          ]
+        },
+        {
+          "step_name": "10. 최종 전기 및 성능 검사",
+          "description": "완성된 헤어핀 스태터의 전기적 특성 및 성능을 종합적으로 검사하여 품질 기준 충족 여부를 확인합니다.",
+          "equipment": [
+            "서지 테스트 장비 (Surge Tester)",
+            "내전압 테스트 장비 (Hipot Tester)",
+            "절연 저항 측정기 (IR Tester)",
+            "부분 방전 테스트 장비 (Partial Discharge Tester)",
+            "인덕턴스/저항 측정 브릿지",
+            "그라울러 테스트 장비 (Growler Tester - 단락 검사)",
+            "종합 성능 테스트 벤치 (Back EMF, 토크 리플 등 시뮬레이션)"
+          ]
+        },
+        {
+          "step_name": "11. 세척 및 포장",
+          "description": "최종 검사를 통과한 스태터를 세척하고, 다음 공정 또는 출하를 위해 포장하는 단계입니다.",
+          "equipment": [
+            "산업용 세척기 (초음파 또는 스프레이 방식)",
+            "건조 스테이션",
+            "자동 포장 장비",
+            "제품 식별 라벨링 시스템"
+          ]
+        }
+      ],
+      "generated_equipment": [],
+      "evaluation": null,
+      "error": "AttributeError: 'dict' object has no attribute 'lower'",
+      "latency_sec": 19.07
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": false,
+      "generated_steps": [
+        {
+          "step_name": "1. 기판 준비 및 세정 (Substrate Preparation & Cleaning)",
+          "description": "유리 기판을 제조 공정에 투입하기 전, 표면의 오염 물질을 제거하고 최적의 상태로 준비하는 단계입니다.",
+          "equipment": [
+            "유리 기판 로더/언로더 (Glass Substrate Loader/Unloader)",
+            "습식 세정 시스템 (Wet Cleaning System - DI Water, Chemical Baths)",
+            "건조 오븐 (Drying Oven)",
+            "UV-오존 세정기 (UV-Ozone Cleaner)"
+          ]
+        },
+        {
+          "step_name": "2. TFT 백플레인 형성 (TFT Backplane Fabrication)",
+          "description": "각 픽셀을 제어하는 박막 트랜지스터(TFT) 회로를 기판 위에 형성하는 단계입니다. 여러 층의 증착, 포토리소그래피, 식각 공정이 반복됩니다.",
+          "equipment": [
+            "스퍼터링 시스템 (Sputtering System - 금속, 산화물 증착)",
+            "플라즈마 강화 화학 기상 증착기 (PECVD - 반도체, 유전체 증착)",
+            "포토레지스트 코터 (Photoresist Coater)",
+            "노광 장비 (Exposure Tool - Stepper/Scanner)",
+            "현상기 (Developer)",
+            "건식 식각 장비 (Dry Etcher - RIE/ICP)",
+            "습식 식각 장비 (Wet Etcher)",
+            "애셔 (Asher - Photoresist Stripper)",
+            "자동 광학 검사 장비 (AOI - Automated Optical Inspection)"
+          ]
+        },
+        {
+          "step_name": "3. 픽셀 정의층 (PDL) 형성 (Pixel Definition Layer Formation)",
+          "description": "OLED 유기물 증착 시 각 픽셀 영역을 정확하게 분리하고 정의하여 빛이 새는 것을 방지하는 절연층을 형성하는 단계입니다.",
+          "equipment": [
+            "포토레지스트 코터 (Photoresist Coater)",
+            "노광 장비 (Exposure Tool)",
+            "현상기 (Developer)",
+            "건식 식각 장비 (Dry Etcher)",
+            "경화 오븐 (Curing Oven)"
+          ]
+        },
+        {
+          "step_name": "4. OLED 유기물 및 전극 증착 (OLED Organic & Electrode Deposition)",
+          "description": "발광층을 포함한 OLED 유기물 층과 양극/음극 전극을 진공 상태에서 증착하여 OLED 소자를 완성하는 핵심 단계입니다.",
+          "equipment": [
+            "다중 챔버 진공 열 증착기 (Multi-chamber Vacuum Thermal Evaporator - Cluster Tool)",
+            "섀도우 마스크 정렬기 (Shadow Mask Aligner)",
+            "유기물 증착원 (Organic Material Sources - Crucible)",
+            "금속 증착원 (Metal Sources)",
+            "로드락 시스템 (Load-lock System)"
+          ]
+        },
+        {
+          "step_name": "5. 봉지 (Encapsulation)",
+          "description": "OLED 유기물이 산소와 수분에 취약하므로, 이를 보호하기 위한 봉지층을 형성하여 소자의 수명과 신뢰성을 확보하는 단계입니다.",
+          "equipment": [
+            "박막 봉지 (TFE) 시스템 (PECVD, ALD, Inkjet Dispenser for Organic Layers, UV Curing)",
+            "유리 봉지 본더 (Glass Lid Bonder - Dispenser, Laminator, UV Curing)"
+          ]
+        },
+        {
+          "step_name": "6. 셀 절단 및 분리 (Cell Cutting & Singulation)",
+          "description": "대형 마더 글라스에서 개별 디스플레이 패널을 분리하기 위해 절단하는 단계입니다.",
+          "equipment": [
+            "레이저 스크라이빙/커팅 머신 (Laser Scribing/Cutting Machine)",
+            "다이싱 머신 (Dicing Machine)",
+            "엣지 그라인더 (Edge Grinder)"
+          ]
+        },
+        {
+          "step_name": "7. 드라이버 IC 및 FPC 부착 (Driver IC & FPC Attachment)",
+          "description": "디스플레이를 구동하기 위한 드라이버 IC와 외부 신호 연결을 위한 유연 인쇄 회로(FPC)를 패널에 부착하는 단계입니다.",
+          "equipment": [
+            "COG (Chip-on-Glass) 본더",
+            "COF (Chip-on-Film) 본더",
+            "FPC (Flexible Printed Circuit) 본더",
+            "이방성 도전 필름/페이스트 디스펜서 (Anisotropic Conductive Film/Paste Dispenser)"
+          ]
+        },
+        {
+          "step_name": "8. 모듈 조립 및 검사 (Module Assembly & Inspection)",
+          "description": "패널을 베젤, 백라이트(필요시), 기타 부품과 조립하고, 조립 상태 및 초기 기능을 검사하는 단계입니다.",
+          "equipment": [
+            "로봇 조립 시스템 (Robotic Assembly Systems)",
+            "프레임 본더 (Frame Bonder)",
+            "디스펜서 (Dispenser)",
+            "라미네이터 (Laminator)",
+            "자동 광학 검사 장비 (AOI - Automated Optical Inspection)"
+          ]
+        },
+        {
+          "step_name": "9. 최종 기능 및 광학 검사 (Final Functional & Optical Testing)",
+          "description": "완성된 디스플레이 모듈의 모든 기능(화질, 색상, 밝기, 응답 속도 등)과 전기적 특성을 최종적으로 검사하는 단계입니다.",
+          "equipment": [
+            "전기적 테스터 (Electrical Tester - Pixel Defect, Short/Open Test)",
+            "광학 테스터 (Optical Tester - Colorimeter, Spectroradiometer, Luminance Meter)",
+            "번인 챔버 (Burn-in Chamber - 초기 불량 선별)",
+            "자동 광학 검사 장비 (AOI - Automated Optical Inspection)"
+          ]
+        },
+        {
+          "step_name": "10. 포장 및 출하 (Packaging & Shipping)",
+          "description": "최종 검사를 통과한 제품을 안전하게 포장하여 고객에게 출하 준비를 하는 단계입니다.",
+          "equipment": [
+            "자동 포장 기계 (Automated Packaging Machine)",
+            "라벨링 시스템 (Labeling System)"
+          ]
+        }
+      ],
+      "generated_equipment": [],
+      "evaluation": null,
+      "error": "AttributeError: 'dict' object has no attribute 'lower'",
+      "latency_sec": 17.67
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_steps": [
+        "1. 베이스 프레임 조립 및 하부 부품 장착",
+        "2. 아우터 튜브(Outer Tub) 및 서스펜션 시스템 조립",
+        "3. 이너 드럼(Inner Drum) 및 구동 시스템(모터, 벨트) 조립",
+        "4. 급수/배수 시스템(펌프, 밸브, 호스) 조립",
+        "5. 카운터웨이트(Counterweight) 장착",
+        "6. 와이어링 하네스(Wiring Harness) 및 센서 설치",
+        "7. 측면 및 후면 패널 조립",
+        "8. 컨트롤 패널 및 상단 커버 조립",
+        "9. 도어(Door) 또는 상단 뚜껑(Lid) 조립",
+        "10. 최종 기능 및 안전성 테스트",
+        "11. 외관 검사 및 클리닝",
+        "12. 포장 및 라벨링",
+        "13. 팔레타이징 및 출하 대기"
+      ],
+      "generated_equipment": [
+        {
+          "step": "1. 베이스 프레임 조립 및 하부 부품 장착",
+          "equipment_list": [
+            "컨베이어 시스템 (팔레트 또는 슬랫 컨베이어)",
+            "자동/반자동 스크류 체결기 (토크 제어 기능)",
+            "조립 지그 및 고정 장치",
+            "부품 공급 시스템 (피더, 랙)",
+            "레벨링 피트(Leveling Feet) 장착 설비"
+          ]
+        },
+        {
+          "step": "2. 아우터 튜브(Outer Tub) 및 서스펜션 시스템 조립",
+          "equipment_list": [
+            "컨베이어 시스템",
+            "아우터 튜브 리프팅 및 위치 결정 로봇/매니퓰레이터",
+            "서스펜션 스프링/댐퍼 장착 지그",
+            "베어링 및 씰(Seal) 프레스 장비 (필요시)",
+            "자동/반자동 스크류 체결기"
+          ]
+        },
+        {
+          "step": "3. 이너 드럼(Inner Drum) 및 구동 시스템(모터, 벨트) 조립",
+          "equipment_list": [
+            "컨베이어 시스템",
+            "이너 드럼 삽입 로봇/매니퓰레이터",
+            "모터 장착 지그 및 자동/반자동 스크류 체결기",
+            "벨트 장착 및 장력 조절 장비",
+            "풀리(Pulley) 조립 및 고정 장비",
+            "샤프트(Shaft) 정렬 및 고정 지그"
+          ]
+        },
+        {
+          "step": "4. 급수/배수 시스템(펌프, 밸브, 호스) 조립",
+          "equipment_list": [
+            "컨베이어 시스템",
+            "펌프 및 밸브 장착 지그",
+            "호스 클램프 자동/반자동 장착기",
+            "세제 디스펜서(Detergent Dispenser) 조립 설비",
+            "초기 누수 감지 시스템 (압력 테스트 또는 육안 검사)"
+          ]
+        },
+        {
+          "step": "5. 카운터웨이트(Counterweight) 장착",
+          "equipment_list": [
+            "컨베이어 시스템",
+            "카운터웨이트 리프팅 및 위치 결정 로봇/매니퓰레이터",
+            "자동/반자동 스크류 체결기 (고토크용)",
+            "안전 지그 및 고정 장치"
+          ]
+        },
+        {
+          "step": "6. 와이어링 하네스(Wiring Harness) 및 센서 설치",
+          "equipment_list": [
+            "컨베이어 시스템",
+            "와이어링 하네스 라우팅(Routing) 지그",
+            "커넥터(Connector) 체결 도구 (수동/자동)",
+            "케이블 타이(Cable Tie) 자동 장착기",
+            "센서(수위, 온도, 도어 잠금 등) 장착 지그",
+            "초기 전기 연속성 및 단락 테스트 장비"
+          ]
+        },
+        {
+          "step": "7. 측면 및 후면 패널 조립",
+          "equipment_list": [
+            "컨베이어 시스템",
+            "패널 리프팅 및 위치 결정 로봇/매니퓰레이터",
+            "패널 고정 지그",
+            "자동/반자동 스크류 체결기",
+            "패널 간격 및 정렬 검사 시스템"
+          ]
+        },
+        {
+          "step": "8. 컨트롤 패널 및 상단 커버 조립",
+          "equipment_list": [
+            "컨베이어 시스템",
+            "컨트롤 패널 장착 지그",
+            "상단 커버 리프팅 및 위치 결정 로봇/매니퓰레이터",
+            "자동/반자동 스크류 체결기",
+            "버튼 및 디스플레이 기능 초기 테스트 장비"
+          ]
+        },
+        {
+          "step": "9. 도어(Door) 또는 상단 뚜껑(Lid) 조립",
+          "equipment_list": [
+            "컨베이어 시스템",
+            "도어/뚜껑 리프팅 및 힌지(Hinge) 장착 지그",
+            "자동/반자동 스크류 체결기",
+            "도어 개폐 및 잠금 메커니즘 테스트 장비",
+            "도어 가스켓(Gasket) 장착 설비"
+          ]
+        },
+        {
+          "step": "10. 최종 기능 및 안전성 테스트",
+          "equipment_list": [
+            "자동화된 기능 테스트 스테이션 (물 공급/배수, 세탁/탈수 사이클 시뮬레이션)",
+            "누수 감지 시스템 (수압 테스트, 센서 기반)",
+            "전기 안전성 테스트 장비 (절연 저항, 접지 연속성, 내전압 테스트)",
+            "소음 및 진동 측정 장비",
+            "모터 성능 및 회전 속도 측정 장비",
+            "제어판 및 디스플레이 작동 테스트 장비",
+            "데이터 로깅 및 분석 시스템",
+            "비상 정지 및 안전 인터록(Interlock) 테스트 장비"
+          ]
+        },
+        {
+          "step": "11. 외관 검사 및 클리닝",
+          "equipment_list": [
+            "고휘도 조명 및 검사 스테이션",
+            "육안 검사 인력 또는 비전 검사 시스템 (스크래치, 찌그러짐, 이물질)",
+            "에어 블로우(Air Blow) 및 클리닝 스테이션",
+            "표면 보호 필름 부착 장비 (필요시)"
+          ]
+        },
+        {
+          "step": "12. 포장 및 라벨링",
+          "equipment_list": [
+            "자동 포장재 공급 및 조립 장비 (스티로폼, 완충재)",
+            "자동 비닐 랩핑(Wrapping) 또는 수축 포장기",
+            "자동 박스 조립 및 테이핑(Taping) 머신",
+            "제품 정보 및 바코드 라벨 프린터 및 부착기",
+            "사용 설명서 및 액세서리 삽입 장비"
+          ]
+        },
+        {
+          "step": "13. 팔레타이징 및 출하 대기",
+          "equipment_list": [
+            "자동 팔레타이징 로봇 또는 반자동 팔레타이저",
+            "스트레치 랩핑(Stretch Wrapping) 머신 (팔레트 고정용)",
+            "지게차 또는 AGV (Automated Guided Vehicle) 시스템",
+            "창고 관리 시스템 (WMS)"
+          ]
+        }
+      ],
+      "evaluation": {
+        "n": 3,
+        "M": 6,
+        "accuracy": 0.5,
+        "sequence_match": 1.0,
+        "matches": [
+          {
+            "gt_idx": 2,
+            "gen_idx": 3,
+            "gt_step": "드럼/수조 조립",
+            "gen_step": "4. 급수/배수 시스템(펌프, 밸브, 호스) 조립",
+            "similarity": 0.4
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 4,
+            "gt_step": "모터/펌프 장착",
+            "gen_step": "5. 카운터웨이트(Counterweight) 장착",
+            "similarity": 0.444
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 9,
+            "gt_step": "누수/기능 테스트",
+            "gen_step": "10. 최종 기능 및 안전성 테스트",
+            "similarity": 0.462
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 17.7
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": true,
+      "generated_steps": [
+        "원료 입고 및 보관",
+        "정량 공급 및 계량",
+        "연속 건식 혼합",
+        "연속 습식 과립화",
+        "연속 유동층 건조",
+        "과립 분쇄 및 체질",
+        "최종 연속 혼합 및 윤활",
+        "정제 압축",
+        "정제 제진 및 금속 검출",
+        "연속 정제 코팅",
+        "인라인 품질 관리 (PAT)",
+        "정제 검사 및 분류",
+        "1차 포장",
+        "2차 포장",
+        "팔레타이징 및 출하"
+      ],
+      "generated_equipment": [
+        {
+          "step": "원료 입고 및 보관",
+          "equipment_list": [
+            "원료 보관 창고 (온도/습도 제어)",
+            "팔레트 랙 및 선반",
+            "지게차 및 전동 파렛트 트럭",
+            "바코드 스캐너 및 창고 관리 시스템 (WMS)"
+          ]
+        },
+        {
+          "step": "정량 공급 및 계량",
+          "equipment_list": [
+            "다중 정량 공급기 (Gravimetric Feeders, Loss-in-Weight Feeders)",
+            "로드셀 (Load Cells)",
+            "진공 이송 시스템 (Vacuum Transfer System)",
+            "스크류 컨베이어 또는 벨트 컨베이어"
+          ]
+        },
+        {
+          "step": "연속 건식 혼합",
+          "equipment_list": [
+            "연속 혼합기 (Continuous Blender, 예: Twin-Screw Blender, Ribbon Blender)",
+            "분말 이송 시스템 (Powder Transfer System)"
+          ]
+        },
+        {
+          "step": "연속 습식 과립화",
+          "equipment_list": [
+            "연속 트윈 스크류 과립기 (Continuous Twin-Screw Granulator)",
+            "액체 주입 펌프 (Liquid Dosing Pumps)",
+            "정량 공급 시스템 (Dosing System for Binder Solution)"
+          ]
+        },
+        {
+          "step": "연속 유동층 건조",
+          "equipment_list": [
+            "연속 유동층 건조기 (Continuous Fluid Bed Dryer)",
+            "공기 처리 장치 (Air Handling Unit, AHU)",
+            "배기 시스템 (Exhaust System)"
+          ]
+        },
+        {
+          "step": "과립 분쇄 및 체질",
+          "equipment_list": [
+            "코밀 (Comil) 또는 해머밀 (Hammer Mill)",
+            "진동 체 (Vibratory Sieve) 또는 로터리 체 (Rotary Sieve)",
+            "과립 이송 시스템 (Granule Transfer System, 예: 진공 또는 기계식 컨베이어)"
+          ]
+        },
+        {
+          "step": "최종 연속 혼합 및 윤활",
+          "equipment_list": [
+            "연속 혼합기 (Continuous Blender)",
+            "윤활제 정량 공급기 (Lubricant Gravimetric Feeder)",
+            "혼합물 이송 시스템 (Blended Material Transfer System)"
+          ]
+        },
+        {
+          "step": "정제 압축",
+          "equipment_list": [
+            "고속 로터리 정제 압축기 (High-Speed Rotary Tablet Press)",
+            "펀치 및 다이 세트 (Punch and Die Sets)",
+            "정제 호퍼 (Tablet Hopper)"
+          ]
+        },
+        {
+          "step": "정제 제진 및 금속 검출",
+          "equipment_list": [
+            "정제 제진기 (Tablet Deduster)",
+            "금속 검출기 (Metal Detector)",
+            "불량 정제 배출 시스템 (Reject Tablet System)"
+          ]
+        },
+        {
+          "step": "연속 정제 코팅",
+          "equipment_list": [
+            "연속 코팅기 (Continuous Coater, 예: Perforated Pan Coater)",
+            "코팅액 분사 시스템 (Coating Solution Spray System)",
+            "코팅액 제조 및 공급 시스템",
+            "공기 처리 장치 (AHU) 및 배기 시스템"
+          ]
+        },
+        {
+          "step": "인라인 품질 관리 (PAT)",
+          "equipment_list": [
+            "근적외선 분광기 (NIR Spectrometer)",
+            "라만 분광기 (Raman Spectrometer)",
+            "정제 경도/두께/중량 측정기 (Tablet Hardness/Thickness/Weight Tester)",
+            "비전 검사 시스템 (Vision Inspection System)",
+            "데이터 수집 및 분석 시스템 (Data Acquisition and Analysis System)"
+          ]
+        },
+        {
+          "step": "정제 검사 및 분류",
+          "equipment_list": [
+            "자동 정제 검사기 (Automatic Tablet Inspection Machine)",
+            "불량 정제 배출 시스템 (Reject Tablet System)",
+            "정제 분류 및 이송 시스템"
+          ]
+        },
+        {
+          "step": "1차 포장",
+          "equipment_list": [
+            "블리스터 포장기 (Blister Packaging Machine) 또는 병입기 (Bottle Filling Machine)",
+            "캡핑기 (Capping Machine)",
+            "라벨링기 (Labeling Machine)",
+            "인쇄기 (Printer, 예: 잉크젯 또는 레이저)"
+          ]
+        },
+        {
+          "step": "2차 포장",
+          "equipment_list": [
+            "카토너 (Cartoner)",
+            "케이스 패커 (Case Packer)",
+            "봉합기 (Sealing Machine)"
+          ]
+        },
+        {
+          "step": "팔레타이징 및 출하",
+          "equipment_list": [
+            "자동 팔레타이저 (Automatic Palletizer)",
+            "스트레치 래퍼 (Stretch Wrapper)",
+            "컨베이어 시스템 (Conveyor System)",
+            "창고 관리 시스템 (WMS) 연동"
+          ]
+        }
+      ],
+      "evaluation": {
+        "n": 5,
+        "M": 6,
+        "accuracy": 0.8333,
+        "sequence_match": 0.8,
+        "matches": [
+          {
+            "gt_idx": 0,
+            "gen_idx": 0,
+            "gt_step": "원료 공급",
+            "gen_step": "원료 입고 및 보관",
+            "similarity": 0.4
+          },
+          {
+            "gt_idx": 1,
+            "gen_idx": 6,
+            "gt_step": "연속 혼합",
+            "gen_step": "최종 연속 혼합 및 윤활",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 2,
+            "gen_idx": 3,
+            "gt_step": "과립화",
+            "gen_step": "연속 습식 과립화",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 3,
+            "gen_idx": 4,
+            "gt_step": "건조",
+            "gen_step": "연속 유동층 건조",
+            "similarity": 0.9
+          },
+          {
+            "gt_idx": 5,
+            "gen_idx": 9,
+            "gt_step": "코팅",
+            "gen_step": "연속 정제 코팅",
+            "similarity": 0.9
+          }
+        ]
+      },
+      "error": null,
+      "latency_sec": 17.43
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "model": "Gemini 2.5 Flash",
+      "model_id": "gemini-2.5-flash",
+      "success": false,
+      "generated_steps": [
+        {
+          "step_name": "1. 원료 입고 및 보관 (Raw Material Receiving & Storage)",
+          "description": "타이어 제조에 필요한 고무(천연/합성), 카본 블랙, 화학 약품, 직물 코드, 스틸 코드 등의 원료를 입고하고 적절한 환경에 보관합니다.",
+          "equipment": [
+            "원료 저장 사일로 (카본 블랙, 화학 약품)",
+            "고무 베일 보관 창고 (온도/습도 제어)",
+            "직물/스틸 코드 롤 보관 랙",
+            "계량 시스템 (자동 계량기)",
+            "지게차 및 자동 운반 로봇 (AGV)",
+            "컨베이어 시스템"
+          ]
+        },
+        {
+          "step_name": "2. 고무 배합 (Rubber Mixing)",
+          "description": "다양한 종류의 고무, 카본 블랙, 오일, 화학 약품 등을 정해진 비율로 혼합하여 타이어의 특정 부위에 맞는 고무 컴파운드를 만듭니다. 일반적으로 마스터 배치(Master Batch)와 최종 배치(Final Batch)의 2단계로 진행됩니다.",
+          "equipment": [
+            "내부 믹서 (Banbury Mixer 또는 Intermeshing Mixer)",
+            "자동 원료 공급 시스템 (계량 및 투입)",
+            "오픈 롤 밀 (Open Two-Roll Mill, 최종 배합 및 시트화)",
+            "냉각 컨베이어 (Cooling Conveyor)",
+            "고무 시트 절단기 (Slab Cutter)",
+            "금속 검출기",
+            "품질 검사 스테이션 (점도, 경도 등)"
+          ]
+        },
+        {
+          "step_name": "3. 컴파운드 압출 및 성형 (Compound Extrusion & Forming)",
+          "description": "배합된 고무 컴파운드를 타이어의 각 부품(트레드, 사이드월, 이너 라이너 등) 형태로 압출하거나 성형합니다.",
+          "equipment": [
+            "압출기 (Extruder, 단일 또는 다중 컴파운드 압출)",
+            "압출 다이 (Extrusion Die)",
+            "냉각 수조/컨베이어 (Cooling Trough/Conveyor)",
+            "자동 절단기 (Automatic Cutter)",
+            "중량 측정 시스템 (Weight Measurement System)",
+            "품질 검사 스테이션 (치수, 형상)"
+          ]
+        },
+        {
+          "step_name": "4. 코드 직물/스틸 가공 (Cord Fabric/Steel Processing)",
+          "description": "타이어의 강성을 담당하는 직물 코드(나일론, 폴리에스터, 레이온)와 스틸 코드(비드 와이어, 벨트 와이어)를 고무와 접착시키고 필요한 형태로 가공합니다.",
+          "equipment": [
+            "캘린더 (Calender, 고무 코팅 및 시트화)",
+            "코드 직물 공급/권취 장치 (Let-off/Wind-up Unit)",
+            "스틸 코드 공급 장치",
+            "바이어스 커터 (Bias Cutter, 직물/스틸 코드 절단)",
+            "비드 와이어 성형기 (Bead Wire Former/Winder)",
+            "비드 와이어 고무 피복기 (Bead Wire Rubber Coater)",
+            "품질 검사 스테이션 (코드 간격, 접착력)"
+          ]
+        },
+        {
+          "step_name": "5. 타이어 성형 (Tire Building / Green Tire Assembly)",
+          "description": "압출 및 가공된 각 부품(이너 라이너, 비드, 카카스 플라이, 벨트, 트레드, 사이드월)을 타이어 성형기에서 조립하여 '그린 타이어(Green Tire)'를 만듭니다.",
+          "equipment": [
+            "타이어 성형기 (Tire Building Machine, 1단계 또는 2단계)",
+            "자동 부품 공급 장치 (Automatic Component Feeder)",
+            "로봇 팔 (Robot Arm, 부품 이송 및 배치)",
+            "그린 타이어 이송 컨베이어",
+            "품질 검사 스테이션 (부품 정렬, 조립 상태)"
+          ]
+        },
+        {
+          "step_name": "6. 가류 (Curing / Vulcanization)",
+          "description": "그린 타이어를 가류 프레스에 넣어 고온, 고압 하에서 화학 반응(가류)을 통해 고무를 경화시키고, 타이어의 최종 형상(트레드 패턴, 사이드월 문자 등)을 부여합니다.",
+          "equipment": [
+            "가류 프레스 (Curing Press, 블래더 프레스 또는 세그먼트 몰드 프레스)",
+            "타이어 로딩/언로딩 로봇 (Tire Loading/Unloading Robot)",
+            "가류 몰드 (Curing Mold)",
+            "증기/고온수/질소 공급 시스템",
+            "냉각 컨베이어 (Cooled Conveyor, 가류 후 타이어 냉각)"
+          ]
+        },
+        {
+          "step_name": "7. 최종 검사 및 마무리 (Final Inspection & Finishing)",
+          "description": "가류된 타이어의 품질을 최종적으로 검사하고, 불필요한 고무(플래시)를 제거하며, 라벨링 작업을 수행합니다.",
+          "equipment": [
+            "트리밍 머신 (Trimming Machine, 플래시 제거)",
+            "타이어 균일성 시험기 (Tire Uniformity Machine, T.U.M)",
+            "타이어 밸런스 시험기 (Tire Balance Machine)",
+            "X-ray 검사기 (내부 결함 검사)",
+            "육안 검사 스테이션 (Visual Inspection Station)",
+            "라벨링 머신 (Labeling Machine)",
+            "타이어 분류 및 이송 시스템"
+          ]
+        },
+        {
+          "step_name": "8. 창고 보관 및 출하 (Warehousing & Shipping)",
+          "description": "최종 검사를 통과한 타이어를 창고에 보관하고, 주문에 따라 분류하여 출하합니다.",
+          "equipment": [
+            "자동 창고 시스템 (AS/RS, Automated Storage and Retrieval System)",
+            "팔레타이저 (Palletizer)",
+            "지게차 및 자동 운반 로봇 (AGV)",
+            "출하 도크 (Shipping Dock)",
+            "컨베이어 시스템"
+          ]
+        }
+      ],
+      "generated_equipment": [],
+      "evaluation": null,
+      "error": "AttributeError: 'dict' object has no attribute 'lower'",
+      "latency_sec": 15.44
+    },
+    {
+      "product_id": "P01",
+      "product_name": "EV 배터리 셀 (전극~화성)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    },
+    {
+      "product_id": "P02",
+      "product_name": "자동차 차체 (Body-in-White)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    },
+    {
+      "product_id": "P03",
+      "product_name": "스마트폰 SMT (Surface Mount Technology)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    },
+    {
+      "product_id": "P04",
+      "product_name": "반도체 후공정 (Backend Packaging)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    },
+    {
+      "product_id": "P05",
+      "product_name": "태양광 PV 모듈 조립",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    },
+    {
+      "product_id": "P06",
+      "product_name": "전기차 모터 (Hairpin Stator)",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    },
+    {
+      "product_id": "P07",
+      "product_name": "OLED 디스플레이 패널",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    },
+    {
+      "product_id": "P08",
+      "product_name": "가정용 세탁기",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    },
+    {
+      "product_id": "P09",
+      "product_name": "연속식 제약 정제 제조",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    },
+    {
+      "product_id": "P10",
+      "product_name": "타이어 제조",
+      "model": "GPT-4o",
+      "model_id": "gpt-4o",
+      "success": false,
+      "generated_steps": null,
+      "generated_equipment": null,
+      "evaluation": null,
+      "error": "ModuleNotFoundError: No module named 'openai'",
+      "latency_sec": 0.0
+    }
+  ]
+}

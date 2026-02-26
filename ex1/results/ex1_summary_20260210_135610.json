@@ -1,0 +1,19 @@
+{
+  "experiment": "Ex1 Zero-shot BOP Generation (SYSTEM_PROMPT)",
+  "timestamp": "2026-02-10T13:56:10.727660",
+  "config": {
+    "temperature": 0.0,
+    "similarity_threshold": 0.4,
+    "prompt_source": "app/prompts.py SYSTEM_PROMPT"
+  },
+  "model_averages": {
+    "GPT-5 Mini": {
+      "avg_accuracy": 0.6784,
+      "avg_sequence_match": 0.8256,
+      "avg_generated_count": 8.9,
+      "avg_latency_sec": 85.73,
+      "success_rate": 1.0,
+      "products_tested": 10
+    }
+  }
+}

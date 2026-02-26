@@ -1,0 +1,43 @@
+{
+  "experiment": "Ex1 Zero-shot BOP Generation (SYSTEM_PROMPT)",
+  "timestamp": "2026-02-10T14:13:48.200694",
+  "config": {
+    "temperature": 0.0,
+    "similarity_threshold": 0.4,
+    "prompt_source": "app/prompts.py SYSTEM_PROMPT"
+  },
+  "model_averages": {
+    "Gemini 2.5 Flash": {
+      "avg_accuracy": 0.8119,
+      "avg_sequence_match": 0.758,
+      "avg_generated_count": 9.1,
+      "avg_latency_sec": 31.4,
+      "success_rate": 1.0,
+      "products_tested": 10
+    },
+    "GPT-4o Mini": {
+      "avg_accuracy": 0.2993,
+      "avg_sequence_match": 0.7667,
+      "avg_generated_count": 3.5,
+      "avg_latency_sec": 25.57,
+      "success_rate": 1.0,
+      "products_tested": 10
+    },
+    "GPT-4o": {
+      "avg_accuracy": 0.4031,
+      "avg_sequence_match": 0.7333,
+      "avg_generated_count": 4.2,
+      "avg_latency_sec": 12.11,
+      "success_rate": 1.0,
+      "products_tested": 10
+    },
+    "o3-mini": {
+      "avg_accuracy": 0.5179,
+      "avg_sequence_match": 0.8333,
+      "avg_generated_count": 4.7,
+      "avg_latency_sec": 29.34,
+      "success_rate": 1.0,
+      "products_tested": 10
+    }
+  }
+}

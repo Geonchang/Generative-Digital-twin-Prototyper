@@ -10,8 +10,9 @@ import inspect
 import traceback
 import logging
 import math
+import re
 from pathlib import Path
-from typing import Tuple, Optional, Dict, Any
+from typing import Tuple, Optional, Dict, Any, List
 
 from datetime import datetime
 from app.tools.registry import get_tool, get_script_path, WORKDIR_BASE, LOGS_DIR, update_tool_adapter, update_tool_metadata
@@ -22,6 +23,241 @@ log = logging.getLogger("tool_executor")
 SUBPROCESS_TIMEOUT_SEC = 60
 MAX_AUTO_REPAIR_ATTEMPTS = 0  # 자동 복구 비활성화
 MAX_SCRIPT_REPAIR_ATTEMPTS = 0  # 스크립트 실행 오류 자동 복구 비활성화
+
+
+def _generate_next_id(existing_items: List[dict], id_field: str, prefix: str) -> str:
+    """기존 항목의 ID 패턴을 기반으로 다음 순번 ID를 생성합니다."""
+    max_num = 0
+    for item in existing_items:
+        item_id = item.get(id_field, "")
+        m = re.match(rf'^{re.escape(prefix)}(\d+)', item_id)
+        if m:
+            max_num = max(max_num, int(m.group(1)))
+    return f"{prefix}{max_num + 1:03d}"
+
+
+def _ensure_process_completeness(original_bop: dict, updated_bop: dict) -> dict:
+    """
+    도구 후처리기가 공정을 추가했지만 process_details나 resource_assignments를
+    누락한 경우, UI의 '병렬 추가'/'공정 추가' 버튼과 동일한 방식으로 자동 보완합니다.
+
+    1. processes[]에만 있고 process_details[]가 없는 공정 → 기본 상세 생성 + 선행 공정 리소스 복제
+    2. 새 병렬 라인(parallel_index > 1)에 resource_assignments가 없는 경우 → 첫 인스턴스에서 복제
+    """
+    processes = updated_bop.get("processes") or []
+    details = list(updated_bop.get("process_details") or [])
+    assignments = list(updated_bop.get("resource_assignments") or [])
+    equipments = list(updated_bop.get("equipments") or [])
+    workers = list(updated_bop.get("workers") or [])
+
+    orig_proc_ids = {p["process_id"] for p in (original_bop.get("processes") or [])}
+    detail_proc_ids = {d["process_id"] for d in details}
+
+    added_details = []
+    added_assignments = []
+    added_equipments = []
+    added_workers = []
+    changed = False
+
+    # --- 1. 새 공정에 process_details 누락 보완 ---
+    for proc in processes:
+        pid = proc["process_id"]
+        if pid in detail_proc_ids:
+            continue  # 이미 상세 정보가 있음
+
+        changed = True
+
+        # process entry에 name/cycle_time 등이 있으면 사용 (비표준이지만 도구가 넣을 수 있음)
+        name = proc.get("name", f"공정 {pid}")
+        cycle_time = proc.get("cycle_time_sec", 60.0)
+        description = proc.get("description", "")
+
+        # 위치 계산: 선행 공정 기준 x+5 오프셋, 없으면 기존 공정 중 max_x + 5
+        location = {"x": 0, "y": 0, "z": 0}
+        pred_ids = proc.get("predecessor_ids") or []
+        all_details = details + added_details
+
+        if pred_ids:
+            pred_detail = next(
+                (d for d in all_details if d["process_id"] == pred_ids[0]),
+                None
+            )
+            if pred_detail and pred_detail.get("location"):
+                location = {
+                    "x": pred_detail["location"].get("x", 0) + 5,
+                    "y": pred_detail["location"].get("y", 0),
+                    "z": pred_detail["location"].get("z", 0)
+                }
+            else:
+                max_x = max((d.get("location", {}).get("x", 0) for d in all_details), default=0)
+                location["x"] = max_x + 5
+        else:
+            max_x = max((d.get("location", {}).get("x", 0) for d in all_details), default=0)
+            location["x"] = max_x + 5
+
+        new_detail = {
+            "process_id": pid,
+            "parallel_index": 1,
+            "name": name,
+            "description": description,
+            "cycle_time_sec": cycle_time,
+            "location": location,
+            "rotation_y": 0.0
+        }
+        added_details.append(new_detail)
+
+        # 선행 공정에서 리소스 복제 (병렬 추가 버튼과 유사한 동작)
+        if pred_ids:
+            source_assignments = [
+                r for r in assignments
+                if r["process_id"] == pred_ids[0] and r.get("parallel_index", 1) == 1
+            ]
+            all_eq = equipments + added_equipments
+            all_wk = workers + added_workers
+
+            for r in source_assignments:
+                new_r = {
+                    "process_id": pid,
+                    "parallel_index": 1,
+                    "resource_type": r["resource_type"],
+                    "quantity": r.get("quantity", 1),
+                    "role": r.get("role", ""),
+                    "relative_location": copy.deepcopy(
+                        r.get("relative_location", {"x": 0, "y": 0, "z": 0})
+                    )
+                }
+
+                if r["resource_type"] == "equipment":
+                    orig_eq = next(
+                        (e for e in all_eq if e["equipment_id"] == r["resource_id"]), None
+                    )
+                    new_eq_id = _generate_next_id(all_eq, "equipment_id", "EQ")
+                    new_eq = {
+                        "equipment_id": new_eq_id,
+                        "name": f"{orig_eq['name']} (복제)" if orig_eq else f"장비 {new_eq_id}",
+                        "type": orig_eq["type"] if orig_eq else "machine"
+                    }
+                    added_equipments.append(new_eq)
+                    all_eq = equipments + added_equipments
+                    new_r["resource_id"] = new_eq_id
+                elif r["resource_type"] == "worker":
+                    orig_w = next(
+                        (w for w in all_wk if w["worker_id"] == r["resource_id"]), None
+                    )
+                    new_w_id = _generate_next_id(all_wk, "worker_id", "W")
+                    new_w = {
+                        "worker_id": new_w_id,
+                        "name": f"{orig_w['name']} (복제)" if orig_w else f"작업자 {new_w_id}",
+                        "skill_level": orig_w["skill_level"] if orig_w else "Mid"
+                    }
+                    added_workers.append(new_w)
+                    all_wk = workers + added_workers
+                    new_r["resource_id"] = new_w_id
+                else:
+                    # 자재: 같은 ID 공유
+                    new_r["resource_id"] = r["resource_id"]
+
+                added_assignments.append(new_r)
+
+    # --- 2. 기존 공정의 새 병렬 라인에 resource_assignments 누락 보완 ---
+    orig_detail_keys = {
+        (d["process_id"], d.get("parallel_index", 1))
+        for d in (original_bop.get("process_details") or [])
+    }
+
+    for proc in processes:
+        pid = proc["process_id"]
+        if pid not in orig_proc_ids:
+            continue  # 새 공정은 위에서 처리됨
+
+        proc_details = [d for d in details if d["process_id"] == pid]
+        for detail in proc_details:
+            pi = detail.get("parallel_index", 1)
+            if pi <= 1:
+                continue  # 첫 인스턴스는 기존 데이터 유지
+
+            # 원래부터 있던 병렬 라인이면 건너뜀
+            if (pid, pi) in orig_detail_keys:
+                continue
+
+            # 이 병렬 인덱스에 리소스가 이미 있으면 건너뜀
+            has_assignments = any(
+                r["process_id"] == pid and r.get("parallel_index", 1) == pi
+                for r in assignments + added_assignments
+            )
+            if has_assignments:
+                continue
+
+            changed = True
+
+            # 첫 인스턴스에서 리소스 복제
+            source_assignments = [
+                r for r in assignments
+                if r["process_id"] == pid and r.get("parallel_index", 1) == 1
+            ]
+            all_eq = equipments + added_equipments
+            all_wk = workers + added_workers
+
+            for r in source_assignments:
+                new_r = {
+                    "process_id": pid,
+                    "parallel_index": pi,
+                    "resource_type": r["resource_type"],
+                    "quantity": r.get("quantity", 1),
+                    "role": r.get("role", ""),
+                    "relative_location": copy.deepcopy(
+                        r.get("relative_location", {"x": 0, "y": 0, "z": 0})
+                    )
+                }
+
+                if r["resource_type"] == "equipment":
+                    orig_eq = next(
+                        (e for e in all_eq if e["equipment_id"] == r["resource_id"]), None
+                    )
+                    new_eq_id = _generate_next_id(all_eq, "equipment_id", "EQ")
+                    new_eq = {
+                        "equipment_id": new_eq_id,
+                        "name": f"{orig_eq['name']} (복제)" if orig_eq else f"장비 {new_eq_id}",
+                        "type": orig_eq["type"] if orig_eq else "machine"
+                    }
+                    added_equipments.append(new_eq)
+                    all_eq = equipments + added_equipments
+                    new_r["resource_id"] = new_eq_id
+                elif r["resource_type"] == "worker":
+                    orig_w = next(
+                        (w for w in all_wk if w["worker_id"] == r["resource_id"]), None
+                    )
+                    new_w_id = _generate_next_id(all_wk, "worker_id", "W")
+                    new_w = {
+                        "worker_id": new_w_id,
+                        "name": f"{orig_w['name']} (복제)" if orig_w else f"작업자 {new_w_id}",
+                        "skill_level": orig_w["skill_level"] if orig_w else "Mid"
+                    }
+                    added_workers.append(new_w)
+                    all_wk = workers + added_workers
+                    new_r["resource_id"] = new_w_id
+                else:
+                    new_r["resource_id"] = r["resource_id"]
+
+                added_assignments.append(new_r)
+
+    # 보완된 데이터 반영
+    if changed:
+        updated_bop = copy.deepcopy(updated_bop)
+        updated_bop["process_details"] = details + added_details
+        updated_bop["resource_assignments"] = assignments + added_assignments
+        if added_equipments:
+            updated_bop["equipments"] = equipments + added_equipments
+        if added_workers:
+            updated_bop["workers"] = workers + added_workers
+
+        log.info(
+            "[ensure_completeness] 보완 완료: details +%d, assignments +%d, equipments +%d, workers +%d",
+            len(added_details), len(added_assignments),
+            len(added_equipments), len(added_workers)
+        )
+
+    return updated_bop
 
 
 def _sanitize_json_floats(obj):
@@ -415,6 +651,8 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
         log.info("[execute] =========================")
 
         # === Post-processor 실행 (자동 복구 포함) ===
+        # 후처리기가 bop_data를 in-place로 수정할 수 있으므로 원본 스냅샷 보존
+        bop_before_post = copy.deepcopy(bop_data)
         updated_bop = None
         post_error = None
 
@@ -461,6 +699,9 @@ async def execute_tool(tool_id: str, bop_data: dict, params: Optional[Dict[str, 
                 "execution_time_sec": exec_log["execution_time_sec"],
                 "auto_repair_attempted": exec_log["auto_repair_attempts"] > 0,
             }
+
+        # === 새 공정/병렬 라인의 누락 데이터 보완 ===
+        updated_bop = _ensure_process_completeness(bop_before_post, updated_bop)
 
         # === JSON 직렬화 불가능한 값 정리 (NaN, Infinity 등) ===
         updated_bop, sanitized = _sanitize_json_floats(updated_bop)
