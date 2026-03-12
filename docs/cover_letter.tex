@@ -1,0 +1,48 @@
+\documentclass[11pt]{letter}
+\usepackage[margin=1in]{geometry}
+\usepackage{url}
+
+\begin{document}
+
+\begin{letter}{Program Committee \\
+22nd IEEE International Conference on Automation Science and Engineering (CASE 2026) \\
+Shenyang, China}
+
+\opening{Dear Program Committee Members,}
+
+We are pleased to submit our manuscript entitled \textbf{``GDP (Generative Digital-twin Prototyper): An LLM-Based Framework for Automated Process Design and Analysis Tool Integration''} for consideration at IEEE CASE 2026.
+
+This paper proposes GDP, a framework that leverages large language models (LLMs) to simultaneously address two persistent barriers in digital twin research: (1) the scarcity of publicly available manufacturing process data that hinders non-expert researchers, and (2) the interface fragmentation between process design and analysis tools that burdens expert engineers. GDP adopts the Siemens Bill of Process (BOP) concept with a process-centric flattened data model optimized for LLM generation, and introduces an Auto-Repair mechanism for self-correcting runtime errors in tool adapters.
+
+We believe this work is particularly relevant to CASE 2026's theme of \textit{Smart Industry} and its focus on LLM-based applications for manufacturing systems. Our main contributions are:
+
+\begin{enumerate}
+\item \textbf{Zero-shot process design for non-experts}: Three state-of-the-art LLMs achieve an average F1 of 88.9\% across 10 heterogeneous manufacturing product families under N:M coverage-based matching, demonstrating that viable process data can be generated without domain expertise.
+
+\item \textbf{Auto-Repair with two-tier evaluation}: In 320 tool integration experiments, the Auto-Repair mechanism achieves 100\% execution pass rate with at most two repair attempts. More importantly, we discover that 16.2\% of adapters constitute ``silent failures''---executing without errors but producing semantically incorrect results---demonstrating that execution-only evaluation is insufficient and property-based validation is necessary.
+
+\item \textbf{Practical efficiency gains}: An evaluation with five manufacturing engineers shows that AI-assisted design reduces process design time by 55.2\% compared to manual design, with consistent completion times regardless of user proficiency.
+\end{enumerate}
+
+This manuscript is original, has not been published previously, and is not under consideration for publication elsewhere. All authors have approved the manuscript and agree with its submission to IEEE CASE 2026.
+
+We appreciate your time and consideration and look forward to the opportunity to present this work.
+
+\closing{Sincerely,}
+
+Geonchang Lee \\
+Department of Digital Media and Communications Engineering \\
+Sungkyunkwan University \\
+Suwon, Republic of Korea \\
+\texttt{ilsc2908@skku.edu}
+
+\vspace{0.5em}
+
+Honguk Woo (Corresponding Author) \\
+Department of Software \\
+Sungkyunkwan University \\
+Suwon, Republic of Korea \\
+\texttt{hwoo@skku.edu}
+
+\end{letter}
+\end{document}

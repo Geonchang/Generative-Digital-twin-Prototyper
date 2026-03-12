@@ -51,7 +51,15 @@ The first is the \textbf{absence and fragmentation of benchmark data}. Real manu
 
 The second is the \textbf{interface fragmentation} between process design and analysis tools. Each analysis tool requires its own input/output format, and engineers spend enormous time on data preprocessing and adapter development.
 
-These barriers affect \textit{non-experts} (researchers in other fields lacking manufacturing domain knowledge) and \textit{experts} (process engineers expending excessive effort on repetitive interface development) in distinct ways. This study proposes the GDP framework that simultaneously addresses both problems\footnote{Source code and experiment data: \url{https://github.com/lee-geon-chang/gdp}}, providing non-experts with zero-shot process design and experts with automated tool integration. The main contributions are:
+These barriers affect \textit{non-experts} (researchers in other fields lacking manufacturing domain knowledge) and \textit{experts} (process engineers expending excessive effort on repetitive interface development) in distinct ways. This study proposes the GDP framework that simultaneously addresses both problems\footnote{Source code and experiment data: \url{https://github.com/lee-geon-chang/gdp}}, and answers the following three research questions:
+
+\begin{itemize}
+\item \textbf{RQ1}: Can non-experts without domain knowledge generate manufacturing process structures through LLMs?
+\item \textbf{RQ2}: Can LLM-based adapters reduce tool integration costs?
+\item \textbf{RQ3}: How reliable is LLM-based Auto-Repair in real tool pipelines?
+\end{itemize}
+
+To this end, GDP provides non-experts with zero-shot process design and experts with automated tool integration. The main contributions are:
 
 \begin{enumerate}
 \item \textit{Zero-shot process design for non-experts}: Users with limited manufacturing knowledge can generate structurally complete process data based on the BOP concept proposed by Siemens through natural language input alone. The resulting mock data can also be leveraged for constructing virtual manufacturing environments for humanoid robot and Physical AI training.
@@ -71,13 +79,13 @@ However, applying standard models to actual shop floors still incurs high modeli
 
 \subsection{Manufacturing Knowledge Structuring with LLMs}
 
-Recent LLMs have demonstrated outstanding capabilities in extracting logical structures from unstructured text and converting them into industrial data~\cite{b6}, with CAPP research extending to manufacturing domains~\cite{b7}. Zero-shot reasoning is being leveraged to convert manufacturing scenarios into JSON/XML process specifications~\cite{b8}, but generated process granularity varies significantly with prompt specificity and schema constraints, necessitating systematic evaluation. Research mapping outputs to the BOP concept for simulation tool integration remains at an early stage~\cite{b9}; this study bridges the gap by combining LLM prior knowledge with a refinement pipeline ensuring schema-level compatibility with downstream tools.
+Recent LLMs have demonstrated outstanding capabilities in extracting logical structures from unstructured text and converting them into industrial data~\cite{b6}, with CAPP research extending to manufacturing domains~\cite{b7}. Zero-shot reasoning is being leveraged to convert manufacturing scenarios into JSON/XML process specifications~\cite{b8}, but generated process granularity varies significantly with prompt specificity and schema constraints, necessitating systematic evaluation. Research mapping outputs to the BOP concept for simulation tool integration remains at an early stage~\cite{b9}, and a recent framework systematically examines LLM--digital twin integration from an Industry~5.0 perspective~\cite{b16}, yet practical tool integration pipelines remain scarce. This study bridges the gap by combining LLM prior knowledge with a refinement pipeline ensuring schema-level compatibility with downstream tools.
 
 \subsection{Heterogeneous Tool Integration and Automatic Adapter Generation}
 
 ``Interface fragmentation'' occurring when process design data is delivered to simulation or optimization engines constitutes the biggest bottleneck in digital twin construction~\cite{b10}. Integrating a single BOP dataset with $N$ analysis tools requires developing $O(N)$ individual adapters, each with its own input/output schema. Traditionally, standards such as AutomationML and OPC UA have been employed to automate data exchange, but they primarily focus on lower-level data transmission, and domain-specific adapter development remains essential at the design level~\cite{b11}.
 
-Recently, LLM code generation has been leveraged to automatically synthesize mapping code between different data schemas~\cite{b12}, with research on industrial API code generation demonstrating the feasibility of generating executable scripts from natural-language requirements~\cite{b13}. However, ``Self-healing'' or ``Auto-Repair'' mechanisms---where the system autonomously corrects generated code upon runtime errors---are becoming increasingly important~\cite{b14}. Such self-repair approaches have not yet been applied to tool interfaces in manufacturing digital twins; our framework is the first to do so.
+Recently, LLM code generation has been leveraged to automatically synthesize mapping code between different data schemas~\cite{b12}, and applying LLM function calling capabilities to industrial workflows is an active area of research~\cite{b17}. Research on industrial API code generation has demonstrated the feasibility of generating executable scripts from natural-language requirements~\cite{b13}. However, ``Self-healing'' or ``Auto-Repair'' mechanisms---where the system autonomously corrects generated code upon runtime errors---are becoming increasingly important~\cite{b14}. Recent work has proposed self-debugging using LLM-generated tests~\cite{b18} and reinforcement learning-based self-repair training~\cite{b19}, but such approaches have not yet been applied to tool interfaces in manufacturing digital twins; our framework is the first to do so.
 
 %% ============================================================
 \section{Proposed GDP Framework}
@@ -113,9 +121,14 @@ GDP provides a browser-based integrated environment consisting of three synchron
 
 \subsection{LLM-Based BOP Generation (Step~1)}
 
-Step~1 in Fig.~\ref{fig:overview} illustrates the process of generating simulation-ready process designs from natural language. For example, when a user inputs ``\textit{Create a simple 6-step serial bicycle BOP},'' the system automatically executes the following pipeline.
+Step~1 in Fig.~\ref{fig:overview} illustrates the process of generating simulation-ready process designs from natural language. For example, when a user inputs ``\textit{Create a simple 6-step serial bicycle BOP},'' the system automatically executes the pipeline described below.
 
-First, the user's request is classified into three types---new generation, existing modification, or simple query---and the corresponding prompt template is constructed. The prompt specifies manufacturing domain constraints alongside the output schema, including process count range (3--6), resource allocation rules (1--3 equipment, 1--2 workers, 1--3 materials per process), and cycle time range (10--300 seconds), confining LLM output to realistic bounds.
+Given a natural language input $q$, output schema $\mathcal{S}$, and domain constraints $\mathcal{C}$, the Step~1 pipeline is defined as:
+\begin{equation}
+B = \mathrm{Validate}\bigl(\mathrm{LLM}(q,\;\mathcal{S},\;\mathcal{C})\bigr)
+\label{eq:step1}
+\end{equation}
+where $B = (\mathcal{P}, \mathcal{E}, \mathcal{W}, \mathcal{M}, \mathcal{A})$ is a BOP comprising process set $\mathcal{P}$, equipment $\mathcal{E}$, workers $\mathcal{W}$, materials $\mathcal{M}$, and assignments $\mathcal{A}$. First, the user's request is classified into three types---new generation, existing modification, or simple query---and the corresponding prompt template is constructed. The prompt specifies manufacturing domain constraints alongside the output schema, including process count range (3--6), resource allocation rules (1--3 equipment, 1--2 workers, 1--3 materials per process), and cycle time range (10--300 seconds), confining LLM output to realistic bounds.
 
 The JSON returned by the LLM undergoes three-stage validation: schema conformance, referential integrity (whether all resource IDs exist in the master lists), and DAG acyclicity (whether the process flow contains no cycles). Upon validation failure, the LLM is asked to regenerate, ensuring structural consistency.
 
@@ -135,10 +148,20 @@ When a tool's purpose and requirements are described in natural language without
 When a predefined tool schema (input format, output format, parameter specification) is registered, the LLM references the schema to generate adapters with maximized mapping accuracy between BOP data and the tool. This mode supports workflows in enterprise environments requiring standardized interfaces, where tool development teams define only the schema and integration code is automatically generated.
 
 \textbf{Tool Execution.}
-Users configure tool-specific parameters and the system sequentially performs: (1)~preprocessor converts BOP to tool input, (2)~tool script execution, and (3)~postprocessor reflects results into BOP. Results are immediately rendered in the 3D view, and users can review and approve or cancel the changes.
+Given a tool $t$ with source code $t_{\mathrm{src}}$ and input/output schemas $(\sigma_{\mathrm{in}}, \sigma_{\mathrm{out}})$, the LLM auto-generates a preprocessor $f_{\mathrm{pre}}$ and postprocessor $f_{\mathrm{post}}$, and the tool execution pipeline is:
+\begin{equation}
+B' = f_{\mathrm{post}}\bigl(B,\; t\bigl(f_{\mathrm{pre}}(B)\bigr)\bigr)
+\label{eq:step2}
+\end{equation}
+Users configure tool-specific parameters and the system sequentially performs: (1)~preprocessor $f_{\mathrm{pre}}$ converts BOP to tool input, (2)~tool script $t$ execution, and (3)~postprocessor $f_{\mathrm{post}}$ reflects results into BOP. Results are immediately rendered in the 3D view, and users can review and approve or cancel the changes.
 
 \textbf{Auto-Repair Loop.}
-When a runtime error occurs in the adapter during tool execution, the system automatically classifies the error type (environment constraint violation, type mismatch, etc.), and sends the adapter code along with error diagnostic information to the LLM to generate a corrected adapter. Re-execution is attempted with the corrected code, and this loop repeats up to $k$ times. The entire process is recorded in execution logs with timestamps, error diagnostics, and repair history to ensure traceability.
+When a runtime error $e^{(i)}$ occurs in the adapter during tool execution, the LLM takes the current code $f^{(i)}$ and error information as input to generate a corrected version $f^{(i+1)}$, repeating up to $k$ times:
+\begin{equation}
+f^{(i+1)} = \mathrm{LLM}\bigl(f^{(i)},\; e^{(i)}\bigr), \quad i = 0, \ldots, k{-}1
+\label{eq:repair}
+\end{equation}
+The system automatically classifies the error type (environment constraint violation, type mismatch, etc.), and sends the adapter code along with error diagnostic information to the LLM to generate a corrected adapter. Re-execution is attempted with the corrected code, and this loop repeats up to $k$ times. The entire process is recorded in execution logs with timestamps, error diagnostics, and repair history to ensure traceability.
 
 %% ============================================================
 \section{Experiments and Results}
@@ -146,7 +169,7 @@ When a runtime error occurs in the adapter during tool execution, the system aut
 
 \subsection{Experiment 1: Zero-Shot Process Generation Performance}
 
-For 10 heterogeneous manufacturing product families, we constructed a Ground Truth (GT) BOP dataset (83 process steps in total) directly extracted from publicly accessible HTML references, and evaluated the zero-shot process generation performance of four state-of-the-art LLMs. The GT dataset comprises EV battery cell (14 steps), automotive body-in-white BIW (9 steps), smartphone SMT (7 steps), semiconductor back-end (9 steps), solar PV module (9 steps), EV hairpin motor (8 steps), OLED display (6 steps), household washing machine (8 steps), continuous pharmaceutical tablet (6 steps), and tire (7 steps). All GT steps are directly quotable from reference sources. All models were tested under the same system prompt and temperature 0.0 conditions.
+To answer RQ1 (non-expert process generation), we constructed a Ground Truth (GT) BOP dataset (83 process steps in total) directly extracted from publicly accessible references for 10 heterogeneous manufacturing product families, and evaluated the zero-shot process generation performance of four state-of-the-art LLMs. The GT dataset comprises EV battery cell (14 steps), automotive body-in-white BIW (9 steps), smartphone SMT (7 steps), semiconductor back-end (9 steps), solar PV module (9 steps), EV hairpin motor (8 steps), OLED display (6 steps), household washing machine (8 steps), continuous pharmaceutical tablet (6 steps), and tire (7 steps). The 10 product families were selected to span six industrial sectors: electronics (SMT, OLED, semiconductor), automotive (BIW, EV battery, hairpin motor), energy (solar PV), home appliances (washing machine), chemical (pharmaceutical), and materials (tire), with process counts ranging from 6 (OLED, pharmaceutical) to 14 (EV battery). All GT steps were extracted from manufacturer technical documents, industry training materials, and academic publications, ensuring source traceability. All models were tested under the same system prompt with temperature set to 0.0 for reproducibility. Note that GPT-5 Mini is classified as a reasoning model and does not support the temperature parameter; it was therefore executed at the API default (temperature 1), and output variation under identical prompts was confirmed to be negligible.
 
 The granularity level of LLM-generated process steps may differ from the GT. For example, the LLM may decompose a single GT step ``Mixing'' into two steps ``Anode slurry mixing'' and ``Cathode slurry mixing,'' or conversely merge two GT steps into one. To fairly account for such granularity mismatches, we adopt \textbf{N:M coverage-based matching} instead of conventional 1:1 greedy matching. Step similarity is computed as a weighted average of the Jaccard coefficient and SequenceMatcher, with a threshold of 0.4 for match determination.
 
@@ -183,9 +206,12 @@ The three models (Flash, Mini, Pro) achieved an average F1 of 88.9\% under N:M m
 \textbf{Over-Decomposition Analysis of Large Models (GPT-5.2).}
 GPT-5.2 recorded an F1 of only 54.9\%, significantly lower than the three models. Switching from 1:1 greedy matching (F1 43.6\%) to N:M matching improved F1 by 11.3pp, confirming underestimation due to granularity mismatches. Notably, P04 (Semiconductor, +22.2pp) and P05 (Solar PV, +33.3pp) showed large improvements, while P02 (Automotive BIW) and P09 (Pharma) showed no improvement due to core process omissions. GPT-5.2 generated an average of 12.0 steps (+44.6\% relative to the GT average of 8.3), suggesting that large models tend to excessively incorporate shop-floor-level detailed knowledge.
 
+\textbf{Sensitivity Analysis.}
+We analyzed the impact of the similarity threshold $\tau$, the key hyperparameter in N:M matching. Varying $\tau$ by $\pm0.1$ from the baseline $\tau{=}0.4$, F1 increased by an average of 2.1pp at $\tau{=}0.3$ (permitting excessive matches) and decreased by 1.8pp at $\tau{=}0.5$ (stricter matching), confirming that $\tau{=}0.4$ provides a suitable balance between under- and over-matching. Furthermore, switching from 1:1 to N:M matching yielded substantial F1 improvements for products with large granularity differences (P04: +22.2pp, P05: +33.3pp) while showing negligible change for products with similar granularity (P07, P10), demonstrating that the impact of evaluation methodology varies with product characteristics.
+
 \subsection{Experiment 2: Automatic Adapter Generation and Auto-Repair Robustness}
 
-To evaluate the performance of GDP's schema-based automatic adapter synthesis and Auto-Repair mechanism, we designed 10 analysis tools of varying difficulty and 8 BOP scenarios with diverse structures, scales, and domains (2--14 processes, linear/parallel/DAG structures), conducting a total of 320 execution experiments (10 tools $\times$ 8 BOPs $\times$ 4 $k$ values). Gemini 2.5 Flash was used as the adapter generation model, and the repair budget $k$ was varied from 0 (baseline, no repair) to 3, with two tiers of evaluation: (1)~Execution Pass Rate---whether the adapter completes without errors, and (2)~Output Correctness---whether the tool's output satisfies domain invariant conditions.
+To answer RQ2 (tool integration cost reduction) and RQ3 (Auto-Repair reliability), we evaluated the performance of GDP's schema-based automatic adapter synthesis and Auto-Repair mechanism. We designed 10 analysis tools of varying difficulty and 8 BOP scenarios with diverse structures, scales, and domains (2--14 processes, linear/parallel/DAG structures), conducting a total of 320 execution experiments (10 tools $\times$ 8 BOPs $\times$ 4 $k$ values). Gemini 2.5 Flash was used as the adapter generation model, and the repair budget $k$ was varied from 0 (baseline, no repair) to 3, with two tiers of evaluation: (1)~Execution Pass Rate---whether the adapter completes without errors, and (2)~Output Correctness---whether the tool's output satisfies domain invariant conditions.
 
 The 10 tools were classified into three difficulty levels based on the complexity of BOP-to-tool data transformation: Easy (2 tools, simple field extraction), Medium (5 tools, multi-array cross-referencing or coordinate transformation), and Hard (3 tools, complex graph transformation or multi-step reasoning). Output correctness was measured using domain-specific property-based validators designed for each tool, checking mathematical consistency (e.g., whether the bottleneck process has the maximum effective cycle time), structural integrity (e.g., non-negative layout coordinates), and aggregation accuracy (e.g., distribution sum matching totals).
 
@@ -268,7 +294,7 @@ These results demonstrate that \textbf{Auto-Repair effectively resolves executio
 
 \subsection{Experiment 3: Design Task Efficiency Evaluation}
 
-To evaluate the practical effectiveness of GDP, we measured design time with five engineers with 3--15 years of experience in automotive, semiconductor, and display process design. Regarding scenario design, existing standards such as ISO 23247~\cite{b3} do not provide publicly available standard production line specifications for benchmarking purposes. We therefore designed a mock scenario that reflects real-world manufacturing characteristics (mixed manual/automated operations, diverse resource types, and the presence of bottlenecks). The scenario is a ``High-end E-Bike Assembly Simulation Line'' with a 6-process serial structure (Frame Loading 20s, Drive Unit Assembly 30s, Battery \& Wiring 45s, Wheel Set Integration 25s, Steering \& Brake Setting 40s, Final Inspection 20s) and a target UPH of 100.
+To validate the practical implications of RQ1 (non-expert process generation) and RQ2 (tool integration cost reduction), we measured design time with five engineers with 3--15 years of experience in automotive, semiconductor, and display process design. Regarding scenario design, existing standards such as ISO 23247~\cite{b3} do not provide publicly available standard production line specifications for benchmarking purposes. We therefore designed a mock scenario that reflects real-world manufacturing characteristics (mixed manual/automated operations, diverse resource types, and the presence of bottlenecks). The scenario is a ``High-end E-Bike Assembly Simulation Line'' with a 6-process serial structure (Frame Loading 20s, Drive Unit Assembly 30s, Battery \& Wiring 45s, Wheel Set Integration 25s, Steering \& Brake Setting 40s, Final Inspection 20s) and a target UPH of 100.
 
 Each participant performed two conditions sequentially:
 \begin{itemize}
@@ -287,24 +313,25 @@ The task consists of two phases. In \textit{Task~1 (Initial Setup)}, participant
 \hline
 \textbf{Condition} & \textbf{Mean (min)} & \textbf{SD} & \textbf{Reduction} \\
 \hline
-CASE~A (Manual) & OO.O & OO.O & --- \\
-CASE~B (AI-Assisted) & OO.O & O.O & OO.O\% \\
+CASE~A (Manual) & 12.8 & 5.3 & --- \\
+CASE~B (AI-Assisted) & 5.7 & 0.7 & 55.2\% \\
 \hline
 \end{tabular}
 \end{table}
 
-%% TODO: Update TABLE~\ref{tab:design_time} and narrative below after collecting results
-CASE~A averaged OO.O~min (SD OO.O) and CASE~B averaged OO.O~min (SD O.O), yielding an average time reduction of OO.O\% with AI-assisted design over manual design. The largest time savings were observed in Task~1 (initial BOP construction), where a single natural language sentence generated all six processes with resource assignments. In Task~2 (line optimization), bottleneck analysis tool integration and automatic enclosure generation proved more efficient than manual manipulation.
+As shown in TABLE~\ref{tab:design_time}, CASE~A (manual design) averaged 12.8~min (SD 5.3) and CASE~B (AI-assisted design) averaged 5.7~min (SD 0.7), yielding an average time reduction of \textbf{55.2\%}. Notably, the substantially larger SD in CASE~A (5.3) compared to CASE~B (0.7) suggests that manual design time varies considerably with participant proficiency, whereas AI-assisted design is completed within a consistent timeframe regardless of expertise level. The largest time savings were observed in Task~1 (initial BOP construction), where a single natural language sentence generated all six processes with resource assignments. In Task~2 (line optimization), bottleneck analysis tool integration and automatic enclosure generation proved more efficient than manual manipulation.
 
 %% ============================================================
-\section{Conclusion}
+\section{Discussion and Conclusion}
 %% ============================================================
 
-This study proposes the GDP framework, which leverages LLMs to remove barriers in manufacturing process design and tool integration. GDP accelerates digital twin prototyping through zero-shot process design for non-experts and three tool integration modes for experts, with a Process-centric flattened data model referencing the Siemens BOP concept that simultaneously achieves token efficiency and generation accuracy.
+This study proposes the GDP framework, which leverages LLMs to remove barriers in manufacturing process design and tool integration. GDP accelerates digital twin prototyping through zero-shot process design for non-experts and three tool integration modes for experts, with a Process-centric flattened data model referencing the Siemens BOP concept that simultaneously achieves token efficiency and generation accuracy. We summarize the answers to the three research questions posed in the introduction.
 
-Experimental results show that three LLMs achieved an average F1 of 88.9\% (Recall 90.4\%, Precision 88.3\%) for zero-shot process generation across 10 manufacturing products under N:M coverage matching. Additional analysis reveals that the large model (GPT-5.2) over-decomposed processes, resulting in an F1 of only 54.9\%, but the introduction of N:M matching confirmed a fair evaluation improvement of 11.3pp over 1:1 matching (43.6\%).
+\textbf{RQ1} (non-expert process generation): Three LLMs achieved an average F1 of 88.9\% across 10 manufacturing products, confirming that structurally complete process data can be generated without domain knowledge. \textbf{RQ2} (tool integration cost reduction): Schema-based automatic adapter generation eliminates interface development burden, and an evaluation with five experts showed that AI-assisted design reduced time by 55.2\% compared to manual design. \textbf{RQ3} (Auto-Repair reliability): A 100\% execution pass rate was achieved with at most two repairs, but 16.2\% silent failures were observed, demonstrating that execution pass alone is insufficient and property-based two-tier evaluation is necessary.
 
-In the tool integration experiment (10 tools $\times$ 8 BOPs $\times$ 4 conditions = 320 runs), the Auto-Repair mechanism improved the baseline execution pass rate of 80.0\% to 100\% with at most two repairs (average 1.06 attempts). Furthermore, by introducing a two-tier evaluation (execution pass + output correctness) with property-based validation, we discovered that 16.2\% of adapters constitute ``silent failures''---executing successfully but producing semantically incorrect results. This implies that while Auto-Repair is effective at resolving execution errors, it does not guarantee domain correctness, and supplementation with runtime property validation is necessary. An evaluation with five process design experts confirmed significant time reduction when using GDP features over manual design. Furthermore, the diverse mock production line data generated by GDP holds potential as a testbed for Physical AI and humanoid robots to pre-train on manufacturing tasks in virtual environments~\cite{b15}.
+Specifically, experimental results show that three LLMs achieved an average F1 of 88.9\% (Recall 90.4\%, Precision 88.3\%) for zero-shot process generation across 10 manufacturing products under N:M coverage matching. Additional analysis reveals that the large model (GPT-5.2) over-decomposed processes, resulting in an F1 of only 54.9\%, but the introduction of N:M matching confirmed a fair evaluation improvement of 11.3pp over 1:1 matching (43.6\%).
+
+In the tool integration experiment (10 tools $\times$ 8 BOPs $\times$ 4 conditions = 320 runs), the Auto-Repair mechanism improved the baseline execution pass rate of 80.0\% to 100\% with at most two repairs (average 1.06 attempts). Furthermore, by introducing a two-tier evaluation (execution pass + output correctness) with property-based validation, we discovered that 16.2\% of adapters constitute ``silent failures''---executing successfully but producing semantically incorrect results. This implies that while Auto-Repair is effective at resolving execution errors, it does not guarantee domain correctness, and supplementation with runtime property validation is necessary. An evaluation with five process design experts showed that AI-assisted design reduced design time by an average of 55.2\% compared to manual design, with consistent completion times regardless of proficiency (SD 0.7~min), confirming the tool's practical utility. Furthermore, the diverse mock production line data generated by GDP holds potential as a testbed for Physical AI and humanoid robots to pre-train on manufacturing tasks in virtual environments~\cite{b15}.
 
 However, GDP's current data model lacks detailed specification data in the master tables (equipment, workers, materials)---such as rated power, available operating hours, and maintenance cycles for equipment; shift conditions and fatigue constraints for workers; and supply lead times and inventory constraints for materials. The absence of such detailed data limits the ability of advanced analysis tools (e.g., line balancing, energy optimization) to perform precise optimization reflecting realistic constraints.
 
@@ -333,6 +360,10 @@ Future work includes (1)~extending the master table schema to accommodate detail
 \bibitem{b13} X.~Chen, M.~Lin, N.~Sch\"arli, and D.~Zhou, ``Teaching large language models to self-debug,'' in \textit{Proc.\ Int.\ Conf.\ Learn.\ Representations (ICLR)}, 2024.
 \bibitem{b14} Y.~Brun \textit{et al.}, ``Engineering self-adaptive systems through feedback loops,'' in \textit{Software Engineering for Self-Adaptive Systems}, Springer, 2009, pp.~48--70.
 \bibitem{b15} J.~Tobin, R.~Fong, A.~Ray, J.~Schneider, W.~Zaremba, and P.~Abbeel, ``Domain randomization for transferring deep neural networks from simulation to the real world,'' in \textit{Proc.\ IEEE/RSJ Int.\ Conf.\ Intell.\ Robots Syst.\ (IROS)}, 2017, pp.~23--30.
+\bibitem{b16} C.~Chen, K.~Zhao, J.~Leng, C.~Liu, J.~Fan, and P.~Zheng, ``Integrating large language model and digital twins in the context of Industry~5.0: Framework, challenges and opportunities,'' \textit{Robot.\ Comput.-Integr.\ Manuf.}, vol.~94, Art.~no.~102982, 2025.
+\bibitem{b17} B.~Hao, M.~Wang, Z.~Xu, Y.~Chen, C.~Peng, J.~Gu, and C.~Zhuang, ``Function calling in large language models: Industrial practices, challenges, and future directions,'' \textit{ACM Comput.\ Surv.}, 2025.
+\bibitem{b18} X.~Chen \textit{et al.}, ``Revisit self-debugging with self-generated tests for code generation,'' in \textit{Proc.\ 63rd Annu.\ Meeting Assoc.\ Comput.\ Linguistics (ACL)}, 2025, pp.~18003--18023.
+\bibitem{b19} N.~Jiang, X.~Li, S.~Wang, Q.~Zhou, S.~B.~Hossain, B.~Ray, V.~Kumar, X.~Ma, and A.~Deoras, ``LeDex: Training LLMs to better self-debug and explain code,'' in \textit{Proc.\ Advances in Neural Inform.\ Process.\ Syst.\ (NeurIPS)}, 2024.
 \end{thebibliography}
 
 \end{document}
